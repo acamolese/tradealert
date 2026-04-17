@@ -1,0 +1,47 @@
+name: Morning Scan
+
+on:
+  schedule:
+    # 07:30 ora italiana ~= 05:30 UTC (in CET) o 06:30 UTC (in CEST).
+    # Schedule GitHub Actions e' sempre UTC; eseguiamo entrambi gli orari
+    # per coprire il cambio ora legale, lo script e' idempotente per giorno.
+    - cron: "30 5 * * 1-5"
+    - cron: "30 6 * * 1-5"
+  workflow_dispatch:  # esecuzione manuale dal tab Actions
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8  # 5 min di lavoro normale + fino a 4 min di attesa click confirm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run morning scan
+        env:
+          CAPITAL_API_KEY: ${{ secrets.CAPITAL_API_KEY }}
+          CAPITAL_API_PASSWORD: ${{ secrets.CAPITAL_API_PASSWORD }}
+          CAPITAL_IDENTIFIER: ${{ secrets.CAPITAL_IDENTIFIER }}
+          CAPITAL_ENV: ${{ vars.CAPITAL_ENV || 'demo' }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001' }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          MARGIN_BUDGET_EUR: ${{ vars.MARGIN_BUDGET_EUR || '15' }}
+          MAX_OPEN_POSITIONS: ${{ vars.MAX_OPEN_POSITIONS || '1' }}
+          MIN_SCORE_THRESHOLD: ${{ vars.MIN_SCORE_THRESHOLD || '7' }}
+          EXECUTION_MODE: ${{ vars.EXECUTION_MODE || 'coach' }}
+          CONFIRM_TIMEOUT_SEC: ${{ vars.CONFIRM_TIMEOUT_SEC || '240' }}
+        run: python -m jobs.morning_scan

@@ -1,0 +1,74 @@
+name: Briefing 3x/giorno
+
+on:
+  schedule:
+    # 08:00 IT = 06:00 UTC (CET) o 07:00 UTC (CEST). Lanciamo entrambi gli orari
+    # e usiamo lo slot per disambiguare. Il singolo run e' veloce (~30s).
+    - cron: "0 6 * * *"   # mattina inverno
+    - cron: "0 7 * * *"   # mattina estate (in CEST il cron precedente parte alle 07 IT)
+    - cron: "0 14 * * *"  # pomeriggio inverno (16 IT in CET)
+    - cron: "0 15 * * *"  # pomeriggio estate
+    - cron: "0 20 * * *"  # sera inverno (22 IT in CET)
+    - cron: "0 21 * * *"  # sera estate
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: "morning | afternoon | evening"
+        required: true
+        default: "morning"
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Resolve slot from cron
+        id: slot
+        run: |
+          # Se invocato via workflow_dispatch, prendi lo slot dall'input.
+          # Altrimenti deduci dall'orario UTC del trigger schedule.
+          if [ -n "${{ github.event.inputs.slot }}" ]; then
+            echo "slot=${{ github.event.inputs.slot }}" >> "$GITHUB_OUTPUT"
+          else
+            HOUR=$(date -u +%H)
+            if [ "$HOUR" -lt 12 ]; then
+              echo "slot=morning" >> "$GITHUB_OUTPUT"
+            elif [ "$HOUR" -lt 19 ]; then
+              echo "slot=afternoon" >> "$GITHUB_OUTPUT"
+            else
+              echo "slot=evening" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Run briefing
+        env:
+          CAPITAL_API_KEY: ${{ secrets.CAPITAL_API_KEY }}
+          CAPITAL_API_PASSWORD: ${{ secrets.CAPITAL_API_PASSWORD }}
+          CAPITAL_IDENTIFIER: ${{ secrets.CAPITAL_IDENTIFIER }}
+          CAPITAL_ENV: ${{ vars.CAPITAL_ENV || 'demo' }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001' }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          MARGIN_BUDGET_EUR: ${{ vars.MARGIN_BUDGET_EUR || '15' }}
+          MAX_OPEN_POSITIONS: ${{ vars.MAX_OPEN_POSITIONS || '1' }}
+          MIN_SCORE_THRESHOLD: ${{ vars.MIN_SCORE_THRESHOLD || '7' }}
+          EXECUTION_MODE: ${{ vars.EXECUTION_MODE || 'coach' }}
+          CONFIRM_TIMEOUT_SEC: ${{ vars.CONFIRM_TIMEOUT_SEC || '240' }}
+          BRIEFING_SLOT: ${{ steps.slot.outputs.slot }}
+        run: python -m jobs.briefing
