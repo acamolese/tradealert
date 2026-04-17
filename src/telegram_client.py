@@ -5,11 +5,16 @@ Supporta:
 - send_message_with_buttons: invio con inline keyboard (callback)
 - wait_for_callback: polling getUpdates per attendere il click su un bottone
 - edit_message: aggiorna messaggio (es. per togliere i bottoni dopo click)
+
+Telegram in parse_mode=HTML accetta solo: b, strong, i, em, u, ins, s, strike,
+del, code, pre, a, tg-spoiler, blockquote. Tag come <br>, <p>, <div> rompono
+il parsing. send_message normalizza i piu' comuni per evitare 400 inutili.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 import time
 from typing import Any
 
@@ -18,6 +23,34 @@ import requests
 from .config import Config
 
 log = logging.getLogger(__name__)
+
+
+_ALLOWED_TAGS = {
+    "b", "strong", "i", "em", "u", "ins", "s", "strike", "del",
+    "code", "pre", "a", "tg-spoiler", "blockquote",
+}
+_BREAK_TAG_RE = re.compile(r"<\s*br\s*/?\s*>", re.IGNORECASE)
+_PARA_OPEN_RE = re.compile(r"<\s*p\s*>", re.IGNORECASE)
+_PARA_CLOSE_RE = re.compile(r"<\s*/\s*p\s*>", re.IGNORECASE)
+_TAG_RE = re.compile(r"<\s*/?\s*([a-zA-Z][a-zA-Z0-9-]*)[^>]*>")
+
+
+def sanitize_telegram_html(text: str) -> str:
+    """Rimuove o converte tag HTML non supportati da Telegram."""
+    text = _BREAK_TAG_RE.sub("\n", text)
+    text = _PARA_OPEN_RE.sub("", text)
+    text = _PARA_CLOSE_RE.sub("\n\n", text)
+
+    def _strip(match: re.Match[str]) -> str:
+        tag = match.group(1).lower()
+        if tag in _ALLOWED_TAGS:
+            return match.group(0)
+        return ""
+
+    text = _TAG_RE.sub(_strip, text)
+    # Collassa run lunghissime di newline
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
 
 
 class TelegramClient:
@@ -29,6 +62,8 @@ class TelegramClient:
     # ---------- send ----------
 
     def send_message(self, text: str, parse_mode: str = "HTML") -> dict[str, Any]:
+        if parse_mode == "HTML":
+            text = sanitize_telegram_html(text)
         payload = {
             "chat_id": self._chat_id,
             "text": text,
@@ -44,6 +79,8 @@ class TelegramClient:
         parse_mode: str = "HTML",
     ) -> dict[str, Any]:
         """buttons e' una matrice di {text, callback_data}."""
+        if parse_mode == "HTML":
+            text = sanitize_telegram_html(text)
         payload = {
             "chat_id": self._chat_id,
             "text": text,
@@ -56,6 +93,8 @@ class TelegramClient:
     def edit_message_text(
         self, message_id: int, text: str, parse_mode: str = "HTML"
     ) -> dict[str, Any]:
+        if parse_mode == "HTML":
+            text = sanitize_telegram_html(text)
         payload = {
             "chat_id": self._chat_id,
             "message_id": message_id,

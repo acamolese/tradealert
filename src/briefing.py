@@ -52,8 +52,10 @@ Il briefing deve:
 - evitare hype, frasi tipo "il mercato e' in fermento", e claim non supportati
 - usare un tono pratico, da analista che parla a un suo collega
 
-Format output: testo in HTML semplice (uso solo <b>, <i>, niente liste, niente
-escape strani). Niente preamboli tipo "Ecco il briefing:". Vai dritto al punto."""
+Format output: testo per Telegram con HTML LIMITATO. Tag ammessi SOLO:
+<b>, <i>, <code>. Per andare a capo usa newline (\n), MAI <br>, MAI <p>,
+MAI tag non in elenco. Niente preamboli tipo "Ecco il briefing:". Vai dritto
+al punto."""
 
 
 def _capital_snapshot(capital: CapitalClient) -> dict[str, Any]:
