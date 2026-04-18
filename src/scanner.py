@@ -14,13 +14,20 @@ from typing import Any
 from .capital_client import CapitalClient
 from .config import Config
 from .db import Database
+from .discovery import discover_top_movers
 from .executor import ExecutionResult
 from .features import compute_features
 from .llm_analyzer import LLMAnalyzer, SetupProposal
+from .news import (
+    fetch_finnhub_company_news,
+    fetch_news,
+    news_for_asset,
+)
 from .quiet_hours import is_quiet_now, quiet_reason
 from .risk import SizingResult, calculate_size
 from .telegram_client import TelegramClient
 from .universe import UNIVERSE, Asset
+from .watchlist import DISCOVERY_WATCHLIST
 
 log = logging.getLogger(__name__)
 
@@ -356,13 +363,60 @@ def run_morning_scan(config: Config) -> None:
     except Exception as exc:
         log.warning("Snapshot account fallito: %s", exc)
 
-    log.info("Fetch features per %d asset", len(UNIVERSE))
-    features = _collect_features(capital, UNIVERSE)
+    # Discovery dinamica: top movers del momento dalla watchlist estesa.
+    try:
+        movers, mover_quotes = discover_top_movers(
+            capital, DISCOVERY_WATCHLIST, top_n=5, abs_min_pct=2.0
+        )
+    except Exception:
+        log.exception("Discovery fallita, uso solo universo statico")
+        movers, mover_quotes = [], []
+
+    scan_set: list[Asset] = list(UNIVERSE)
+    seen_epics = {a.epic for a in scan_set}
+    for a in movers:
+        if a.epic not in seen_epics:
+            scan_set.append(a)
+            seen_epics.add(a.epic)
+    log.info(
+        "Scan set: %d asset (universo %d + discovery %d)",
+        len(scan_set),
+        len(UNIVERSE),
+        len(scan_set) - len(UNIVERSE),
+    )
+
+    features = _collect_features(capital, scan_set)
     if not features:
         telegram.send_message(
             "⚠️ Scanner mattutino: nessun dato di mercato disponibile."
         )
         return
+
+    # Arricchimento con news per asset (RSS pubblici + Finnhub company-news
+    # per le azioni). Le news vanno nel payload LLM come contesto per
+    # validare o scartare un momentum senza catalyst.
+    try:
+        all_news = fetch_news(config, limit=40)
+    except Exception:
+        log.exception("fetch_news fallita, proseguo senza news globali")
+        all_news = []
+    for name, af in features.items():
+        per_asset = news_for_asset(name, all_news, limit=3)
+        if af.get("asset_class") == "share":
+            try:
+                per_asset = per_asset + fetch_finnhub_company_news(
+                    config, af.get("epic") or "", limit=3
+                )
+            except Exception:
+                log.exception("finnhub company-news fallita %s", name)
+        af["news"] = [
+            {
+                "headline": n.get("headline"),
+                "source": n.get("source"),
+                "datetime": n.get("datetime"),
+            }
+            for n in per_asset[:3]
+        ]
 
     log.info("Ranking LLM su %d asset", len(features))
     from datetime import datetime, timezone

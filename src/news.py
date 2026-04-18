@@ -30,7 +30,59 @@ RSS_FEEDS = [
     ("Investing.com Forex", "https://www.investing.com/rss/news_285.rss"),
     ("Investing.com Commodities", "https://www.investing.com/rss/news_11.rss"),
     ("Investing.com Stock Markets", "https://www.investing.com/rss/news_25.rss"),
+    # --- Crypto-specific ---
+    ("CoinDesk", "https://www.coindesk.com/arc/outboundfeeds/rss/"),
+    ("Cointelegraph", "https://cointelegraph.com/rss"),
+    ("Decrypt", "https://decrypt.co/feed"),
 ]
+
+
+# Keywords per il matching news <-> asset. Per un asset non mappato
+# usiamo il ``name`` come fallback (minuscolo).
+ASSET_KEYWORDS: dict[str, list[str]] = {
+    "Bitcoin": ["bitcoin", "btc"],
+    "Ethereum": ["ethereum", " eth "],
+    "Solana": ["solana", " sol "],
+    "Ripple": ["ripple", "xrp"],
+    "Cardano": ["cardano", " ada "],
+    "Avalanche": ["avalanche", "avax"],
+    "Polkadot": ["polkadot", " dot "],
+    "Chainlink": ["chainlink"],
+    "Dogecoin": ["dogecoin", "doge"],
+    "Ethereum Classic": ["ethereum classic", " etc "],
+    "EthereumFi": ["ether.fi", "ethfi"],
+    "EthereumPoW": ["ethereumpow", "ethw"],
+    "ARPA": ["arpa"],
+    "Gold": ["gold", "xau"],
+    "Silver": ["silver", "xag"],
+    "WTI Oil": ["wti", "crude oil", "oil price"],
+    "Brent Oil": ["brent", "crude oil", "oil price"],
+    "Natural Gas": ["natural gas"],
+    "US500": ["s&p 500", "sp500", "s&p500"],
+    "Nasdaq 100": ["nasdaq"],
+    "DAX 40": ["dax"],
+    "FTSE 100": ["ftse"],
+    "Nikkei 225": ["nikkei"],
+    "EUR/USD": ["eur/usd", "euro dollar", "eurusd"],
+    "GBP/USD": ["gbp/usd", "pound", "cable", "sterling"],
+    "USD/JPY": ["usd/jpy", "yen"],
+    "AUD/USD": ["aud/usd", "aussie"],
+    "USD/CHF": ["usd/chf", "swiss franc"],
+    "Apple": ["apple", "aapl"],
+    "Microsoft": ["microsoft", "msft"],
+    "Nvidia": ["nvidia", "nvda"],
+    "Tesla": ["tesla", "tsla"],
+    "Alphabet": ["alphabet", "google", "googl"],
+    "Amazon": ["amazon", "amzn"],
+    "Meta": ["meta platforms", " meta "],
+    "AMD": [" amd "],
+    "Netflix": ["netflix", "nflx"],
+    "JPMorgan": ["jpmorgan", "jpm "],
+    "Coinbase": ["coinbase", "coin "],
+    "Palantir": ["palantir", "pltr"],
+    "Super Micro": ["super micro", "smci"],
+    "Dave & Buster's": ["dave & buster", "play "],
+}
 
 
 def _entry_dt(entry: Any) -> datetime | None:
@@ -142,6 +194,75 @@ def fetch_news(config: Config, limit: int = 25) -> list[dict[str, Any]]:
     merged = _dedup(rss + finnhub)
     merged.sort(key=lambda i: i.get("ts", 0), reverse=True)
     return merged[:limit]
+
+
+def fetch_finnhub_company_news(
+    config: Config, symbol: str, days_back: int = 3, limit: int = 5
+) -> list[dict[str, Any]]:
+    """News specifiche per ticker (azioni US). Finnhub /company-news.
+    Nel free tier: limit 60 req/min, data up to 1 anno.
+    """
+    if not config.finnhub_api_key:
+        return []
+    from_date = (
+        datetime.now(timezone.utc) - timedelta(days=days_back)
+    ).strftime("%Y-%m-%d")
+    to_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        r = requests.get(
+            "https://finnhub.io/api/v1/company-news",
+            params={
+                "symbol": symbol,
+                "from": from_date,
+                "to": to_date,
+                "token": config.finnhub_api_key,
+            },
+            timeout=10,
+        )
+        r.raise_for_status()
+    except requests.RequestException as exc:
+        log.warning("Finnhub company-news %s fallita: %s", symbol, exc)
+        return []
+
+    out: list[dict[str, Any]] = []
+    for item in r.json()[:limit]:
+        ts = item.get("datetime") or 0
+        out.append(
+            {
+                "source": f"Finnhub:{item.get('source', '?')}",
+                "headline": item.get("headline") or "",
+                "summary": (item.get("summary") or "")[:300],
+                "datetime": datetime.fromtimestamp(
+                    ts, tz=timezone.utc
+                ).isoformat()
+                if ts
+                else None,
+                "ts": ts,
+            }
+        )
+    return out
+
+
+def news_for_asset(
+    asset_name: str,
+    all_news: list[dict[str, Any]],
+    limit: int = 3,
+) -> list[dict[str, Any]]:
+    """Filtra news dalla pool globale che menzionano uno dei keyword
+    associati all'asset. Match case-insensitive su headline+summary.
+    """
+    keywords = ASSET_KEYWORDS.get(asset_name) or [asset_name.lower()]
+    keywords = [k.lower() for k in keywords]
+    matches: list[dict[str, Any]] = []
+    for n in all_news:
+        text = (
+            (n.get("headline") or "") + " " + (n.get("summary") or "")
+        ).lower()
+        if any(k in text for k in keywords):
+            matches.append(n)
+        if len(matches) >= limit:
+            break
+    return matches
 
 
 def format_news_for_llm(items: list[dict[str, Any]]) -> str:
