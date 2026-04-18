@@ -15,8 +15,9 @@ from typing import Any
 from .capital_client import CapitalClient
 from .config import Config
 from .db import Database
-from .executor import ExecutionResult, execute_signal
+from .executor import ExecutionResult, _market_meta, execute_signal
 from .position_monitor import close_position_by_deal_id
+from .risk import calculate_size
 from .telegram_client import TelegramClient
 from .universe import UNIVERSE
 from .watchlist import DISCOVERY_WATCHLIST
@@ -29,6 +30,7 @@ VALID_CALLBACK_PREFIXES = (
     "budget:",
     "mclose:",
     "mhold:",
+    "rot:",
 )
 
 
@@ -55,6 +57,15 @@ def _parse_data(data: str) -> tuple[str, dict[str, Any]] | None:
             return action, {"signal_id": int(parts[1])}
         if action in ("mclose", "mhold"):
             return action, {"deal_id": parts[1]}
+        if action == "rot":
+            # rot:exec:<signal_id>:<old_deal_id>
+            # rot:open:<signal_id>
+            # rot:skip:<signal_id>
+            sub = parts[1]
+            out: dict[str, Any] = {"sub": sub, "signal_id": int(parts[2])}
+            if sub == "exec" and len(parts) > 3:
+                out["old_deal_id"] = parts[3]
+            return action, out
     except (IndexError, ValueError):
         return None
     return None
@@ -108,6 +119,168 @@ def _find_epic(asset_name: str) -> str | None:
     return None
 
 
+def _build_confirm_text(
+    signal_row: dict[str, Any],
+    margin_budget: float,
+    sizing,
+) -> str:
+    """Versione leggera di _format_confirm_message per il ri-edit on
+    budget click: non ha key_factors/risks/news (non persistiti)."""
+    asset = signal_row.get("asset", "?")
+    direction = (signal_row.get("direction") or "").upper()
+    score = signal_row.get("score", "?")
+    thesis = signal_row.get("thesis", "") or ""
+
+    if sizing is None or sizing.size is None:
+        reason = getattr(sizing, "reason", "")
+        sizing_block = (
+            f"⚠️ Con budget {margin_budget:.0f} EUR il sizing non passa: {reason}"
+        )
+    else:
+        sizing_block = (
+            f"<b>Preview con budget {margin_budget:.0f} EUR "
+            f"(= margine sul conto):</b>\n"
+            f"Margine bloccato: <code>{sizing.margin_estimate:.2f} EUR</code>\n"
+            f"Size: <code>{sizing.size:g}</code>\n"
+            f"Esposizione generata: <code>{sizing.notional:.2f} EUR</code>\n"
+            f"Rischio se SL: <code>{sizing.risk_estimate:.2f} EUR</code>"
+        )
+
+    return (
+        f"🟡 <b>Conferma richiesta</b> (signal {signal_row.get('id')})\n\n"
+        f"<b>{asset}</b> {direction} (score {score}/10)\n\n"
+        f"<i>Thesis:</i>\n{thesis}\n\n"
+        f"{sizing_block}\n\n"
+        f"<i>I bottoni sotto sono l'importo in EUR da bloccare come margine.</i>"
+    )
+
+
+def _recompute_sizing_for_signal(
+    config: Config,
+    signal_row: dict[str, Any],
+    margin_budget: float,
+):
+    """Fetch market Capital + ricalcola sizing. Ritorna SizingResult o None."""
+    epic = _find_epic(signal_row.get("asset") or "")
+    if not epic:
+        return None
+    capital = CapitalClient(config)
+    try:
+        capital.login()
+        market = capital.get_market(epic)
+    except Exception:
+        log.exception("Recompute sizing: fetch market fallito")
+        return None
+    meta = _market_meta(market)
+    entry = meta["mid_price"] or signal_row.get("entry_price") or 0
+    stop_pct = float(signal_row.get("stop_loss") or 1.5)
+    return calculate_size(
+        margin_budget=margin_budget,
+        entry_price=float(entry),
+        margin_factor=meta["margin_factor"],
+        min_size=meta["min_size"],
+        size_step=meta["size_step"],
+        stop_pct=stop_pct,
+    )
+
+
+def _handle_rotation_callback(
+    args: dict[str, Any],
+    cb: dict[str, Any],
+    config: Config,
+    db: Database,
+    telegram: TelegramClient,
+    state: "DaemonState",
+) -> None:
+    sub = args.get("sub")
+    signal_id = args["signal_id"]
+    message_id = (cb.get("message") or {}).get("message_id")
+
+    signal_row = db.get_signal(signal_id)
+    if not signal_row or signal_row.get("status") != "pending":
+        if message_id:
+            telegram.edit_message_text(
+                message_id,
+                f"⚠️ <b>Signal {signal_id}</b> non più modificabile",
+            )
+        return
+
+    if sub == "skip":
+        db.update_signal_status(signal_id, "skipped")
+        if message_id:
+            telegram.edit_message_text(
+                message_id,
+                f"❌ <b>Rotation ignorata</b> (signal {signal_id})",
+            )
+        return
+
+    epic = _find_epic(signal_row["asset"])
+    if not epic:
+        telegram.send_message(
+            f"⚠️ Signal {signal_id}: epic per "
+            f"{signal_row['asset']} non trovato"
+        )
+        db.update_signal_status(signal_id, "expired")
+        return
+
+    capital = CapitalClient(config)
+    try:
+        capital.login()
+    except Exception as exc:
+        telegram.send_message(f"⚠️ Login Capital fallito: {exc}")
+        return
+
+    if sub == "exec":
+        old_deal_id = args.get("old_deal_id")
+        if old_deal_id:
+            if message_id:
+                telegram.edit_message_text(
+                    message_id,
+                    f"⏳ <b>Rotation in corso</b>\n"
+                    f"Chiusura posizione vecchia...",
+                )
+            try:
+                close_position_by_deal_id(
+                    capital,
+                    db,
+                    telegram,
+                    old_deal_id,
+                    reason=f"rotation->signal {signal_id}",
+                    message_id=None,
+                )
+            except Exception as exc:
+                log.exception("Chiusura rotation fallita")
+                telegram.send_message(
+                    f"⚠️ Chiusura fallita, non apro la nuova: {exc}"
+                )
+                return
+
+    # Apertura nuova posizione (rot:exec dopo la chiusura, rot:open diretta).
+    if message_id:
+        telegram.edit_message_text(
+            message_id,
+            f"⏳ <b>Apertura nuova posizione</b>\n"
+            f"{signal_row['asset']} {signal_row['direction'].upper()}...",
+        )
+    effective_budget = state.staged_budgets.get(
+        signal_id, config.exposure_budget_eur
+    )
+    asset_features = {
+        "epic": epic,
+        "last_price": signal_row.get("entry_price"),
+    }
+    result = execute_signal(
+        config,
+        capital,
+        db,
+        signal_row,
+        asset_features,
+        exposure_override=effective_budget,
+    )
+    telegram.send_message(_format_execution_message(result, signal_row))
+    state.staged_budgets.pop(signal_id, None)
+
+
 def _format_execution_message(
     result: ExecutionResult, signal_row: dict[str, Any]
 ) -> str:
@@ -145,6 +318,10 @@ def handle_callback(
 
     if action in ("mclose", "mhold"):
         _handle_monitor_callback(action, args, cb, config, db, telegram)
+        return
+
+    if action == "rot":
+        _handle_rotation_callback(args, cb, config, db, telegram, state)
         return
 
     signal_id = args["signal_id"]
@@ -185,6 +362,21 @@ def handle_callback(
             # Import locale per evitare ciclo di import a livello modulo.
             from .scanner import _confirm_buttons
 
+            # Ricalcolo preview (margine, size, rischio) per il nuovo budget
+            # e ri-edito SIA il testo del messaggio sia i bottoni, cosi'
+            # l'utente vede subito cosa blocca realmente sul conto.
+            sizing = _recompute_sizing_for_signal(
+                config, signal_row, new_budget
+            )
+            try:
+                telegram.edit_message_text(
+                    message_id,
+                    _build_confirm_text(signal_row, new_budget, sizing),
+                )
+            except Exception:
+                log.exception(
+                    "Ri-edit testo fallito per signal %s", signal_id
+                )
             try:
                 telegram.edit_message_reply_markup(
                     message_id, _confirm_buttons(signal_id, new_budget)

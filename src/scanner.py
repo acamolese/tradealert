@@ -176,15 +176,15 @@ def _format_confirm_message(
 ) -> str:
     if sizing.size is None:
         sizing_block = (
-            f"⚠️ <i>Con esposizione {current_budget:.0f} EUR il sizing non passa: "
+            f"⚠️ <i>Con budget {current_budget:.0f} EUR il sizing non passa: "
             f"{_esc(sizing.reason)}</i>"
         )
     else:
         sizing_block = (
-            f"<b>Preview con esposizione {current_budget:.0f} EUR:</b>\n"
+            f"<b>Preview con budget {current_budget:.0f} EUR (= margine sul conto):</b>\n"
+            f"Margine bloccato: <code>{sizing.margin_estimate:.2f} EUR</code>\n"
             f"Size: <code>{sizing.size:g}</code>\n"
-            f"Esposizione effettiva: <code>{sizing.notional:.2f} EUR</code>\n"
-            f"Margine richiesto: <code>{sizing.margin_estimate:.2f} EUR</code>\n"
+            f"Esposizione generata: <code>{sizing.notional:.2f} EUR</code>\n"
             f"Rischio se SL: <code>{sizing.risk_estimate:.2f} EUR</code>"
         )
     reasoning = _format_reasoning_block(proposal, asset_features)
@@ -194,7 +194,8 @@ def _format_confirm_message(
         f"{proposal.direction.upper()} (score {proposal.score}/10)\n\n"
         f"{reasoning}\n\n"
         f"{sizing_block}\n\n"
-        f"<i>Scegli l'esposizione con i bottoni poi Esegui.</i>"
+        f"<i>I bottoni sotto sono l'importo in EUR da bloccare come margine. "
+        f"Clicca un valore poi Esegui.</i>"
     )
 
 
@@ -316,10 +317,10 @@ def _format_no_setup_message(
 def _preview_sizing(
     proposal: SetupProposal,
     asset_features: dict[str, Any],
-    exposure_budget: float,
+    margin_budget: float,
 ) -> SizingResult:
     return calculate_size(
-        exposure_budget=exposure_budget,
+        margin_budget=margin_budget,
         entry_price=asset_features.get("last_price") or 0,
         margin_factor=asset_features.get("margin_factor") or 0.05,
         min_size=asset_features.get("min_size") or 0.01,
@@ -328,6 +329,109 @@ def _preview_sizing(
         or 0.01,
         stop_pct=proposal.suggested_stop_pct or 1.5,
     )
+
+
+ROTATION_DELTA = 2.0  # punti di score di vantaggio minimo per proporre switch
+
+
+def _maybe_build_rotation_proposal(
+    config: Config,
+    capital: CapitalClient,
+    db: Database,
+    top: SetupProposal,
+    signal_row: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Se MAX_OPEN_POSITIONS e' saturo e il nuovo ``top`` batte la
+    posizione aperta con lo score piu' basso per almeno ``ROTATION_DELTA``
+    punti, ritorna un dict con ``deal_id``, ``asset``, ``score``. None
+    altrimenti (flusso standard).
+    """
+    try:
+        open_positions = capital.get_open_positions()
+    except Exception:
+        log.exception("Rotation: fetch posizioni aperte fallito")
+        return None
+    if len(open_positions) < config.max_open_positions:
+        return None
+
+    candidates: list[tuple[float, str, str]] = []
+    for wrapper in open_positions:
+        pos = wrapper.get("position", {}) or {}
+        deal_id = pos.get("dealId")
+        if not deal_id:
+            continue
+        trade = db.get_trade_by_deal_id(deal_id)
+        if not trade or not trade.get("signal_id"):
+            continue
+        sig = db.get_signal(trade["signal_id"])
+        if not sig:
+            continue
+        try:
+            score = float(sig.get("score") or 0)
+        except (TypeError, ValueError):
+            continue
+        candidates.append((score, deal_id, sig.get("asset") or "?"))
+
+    if not candidates:
+        return None
+
+    candidates.sort(key=lambda t: t[0])
+    worst_score, worst_deal_id, worst_asset = candidates[0]
+    if top.score - worst_score < ROTATION_DELTA:
+        return None
+
+    return {
+        "deal_id": worst_deal_id,
+        "asset": worst_asset,
+        "score": worst_score,
+        "delta": round(top.score - worst_score, 1),
+    }
+
+
+def _format_rotation_message(
+    signal_row: dict[str, Any],
+    proposal: SetupProposal,
+    asset_features: dict[str, Any],
+    rotation: dict[str, Any],
+) -> str:
+    reasoning = _format_reasoning_block(proposal, asset_features)
+    return (
+        f"🔄 <b>Proposta di rotation</b> (signal {signal_row['id']})\n\n"
+        f"<b>Nuovo setup:</b> {_esc(proposal.asset)} "
+        f"{proposal.direction.upper()} (score {proposal.score}/10)\n"
+        f"<b>Posizione da chiudere:</b> {_esc(rotation['asset'])} "
+        f"(score originale {rotation['score']}/10)\n"
+        f"<b>Delta:</b> +{rotation['delta']} punti\n\n"
+        f"{reasoning}\n\n"
+        f"<i>Scegli:</i>\n"
+        f"✅ Ruota: chiude {_esc(rotation['asset'])} e apre "
+        f"{_esc(proposal.asset)}\n"
+        f"🔄 Solo apri: ignora la vecchia (ma MAX_OPEN limita)\n"
+        f"❌ Ignora: nessuna azione"
+    )
+
+
+def _rotation_buttons(
+    signal_id: int, old_deal_id: str
+) -> list[list[dict[str, str]]]:
+    return [
+        [
+            {
+                "text": "✅ Ruota",
+                "callback_data": f"rot:exec:{signal_id}:{old_deal_id}",
+            },
+            {
+                "text": "🔄 Solo apri",
+                "callback_data": f"rot:open:{signal_id}",
+            },
+        ],
+        [
+            {
+                "text": "❌ Ignora",
+                "callback_data": f"rot:skip:{signal_id}",
+            }
+        ],
+    ]
 
 
 def _handle_confirm(
@@ -498,6 +602,21 @@ def run_morning_scan(config: Config) -> None:
             }
         )
         log.info("Signal salvato id=%s", signal_row.get("id"))
+
+        # Rotation: se MAX_OPEN_POSITIONS e' saturo e il nuovo top batte
+        # la posizione peggiore per almeno ROTATION_DELTA punti, propongo
+        # una sostituzione invece del flusso normale.
+        rotation = _maybe_build_rotation_proposal(
+            config, capital, db, top, signal_row
+        )
+        if rotation:
+            telegram.send_message_with_buttons(
+                _format_rotation_message(
+                    signal_row, top, asset_features, rotation
+                ),
+                _rotation_buttons(signal_row["id"], rotation["deal_id"]),
+            )
+            return
 
         telegram.send_message(
             _format_telegram_message(
