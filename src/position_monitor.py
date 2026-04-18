@@ -89,7 +89,8 @@ def _apply_trailing_stop(
     direction = pos.get("direction")  # "BUY" | "SELL"
     entry = pos.get("level")
     current_sl = pos.get("stopLevel")
-    asset_name = market.get("instrumentName") or pos.get("epic") or "?"
+    epic = market.get("epic")  # epic sta in market, non in position
+    asset_name = market.get("instrumentName") or epic or "?"
 
     if not (deal_id and direction and entry and current_sl):
         return
@@ -111,20 +112,21 @@ def _apply_trailing_stop(
 
     r_distance = entry * stop_pct / 100
 
-    snapshot = market.get("bid") or market.get("offer")
-    if snapshot is None:
+    bid = market.get("bid")
+    offer = market.get("offer")
+    if bid is not None and offer is not None:
+        current_price = (float(bid) + float(offer)) / 2
+    else:
         try:
-            m = capital.get_market(pos.get("epic"))
+            m = capital.get_market(epic) if epic else {}
             snap = m.get("snapshot", {}) or {}
-            bid = snap.get("bid")
-            offer = snap.get("offer")
+            b = snap.get("bid")
+            o = snap.get("offer")
             current_price = (
-                (float(bid) + float(offer)) / 2 if bid and offer else None
+                (float(b) + float(o)) / 2 if b and o else None
             )
         except Exception:
             current_price = None
-    else:
-        current_price = float(snapshot)
 
     if current_price is None:
         return
@@ -197,7 +199,7 @@ def _evaluate_position(
     pos = position.get("position", {}) or {}
     market = position.get("market", {}) or {}
     deal_id = pos.get("dealId")
-    epic = pos.get("epic")
+    epic = market.get("epic")  # epic sta in market.epic, non in position.epic
     direction = pos.get("direction")
     entry = pos.get("level")
     size = pos.get("size")
