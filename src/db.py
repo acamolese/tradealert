@@ -83,3 +83,20 @@ class Database:
 
     def insert_monitoring_event(self, event: dict[str, Any]) -> None:
         self._client.table("monitoring_events").insert(event).execute()
+
+    def recent_signal_assets(self, hours: int = 24) -> set[str]:
+        """Asset per cui e' stato creato un signal nelle ultime ``hours``
+        (qualsiasi status). Usato per evitare di riproporre ripetutamente
+        lo stesso asset in scan successivi dello stesso giorno."""
+        from datetime import datetime, timedelta, timezone
+
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(hours=hours)
+        ).isoformat()
+        response = (
+            self._client.table("signals")
+            .select("asset")
+            .gte("created_at", cutoff)
+            .execute()
+        )
+        return {row["asset"] for row in (response.data or []) if row.get("asset")}

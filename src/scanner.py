@@ -270,15 +270,17 @@ def _pick_top_setup(
     proposals: list[SetupProposal],
     features: dict[str, dict[str, Any]],
     min_score: float,
+    exclude_assets: set[str] | None = None,
 ) -> SetupProposal | None:
     """Ritorna il primo setup sopra soglia con mercato aperto e tradeable.
-
-    NON filtra in base al budget: la decisione di alzare il budget per
-    rendere eseguibile un setup borderline e' lasciata all'utente nel
-    flusso di conferma.
+    Scarta asset gia' proposti di recente (``exclude_assets``) per
+    evitare di riproporre in loop lo stesso nome nello stesso giorno.
     """
+    exclude_assets = exclude_assets or set()
     for p in proposals:
         if p.score < min_score:
+            continue
+        if p.asset in exclude_assets:
             continue
         af = features.get(p.asset)
         if not af or not af.get("last_price"):
@@ -577,68 +579,99 @@ def run_morning_scan(config: Config) -> None:
     eligible = [p for p in proposals if p.direction in ("long", "short")]
     eligible.sort(key=lambda p: p.score, reverse=True)
 
+    # Dedup giornaliero: non riproporre asset gia' segnalati nelle ultime 24h
+    try:
+        recent_assets = db.recent_signal_assets(hours=24)
+    except Exception:
+        log.exception("Lookup signal recenti fallito, skip dedup")
+        recent_assets = set()
+
     top = _pick_top_setup(
         eligible,
         features,
         min_score=config.min_score_threshold,
+        exclude_assets=recent_assets,
     )
 
-    if top:
-        asset_features = features.get(top.asset, {})
-        signal_row = db.insert_signal(
-            {
-                "asset": top.asset,
-                "direction": top.direction,
-                "score": top.score,
-                "thesis": top.thesis,
-                "entry_price": asset_features.get("last_price"),
-                # In stop_loss/take_profit memorizziamo le PERCENTUALI
-                # suggerite dal LLM rispetto al prezzo di entrata.
-                "stop_loss": top.suggested_stop_pct,
-                "take_profit": top.suggested_target_pct,
-                "size": None,
-                "expected_cost": None,
-                "status": "pending",
-            }
+    if not top:
+        # Silenzio: nessuna opportunita' nuova sopra soglia.
+        log.info(
+            "Scan: nessun top nuovo (recent_assets=%d, eligible=%d)",
+            len(recent_assets),
+            len(eligible),
         )
-        log.info("Signal salvato id=%s", signal_row.get("id"))
+        return
 
-        # Rotation: se MAX_OPEN_POSITIONS e' saturo e il nuovo top batte
-        # la posizione peggiore per almeno ROTATION_DELTA punti, propongo
-        # una sostituzione invece del flusso normale.
-        rotation = _maybe_build_rotation_proposal(
-            config, capital, db, top, signal_row
+    # Se gli slot di posizione sono pieni, il signal ha senso SOLO se la
+    # rotation scatta (nuovo score - peggiore aperta >= ROTATION_DELTA).
+    # Altrimenti silenzio: eviteremmo comunque l'apertura all'executor.
+    try:
+        open_count = len(capital.get_open_positions())
+    except Exception:
+        log.exception("Fetch posizioni aperte fallito")
+        open_count = 0
+
+    asset_features = features.get(top.asset, {})
+    signal_row = db.insert_signal(
+        {
+            "asset": top.asset,
+            "direction": top.direction,
+            "score": top.score,
+            "thesis": top.thesis,
+            "entry_price": asset_features.get("last_price"),
+            "stop_loss": top.suggested_stop_pct,
+            "take_profit": top.suggested_target_pct,
+            "size": None,
+            "expected_cost": None,
+            "status": "pending",
+        }
+    )
+    log.info("Signal salvato id=%s", signal_row.get("id"))
+
+    rotation = _maybe_build_rotation_proposal(
+        config, capital, db, top, signal_row
+    )
+    if rotation:
+        telegram.send_message_with_buttons(
+            _format_rotation_message(
+                signal_row, top, asset_features, rotation
+            ),
+            _rotation_buttons(signal_row["id"], rotation["deal_id"]),
         )
-        if rotation:
-            telegram.send_message_with_buttons(
-                _format_rotation_message(
-                    signal_row, top, asset_features, rotation
-                ),
-                _rotation_buttons(signal_row["id"], rotation["deal_id"]),
-            )
-            return
+        return
 
-        telegram.send_message(
-            _format_telegram_message(
-                top, asset_features, execution_mode=config.execution_mode
-            )
+    if open_count >= config.max_open_positions:
+        # Slot pieni e nessuna rotation utile: silenzio, marcamo il signal
+        # come expired cosi' non conta nel dedup come 'attivo'.
+        log.info(
+            "Slot pieni (%d/%d) e rotation non applicabile: skip notifica",
+            open_count,
+            config.max_open_positions,
         )
+        db.update_signal_status(signal_row["id"], "expired")
+        return
 
-        if config.execution_mode == "auto":
-            from .executor import execute_signal
+    telegram.send_message(
+        _format_telegram_message(
+            top, asset_features, execution_mode=config.execution_mode
+        )
+    )
 
-            log.info("EXECUTION_MODE=auto, tento esecuzione")
-            result = execute_signal(
-                config, capital, db, signal_row, asset_features
-            )
-            telegram.send_message(_format_execution_message(result, top))
-        elif config.execution_mode == "confirm":
-            log.info(
-                "EXECUTION_MODE=confirm, signal id=%s in attesa di click",
-                signal_row["id"],
-            )
-            _handle_confirm(config, capital, db, telegram, signal_row, top, asset_features)
-        else:
-            log.info("EXECUTION_MODE=coach, solo notifica")
+    if config.execution_mode == "auto":
+        from .executor import execute_signal
+
+        log.info("EXECUTION_MODE=auto, tento esecuzione")
+        result = execute_signal(
+            config, capital, db, signal_row, asset_features
+        )
+        telegram.send_message(_format_execution_message(result, top))
+    elif config.execution_mode == "confirm":
+        log.info(
+            "EXECUTION_MODE=confirm, signal id=%s in attesa di click",
+            signal_row["id"],
+        )
+        _handle_confirm(
+            config, capital, db, telegram, signal_row, top, asset_features
+        )
     else:
-        telegram.send_message(_format_no_setup_message(eligible))
+        log.info("EXECUTION_MODE=coach, solo notifica")
