@@ -333,7 +333,26 @@ def _preview_sizing(
     )
 
 
-ROTATION_DELTA = 2.0  # punti di score di vantaggio minimo per proporre switch
+ROTATION_DELTA = 2.0  # delta default (posizione aperta in profit o neutra)
+ROTATION_DELTA_SOFT_DD = 1.0   # se la posizione aperta peggiore e' in DD >= -0.5%
+ROTATION_DELTA_HARD_DD = 0.5   # se la posizione aperta peggiore e' in DD >= -1%
+
+
+def _position_pnl_pct(pos: dict[str, Any], market: dict[str, Any]) -> float:
+    """Stima del P&L% corrente basata su bid/offer medio e direzione."""
+    entry = pos.get("level")
+    direction = pos.get("direction")
+    bid = market.get("bid")
+    offer = market.get("offer")
+    if entry is None or not direction or bid is None or offer is None:
+        return 0.0
+    mid = (float(bid) + float(offer)) / 2
+    entry_f = float(entry)
+    if entry_f <= 0:
+        return 0.0
+    if direction == "BUY":
+        return (mid - entry_f) / entry_f * 100
+    return (entry_f - mid) / entry_f * 100
 
 
 def _maybe_build_rotation_proposal(
@@ -343,10 +362,12 @@ def _maybe_build_rotation_proposal(
     top: SetupProposal,
     signal_row: dict[str, Any],
 ) -> dict[str, Any] | None:
-    """Se MAX_OPEN_POSITIONS e' saturo e il nuovo ``top`` batte la
-    posizione aperta con lo score piu' basso per almeno ``ROTATION_DELTA``
-    punti, ritorna un dict con ``deal_id``, ``asset``, ``score``. None
-    altrimenti (flusso standard).
+    """Se MAX_OPEN_POSITIONS e' saturo valuta una rotation. La soglia di
+    delta score richiesto e' adattiva rispetto al P&L% della posizione
+    peggiore:
+    - DD >= -1%  -> basta +0.5 score
+    - DD >= -0.5%-> basta +1.0 score
+    - profit/neutra -> serve +2.0 score (default)
     """
     try:
         open_positions = capital.get_open_positions()
@@ -356,9 +377,10 @@ def _maybe_build_rotation_proposal(
     if len(open_positions) < config.max_open_positions:
         return None
 
-    candidates: list[tuple[float, str, str]] = []
+    candidates: list[dict[str, Any]] = []
     for wrapper in open_positions:
         pos = wrapper.get("position", {}) or {}
+        market = wrapper.get("market", {}) or {}
         deal_id = pos.get("dealId")
         if not deal_id:
             continue
@@ -369,24 +391,44 @@ def _maybe_build_rotation_proposal(
         if not sig:
             continue
         try:
-            score = float(sig.get("score") or 0)
+            orig_score = float(sig.get("score") or 0)
         except (TypeError, ValueError):
             continue
-        candidates.append((score, deal_id, sig.get("asset") or "?"))
+        pnl_pct = _position_pnl_pct(pos, market)
+        candidates.append(
+            {
+                "deal_id": deal_id,
+                "asset": sig.get("asset") or "?",
+                "orig_score": orig_score,
+                "pnl_pct": pnl_pct,
+            }
+        )
 
     if not candidates:
         return None
 
-    candidates.sort(key=lambda t: t[0])
-    worst_score, worst_deal_id, worst_asset = candidates[0]
-    if top.score - worst_score < ROTATION_DELTA:
+    # Candidato preferito per chiusura: score originale piu' basso, a parita'
+    # PnL% piu' basso (tecnicamente mediocre E in perdita = prime a uscire).
+    candidates.sort(key=lambda c: (c["orig_score"], c["pnl_pct"]))
+    worst = candidates[0]
+
+    if worst["pnl_pct"] <= -1.0:
+        required_delta = ROTATION_DELTA_HARD_DD
+    elif worst["pnl_pct"] <= -0.5:
+        required_delta = ROTATION_DELTA_SOFT_DD
+    else:
+        required_delta = ROTATION_DELTA
+
+    if top.score - worst["orig_score"] < required_delta:
         return None
 
     return {
-        "deal_id": worst_deal_id,
-        "asset": worst_asset,
-        "score": worst_score,
-        "delta": round(top.score - worst_score, 1),
+        "deal_id": worst["deal_id"],
+        "asset": worst["asset"],
+        "score": worst["orig_score"],
+        "pnl_pct": round(worst["pnl_pct"], 2),
+        "delta": round(top.score - worst["orig_score"], 1),
+        "required_delta": required_delta,
     }
 
 
@@ -397,13 +439,18 @@ def _format_rotation_message(
     rotation: dict[str, Any],
 ) -> str:
     reasoning = _format_reasoning_block(proposal, asset_features)
+    pnl = rotation.get("pnl_pct")
+    pnl_str = f"{pnl:+.2f}%" if isinstance(pnl, (int, float)) else "-"
+    req = rotation.get("required_delta", ROTATION_DELTA)
     return (
         f"🔄 <b>Proposta di rotation</b> (signal {signal_row['id']})\n\n"
         f"<b>Nuovo setup:</b> {_esc(proposal.asset)} "
         f"{proposal.direction.upper()} (score {proposal.score}/10)\n"
-        f"<b>Posizione da chiudere:</b> {_esc(rotation['asset'])} "
-        f"(score originale {rotation['score']}/10)\n"
-        f"<b>Delta:</b> +{rotation['delta']} punti\n\n"
+        f"<b>Posizione da chiudere:</b> {_esc(rotation['asset'])}\n"
+        f"  score originale: <code>{rotation['score']}/10</code>\n"
+        f"  P&amp;L attuale: <code>{pnl_str}</code>\n"
+        f"  soglia richiesta per switch: <code>+{req}</code> "
+        f"(delta effettivo +{rotation['delta']})\n\n"
         f"{reasoning}\n\n"
         f"<i>Scegli:</i>\n"
         f"✅ Ruota: chiude {_esc(rotation['asset'])} e apre "
