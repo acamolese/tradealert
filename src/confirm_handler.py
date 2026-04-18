@@ -19,6 +19,7 @@ from .executor import ExecutionResult, execute_signal
 from .position_monitor import close_position_by_deal_id
 from .telegram_client import TelegramClient
 from .universe import UNIVERSE
+from .watchlist import DISCOVERY_WATCHLIST
 
 log = logging.getLogger(__name__)
 
@@ -96,7 +97,12 @@ def _handle_monitor_callback(
 
 
 def _find_epic(asset_name: str) -> str | None:
+    """Cerca l'epic per asset_name in UNIVERSE prima, poi nella
+    DISCOVERY_WATCHLIST. Signal possono provenire da entrambi."""
     for a in UNIVERSE:
+        if a.name == asset_name:
+            return a.epic
+    for a in DISCOVERY_WATCHLIST:
         if a.name == asset_name:
             return a.epic
     return None
@@ -212,10 +218,10 @@ def handle_callback(
         if not epic:
             msg = (
                 f"⚠️ Signal {signal_id}: epic per "
-                f"{signal_row['asset']} non trovato in UNIVERSE"
+                f"{signal_row['asset']} non trovato in universo/watchlist"
             )
             telegram.send_message(msg)
-            db.update_signal_status(signal_id, "error")
+            db.update_signal_status(signal_id, "expired")
             return
 
         capital = CapitalClient(config)

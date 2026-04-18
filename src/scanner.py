@@ -138,6 +138,34 @@ def _min_entry_eur(asset_features: dict[str, Any]) -> float | None:
     return float(min_size) * float(last) * float(margin_factor)
 
 
+def _format_reasoning_block(
+    proposal: SetupProposal, asset_features: dict[str, Any]
+) -> str:
+    """Compone il blocco Ragionamento + key_factors + risks + news per
+    il messaggio Telegram di conferma."""
+    parts: list[str] = [f"<i>Thesis:</i>\n{_esc(proposal.thesis)}"]
+    if proposal.key_factors:
+        parts.append(
+            "<i>Fattori chiave:</i>\n"
+            + "\n".join(f"• {_esc(f)}" for f in proposal.key_factors[:4])
+        )
+    if proposal.risks:
+        parts.append(
+            "<i>Rischi:</i>\n"
+            + "\n".join(f"⚠️ {_esc(r)}" for r in proposal.risks[:2])
+        )
+    news = asset_features.get("news") or []
+    if news:
+        parts.append(
+            "<i>News recenti:</i>\n"
+            + "\n".join(
+                f"📰 {_esc((n.get('headline') or '')[:100])}"
+                for n in news[:3]
+            )
+        )
+    return "\n\n".join(parts)
+
+
 def _format_confirm_message(
     signal_row: dict[str, Any],
     proposal: SetupProposal,
@@ -159,13 +187,14 @@ def _format_confirm_message(
             f"Margine richiesto: <code>{sizing.margin_estimate:.2f} EUR</code>\n"
             f"Rischio se SL: <code>{sizing.risk_estimate:.2f} EUR</code>"
         )
+    reasoning = _format_reasoning_block(proposal, asset_features)
     return (
         f"🟡 <b>Conferma richiesta</b> (signal {signal_row['id']})\n\n"
         f"<b>{_esc(proposal.asset)}</b> "
         f"{proposal.direction.upper()} (score {proposal.score}/10)\n\n"
+        f"{reasoning}\n\n"
         f"{sizing_block}\n\n"
-        f"<i>Scegli l'esposizione con i bottoni (valori in EUR) poi Esegui. "
-        f"Il click aggiorna la preview.</i>"
+        f"<i>Scegli l'esposizione con i bottoni poi Esegui.</i>"
     )
 
 
