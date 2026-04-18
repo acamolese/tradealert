@@ -26,7 +26,7 @@ UNIVERSE: list[Asset] = [
     Asset("Brent Oil", "OIL_BRENT", "energy"),
     Asset("US500", "US500", "index"),
     Asset("Nasdaq 100", "US100", "index"),
-    Asset("DAX 40", "GERMANY40", "index"),
+    Asset("DAX 40", "DE40", "index"),
     Asset("EUR/USD", "EURUSD", "fx"),
     Asset("GBP/USD", "GBPUSD", "fx"),
     Asset("USD/JPY", "USDJPY", "fx"),
