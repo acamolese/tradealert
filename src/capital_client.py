@@ -57,27 +57,37 @@ class CapitalClient:
             "Content-Type": "application/json",
         }
 
-    def login(self) -> None:
-        """Autentica e memorizza CST + security token nei session header."""
-        response = self._session.post(
-            self._url("/session"),
-            headers={
-                "X-CAP-API-KEY": self._cfg.capital_api_key,
-                "Content-Type": "application/json",
-            },
-            json={
-                "identifier": self._cfg.capital_identifier,
-                "password": self._cfg.capital_password,
-            },
-            timeout=15,
-        )
-        _raise_for_status(response)
-        self._cst = response.headers.get("CST")
-        self._security_token = response.headers.get("X-SECURITY-TOKEN")
-        if not self._cst or not self._security_token:
-            raise RuntimeError(
-                "Login Capital.com riuscito ma mancano i token di sessione."
+    def login(self, max_retries: int = 3) -> None:
+        """Autentica e memorizza CST + security token nei session header.
+        Retry con backoff esponenziale in caso di 429 (rate limit su
+        /session: Capital ammette ~1 req/sec su login)."""
+        import time
+
+        for attempt in range(max_retries):
+            response = self._session.post(
+                self._url("/session"),
+                headers={
+                    "X-CAP-API-KEY": self._cfg.capital_api_key,
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "identifier": self._cfg.capital_identifier,
+                    "password": self._cfg.capital_password,
+                },
+                timeout=15,
             )
+            if response.status_code == 429 and attempt < max_retries - 1:
+                wait = 5 * (2**attempt)  # 5s, 10s, 20s
+                time.sleep(wait)
+                continue
+            _raise_for_status(response)
+            self._cst = response.headers.get("CST")
+            self._security_token = response.headers.get("X-SECURITY-TOKEN")
+            if not self._cst or not self._security_token:
+                raise RuntimeError(
+                    "Login Capital.com riuscito ma mancano i token di sessione."
+                )
+            return
 
     def get_account_info(self) -> dict[str, Any]:
         response = self._session.get(

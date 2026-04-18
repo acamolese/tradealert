@@ -21,10 +21,10 @@ TRADEALERT_HOME=/home/ubuntu/tradealert
 # ---------- Position Monitor: ogni 30 min, 7-22 IT ----------
 */30 7-22 * * *      cd $TRADEALERT_HOME && python -m jobs.monitor >> logs/monitor.log 2>&1
 
-# ---------- Briefing: 3x/giorno con slot esplicito ----------
-0 8 * * *            cd $TRADEALERT_HOME && python -m jobs.briefing morning   >> logs/briefing.log 2>&1
-0 16 * * *           cd $TRADEALERT_HOME && python -m jobs.briefing afternoon >> logs/briefing.log 2>&1
-0 22 * * *           cd $TRADEALERT_HOME && python -m jobs.briefing evening   >> logs/briefing.log 2>&1
+# ---------- Briefing: 3x/giorno, sfasato dal monitor per evitare 429 Capital ----------
+2 8 * * *            cd $TRADEALERT_HOME && python -m jobs.briefing morning   >> logs/briefing.log 2>&1
+2 16 * * *           cd $TRADEALERT_HOME && python -m jobs.briefing afternoon >> logs/briefing.log 2>&1
+2 22 * * *           cd $TRADEALERT_HOME && python -m jobs.briefing evening   >> logs/briefing.log 2>&1
 
 # Il listener Telegram NON va in crontab: gira come daemon systemd
 # (vedi tradealert-listener.service) per latenza ~secondi sui comandi.
