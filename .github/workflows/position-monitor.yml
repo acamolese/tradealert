@@ -2,9 +2,9 @@ name: Position Monitor
 
 on:
   schedule:
-    # Ogni 30 min, lun-ven 06-21 UTC (= 07-22 CET / 08-23 CEST).
-    # Lo script esce subito se non ci sono posizioni aperte (poco costo).
-    - cron: "*/30 6-21 * * 1-5"
+    # Ogni 60 min, TUTTI i giorni (anche weekend per posizioni crypto).
+    # Lo script esce subito se non ci sono posizioni aperte e in quiet hours.
+    - cron: "0 6-21 * * *"
   workflow_dispatch:
 
 concurrency:

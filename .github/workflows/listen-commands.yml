@@ -2,8 +2,10 @@ name: Telegram Commands Listener
 
 on:
   schedule:
-    # Ogni 10 minuti dalle 07:00 alle 22:00 UTC (copre orario mercato europeo+US).
-    - cron: "*/10 7-21 * * 1-5"
+    # Ogni 30 min, TUTTI i giorni 06-21 UTC. Latenza max ~30 min sul comando
+    # /posizioni, accettabile per swing. Limite scelto per stare dentro il
+    # free tier GitHub Actions (2000 min/mese su repo privato).
+    - cron: "*/30 6-21 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -45,5 +47,5 @@ jobs:
           MIN_SCORE_THRESHOLD: ${{ vars.MIN_SCORE_THRESHOLD || '7' }}
           EXECUTION_MODE: ${{ vars.EXECUTION_MODE || 'coach' }}
           CONFIRM_TIMEOUT_SEC: ${{ vars.CONFIRM_TIMEOUT_SEC || '240' }}
-          LISTEN_SECONDS: "180"
+          LISTEN_SECONDS: "60"
         run: python -m jobs.listen
