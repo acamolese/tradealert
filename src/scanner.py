@@ -470,7 +470,27 @@ def run_morning_scan(config: Config) -> None:
         return
 
     log.info("Ranking LLM su %d asset", len(features))
-    proposals = llm.rank_setups(features)
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
+    is_weekend = now.weekday() >= 5  # 5=sat, 6=sun
+    traditional_open = sum(
+        1
+        for name, af in features.items()
+        if af.get("asset_class") != "crypto"
+        and af.get("market_status") in ("TRADEABLE", "EDITS_ONLY")
+    )
+    context = {
+        "is_weekend": is_weekend,
+        "weekday": now.strftime("%A"),
+        "traditional_markets_open": traditional_open,
+        "tradeable_count": sum(
+            1
+            for af in features.values()
+            if af.get("market_status") in ("TRADEABLE", "EDITS_ONLY")
+        ),
+    }
+    proposals = llm.rank_setups(features, context=context)
 
     eligible = [p for p in proposals if p.direction in ("long", "short")]
     eligible.sort(key=lambda p: p.score, reverse=True)

@@ -30,4 +30,9 @@ UNIVERSE: list[Asset] = [
     Asset("EUR/USD", "EURUSD", "fx"),
     Asset("GBP/USD", "GBPUSD", "fx"),
     Asset("USD/JPY", "USDJPY", "fx"),
+    # Crypto: peso ridotto in settimana, priorita' nel weekend quando i
+    # mercati tradizionali sono chiusi. La regola e' codificata nel
+    # system prompt del LLM, qui le includiamo solo nell'universo.
+    Asset("Bitcoin", "BTCUSD", "crypto", notes="weekend-friendly"),
+    Asset("Ethereum", "ETHUSD", "crypto", notes="weekend-friendly"),
 ]

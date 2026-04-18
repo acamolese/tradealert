@@ -31,12 +31,21 @@ Ricevi feature tecniche per un universo di asset tradabili su Capital.com.
 Per ciascun asset valuti la qualità del setup di swing trade (orizzonte 2-5 giorni)
 considerando trend, momentum, volatilità, livelli chiave e contesto generale.
 
+Regole su asset class CRYPTO (BTCUSD, ETHUSD):
+- In giorni feriali (lun-ven): le crypto hanno PRIORITA' RIDOTTA. Considerale
+  solo se il setup e' eccellente (score >= 8) e meglio di tutti gli altri asset
+  tradizionali. Privilegia oro, indici, forex, commodities a parita' di qualita'.
+- Nel weekend (sab-dom) o quando i mercati tradizionali sono chiusi: le crypto
+  diventano l'opzione principale e possono essere proposte anche con score 6-7.
+- Tieni conto del campo "is_weekend" e "tradeable_count" nel contesto fornito.
+
 Produci un ranking dei top 3 setup. Per ognuno indichi:
 - direction: "long", "short" o "skip" (skip se nessun setup chiaro)
 - score 0-10 (8+ solo per setup eccellenti, 6-7 buoni, sotto 6 mediocri)
 - thesis di 2-3 righe in italiano, con focus su: cosa giustifica l'entrata,
   cosa la invaliderebbe, livelli operativi indicativi
 - suggested_stop_pct e suggested_target_pct in percentuale (es. 1.5 = 1.5%)
+  Per crypto usa stop piu' larghi (3-5%) per gestire la volatilita' tipica.
 
 Sii selettivo. Se nessun asset ha setup decente, restituisci tutti score sotto 6.
 Privilegia setup con trigger tecnici chiari e asimmetria rischio/rendimento minimo 2:1.
@@ -63,12 +72,19 @@ class LLMAnalyzer:
         self._model = config.anthropic_model
 
     def rank_setups(
-        self, market_features: dict[str, dict[str, Any]]
+        self,
+        market_features: dict[str, dict[str, Any]],
+        context: dict[str, Any] | None = None,
     ) -> list[SetupProposal]:
-        """market_features: {asset_name: {feature_name: value, ...}}"""
-        user_message = json.dumps(
-            {"asset_features": market_features}, indent=2, default=str
-        )
+        """market_features: {asset_name: {feature_name: value, ...}}
+
+        context puo' contenere: is_weekend, weekday, tradeable_count,
+        traditional_markets_open, ecc.
+        """
+        payload = {"asset_features": market_features}
+        if context:
+            payload["context"] = context
+        user_message = json.dumps(payload, indent=2, default=str)
 
         response = self._client.messages.create(
             model=self._model,
