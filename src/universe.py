@@ -35,4 +35,11 @@ UNIVERSE: list[Asset] = [
     # system prompt del LLM, qui le includiamo solo nell'universo.
     Asset("Bitcoin", "BTCUSD", "crypto", notes="weekend-friendly"),
     Asset("Ethereum", "ETHUSD", "crypto", notes="weekend-friendly"),
+    Asset("Solana", "SOLUSD", "crypto", notes="weekend-friendly"),
+    Asset("Ripple", "XRPUSD", "crypto", notes="weekend-friendly"),
+    Asset("Cardano", "ADAUSD", "crypto", notes="weekend-friendly"),
+    Asset("Avalanche", "AVAXUSD", "crypto", notes="weekend-friendly"),
+    Asset("Polkadot", "DOTUSD", "crypto", notes="weekend-friendly"),
+    Asset("Chainlink", "LINKUSD", "crypto", notes="weekend-friendly"),
+    Asset("Dogecoin", "DOGEUSD", "crypto", notes="weekend-friendly"),
 ]
