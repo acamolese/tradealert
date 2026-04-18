@@ -7,7 +7,6 @@ Wants=network-online.target
 Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/tradealert
-Environment="LISTEN_SECONDS=600"
 ExecStart=/home/ubuntu/tradealert/.venv/bin/python -m jobs.listen
 Restart=always
 RestartSec=5

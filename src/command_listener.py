@@ -1,11 +1,10 @@
 """Listener per comandi Telegram.
 
-Polla getUpdates per N secondi cercando messaggi-comando dell'utente.
-Se trova /posizioni, lancia il flusso di gestione posizioni interattivo.
-
-E' pensato per essere richiamato sia a mano sia da un cron GitHub Actions:
-ogni esecuzione drena gli update arretrati e processa il primo comando
-riconosciuto, poi esce.
+Due modalita':
+- ``listen_forever``: daemon infinito (systemd), offset persistente nel processo.
+- ``listen_once``: ascolta per N secondi, processa il primo comando e ritorna,
+  confermando l'offset a Telegram cosi' i run successivi non lo ri-elaborano.
+  Usato storicamente da GitHub Actions.
 """
 
 from __future__ import annotations
@@ -24,10 +23,35 @@ log = logging.getLogger(__name__)
 KNOWN_COMMANDS = ("/posizioni", "/positions")
 
 
+def _process_update(update: dict, config: Config, expected_chat: str) -> str | None:
+    msg = update.get("message") or update.get("edited_message")
+    if not msg:
+        return None
+    if str(msg.get("chat", {}).get("id")) != expected_chat:
+        return None
+    text = (msg.get("text") or "").strip().lower()
+    if text in KNOWN_COMMANDS:
+        log.info("Comando %s ricevuto, lancio gestione posizioni", text)
+        manage_positions(config)
+        return text
+    return None
+
+
+def _commit_offset(base_url: str, offset: int) -> None:
+    # Chiamata getUpdates con offset=next e timeout=0: rimuove dalla coda
+    # Telegram tutti gli update con id < offset. Safe ignore in caso di errore.
+    try:
+        requests.get(base_url, params={"offset": offset, "timeout": 0}, timeout=5)
+    except requests.RequestException:
+        pass
+
+
 def listen_once(config: Config, max_seconds: int = 60) -> str | None:
-    """Polla per max_seconds. Ritorna il comando processato o None."""
+    """Polla per max_seconds. Ritorna il primo comando processato o None.
+    Committa l'offset a Telegram prima di uscire."""
     telegram = TelegramClient(config)
     expected_chat = str(config.telegram_chat_id)
+    base = f"{telegram._base}/getUpdates"
     deadline = time.time() + max_seconds
     offset = 0
 
@@ -36,9 +60,7 @@ def listen_once(config: Config, max_seconds: int = 60) -> str | None:
         long_poll = min(25, remaining)
         try:
             r = requests.get(
-                f"{telegram._base}/getUpdates",
-                params={"offset": offset, "timeout": long_poll},
-                timeout=long_poll + 5,
+                base, params={"offset": offset, "timeout": long_poll}, timeout=long_poll + 5
             )
             r.raise_for_status()
         except requests.RequestException as exc:
@@ -48,19 +70,41 @@ def listen_once(config: Config, max_seconds: int = 60) -> str | None:
 
         for update in r.json().get("result", []):
             offset = update["update_id"] + 1
-            msg = update.get("message") or update.get("edited_message")
-            if not msg:
-                continue
-            chat_id = msg.get("chat", {}).get("id")
-            if str(chat_id) != expected_chat:
-                # Ignora messaggi di altri utenti
-                continue
-            text = (msg.get("text") or "").strip().lower()
-            if not text:
-                continue
-            if text in KNOWN_COMMANDS:
-                log.info("Comando %s ricevuto, lancio gestione posizioni", text)
-                manage_positions(config)
-                return text
-            # Altri messaggi: ignorati (no help spam)
+            cmd = _process_update(update, config, expected_chat)
+            if cmd:
+                _commit_offset(base, offset)
+                return cmd
+
+    if offset:
+        _commit_offset(base, offset)
     return None
+
+
+def listen_forever(config: Config) -> None:
+    """Daemon: loop infinito con long-polling. Mantiene l'offset nel processo,
+    quindi nessuna ri-elaborazione. Restart=always di systemd resta solo come
+    safety net in caso di crash."""
+    telegram = TelegramClient(config)
+    expected_chat = str(config.telegram_chat_id)
+    base = f"{telegram._base}/getUpdates"
+    offset = 0
+    log.info("Listener daemon avviato (long-poll 25s)")
+
+    while True:
+        try:
+            r = requests.get(
+                base, params={"offset": offset, "timeout": 25}, timeout=30
+            )
+            r.raise_for_status()
+            updates = r.json().get("result", [])
+        except requests.RequestException as exc:
+            log.warning("getUpdates errore: %s", exc)
+            time.sleep(5)
+            continue
+
+        for update in updates:
+            offset = update["update_id"] + 1
+            try:
+                _process_update(update, config, expected_chat)
+            except Exception:
+                log.exception("Errore processando update %s", update.get("update_id"))
