@@ -17,6 +17,7 @@ from .db import Database
 from .executor import ExecutionResult
 from .features import compute_features
 from .llm_analyzer import LLMAnalyzer, SetupProposal
+from .quiet_hours import is_quiet_now, quiet_reason
 from .risk import SizingResult, calculate_size
 from .telegram_client import TelegramClient
 from .universe import UNIVERSE, Asset
@@ -437,6 +438,10 @@ def _handle_confirm(
 
 
 def run_morning_scan(config: Config) -> None:
+    if is_quiet_now():
+        log.info("Skip scan: %s", quiet_reason())
+        return
+
     capital = CapitalClient(config)
     telegram = TelegramClient(config)
     db = Database(config)

@@ -23,6 +23,7 @@ from anthropic import Anthropic
 from .capital_client import CapitalAPIError, CapitalClient
 from .config import Config
 from .news import fetch_news, format_news_for_llm
+from .quiet_hours import is_quiet_now, quiet_reason
 from .telegram_client import TelegramClient
 from .universe import UNIVERSE
 
@@ -126,6 +127,10 @@ def generate_briefing(config: Config, slot: str) -> str:
 
 
 def run_briefing(config: Config, slot: str) -> None:
+    if is_quiet_now():
+        log.info("Skip briefing: %s", quiet_reason())
+        return
+
     title, hint = SLOT_LABEL.get(
         slot, ("📰 Briefing", "Aggiornamento generale.")
     )
