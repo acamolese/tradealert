@@ -1,12 +1,14 @@
-name: Morning Scan
+name: Market Scan
 
 on:
   schedule:
-    # 07:30 ora italiana ~= 05:30 UTC (in CET) o 06:30 UTC (in CEST).
-    # Schedule GitHub Actions e' sempre UTC; eseguiamo entrambi gli orari
-    # per coprire il cambio ora legale, lo script e' idempotente per giorno.
-    - cron: "30 5 * * 1-5"
-    - cron: "30 6 * * 1-5"
+    # 4 scan/giorno, lun-ven. Lo script e' idempotente:
+    # ogni esecuzione produce al massimo 1 setup pendente per volta,
+    # e MAX_OPEN_POSITIONS impedisce aperture multiple sovrapposte.
+    # Slot italiani: 07:30 (apertura EU), 12:30 (pre-USA),
+    # 15:30 (post-apertura USA), 20:30 (pre-chiusura USA).
+    - cron: "30 5,10,13,18 * * 1-5"  # CET (inverno)
+    - cron: "30 6,11,14,19 * * 1-5"  # CEST (estate)
   workflow_dispatch:  # esecuzione manuale dal tab Actions
 
 jobs:
