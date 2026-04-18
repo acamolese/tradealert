@@ -103,6 +103,16 @@ class TelegramClient:
         }
         return self._post("/editMessageText", payload)
 
+    def edit_message_reply_markup(
+        self, message_id: int, buttons: list[list[dict[str, str]]]
+    ) -> dict[str, Any]:
+        payload = {
+            "chat_id": self._chat_id,
+            "message_id": message_id,
+            "reply_markup": {"inline_keyboard": buttons},
+        }
+        return self._post("/editMessageReplyMarkup", payload)
+
     # ---------- callbacks ----------
 
     def drain_updates(self) -> int:

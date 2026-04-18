@@ -15,8 +15,8 @@ SHELL=/bin/bash
 PATH=/home/ubuntu/tradealert/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 TRADEALERT_HOME=/home/ubuntu/tradealert
 
-# ---------- Market Scan: 4x/giorno ----------
-30 7,12,15,20 * * *  cd $TRADEALERT_HOME && python -m jobs.morning_scan >> logs/scan.log 2>&1
+# ---------- Market Scan: ogni 30 min in finestra attiva (sfasato dal monitor) ----------
+5,35 7-22 * * *      cd $TRADEALERT_HOME && python -m jobs.morning_scan >> logs/scan.log 2>&1
 
 # ---------- Position Monitor: ogni 30 min, 7-22 IT ----------
 */30 7-22 * * *      cd $TRADEALERT_HOME && python -m jobs.monitor >> logs/monitor.log 2>&1

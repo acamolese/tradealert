@@ -311,19 +311,16 @@ def _handle_confirm(
     proposal: SetupProposal,
     asset_features: dict[str, Any],
 ) -> None:
-    """Loop interattivo: mostra setup con preview sizing e bottoni budget.
-    L'utente puo' cambiare budget piu' volte, poi cliccare Esegui o Salta.
+    """Invia il messaggio di conferma con bottoni e ritorna. I callback
+    dei bottoni (Esegui/Salta/Budget) sono gestiti in modo asincrono dal
+    listener daemon (``src.confirm_handler``), cosi' nessun polling
+    Telegram concorrente.
     """
-    from .executor import execute_signal
-
     signal_id = signal_row["id"]
     current_budget = float(config.margin_budget_eur)
     sizing = _preview_sizing(proposal, asset_features, current_budget)
 
-    # Drain pre-messaggio per ignorare callback di signal precedenti.
-    start_offset = telegram.drain_updates()
-
-    sent = telegram.send_message_with_buttons(
+    telegram.send_message_with_buttons(
         _format_confirm_message(
             signal_row,
             proposal,
@@ -336,105 +333,6 @@ def _handle_confirm(
             signal_id, current_budget, _min_entry_eur(asset_features)
         ),
     )
-    message_id = sent.get("message_id")
-
-    deadline_abs = time.time() + config.confirm_timeout_sec
-    while True:
-        remaining = int(deadline_abs - time.time())
-        if remaining <= 0:
-            data = None
-            break
-        data, _, start_offset = telegram.wait_for_callback(
-            valid_prefixes=(
-                "budget:",
-                f"exec:{signal_id}",
-                f"skip:{signal_id}",
-            ),
-            timeout_sec=remaining,
-            start_offset=start_offset,
-        )
-
-        if data is None:
-            db.update_signal_status(signal_id, "expired")
-            log.info("Signal %s scaduto per timeout", signal_id)
-            if message_id:
-                telegram.edit_message_text(
-                    message_id,
-                    f"⌛ <b>Signal {signal_id} scaduto</b>\n"
-                    f"Nessuna risposta entro il timeout.",
-                )
-            return
-
-        parts = data.split(":")
-        action = parts[0]
-
-        if action == "budget":
-            try:
-                new_budget = float(parts[1])
-                if int(parts[2]) != signal_id:
-                    continue  # callback di altro signal, ignora
-            except (IndexError, ValueError):
-                continue
-            current_budget = new_budget
-            sizing = _preview_sizing(proposal, asset_features, current_budget)
-            if message_id:
-                telegram.edit_message_text(
-                    message_id,
-                    _format_confirm_message(
-                        signal_row,
-                        proposal,
-                        asset_features,
-                        current_budget,
-                        sizing,
-                        config.confirm_timeout_sec,
-                    ),
-                )
-                # Bottoni vanno re-inviati con la nuova selezione: Telegram
-                # editMessageText non ne supporta il refresh diretto, usiamo
-                # editMessageReplyMarkup separatamente.
-                telegram._post(
-                    "/editMessageReplyMarkup",
-                    {
-                        "chat_id": telegram._chat_id,
-                        "message_id": message_id,
-                        "reply_markup": {
-                            "inline_keyboard": _confirm_buttons(
-                                signal_id,
-                                current_budget,
-                                _min_entry_eur(asset_features),
-                            )
-                        },
-                    },
-                )
-            continue  # resta in attesa di altre interazioni
-
-        if action == "skip":
-            db.update_signal_status(signal_id, "skipped")
-            log.info("Signal %s saltato dall'utente", signal_id)
-            if message_id:
-                telegram.edit_message_text(
-                    message_id,
-                    f"❌ <b>Signal {signal_id} saltato</b>",
-                )
-            return
-
-        if action == "exec":
-            if message_id:
-                telegram.edit_message_text(
-                    message_id,
-                    f"⏳ <b>Apertura posizione in corso</b> "
-                    f"(signal {signal_id}, budget €{current_budget:.0f})...",
-                )
-            result = execute_signal(
-                config,
-                capital,
-                db,
-                signal_row,
-                asset_features,
-                margin_budget_override=current_budget,
-            )
-            telegram.send_message(_format_execution_message(result, proposal))
-            return
 
 
 def run_morning_scan(config: Config) -> None:
