@@ -1,0 +1,30 @@
+# TradeAlert crontab per VM Oracle Free Tier (Ubuntu 22.04).
+#
+# Tutti gli orari sono in TZ Europe/Rome (impostata sulla VM).
+# Quiet hours interno blocca le notifiche fuori dalle finestre attive
+# (lun-ven 07:00-22:30, weekend 09:00-22:30).
+#
+# Installazione:
+#   sudo timedatectl set-timezone Europe/Rome
+#   crontab deploy/crontab.txt
+#   crontab -l   # verifica
+#
+# Variabili: lo script load_config() legge da /home/ubuntu/tradealert/.env
+
+SHELL=/bin/bash
+PATH=/home/ubuntu/tradealert/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+TRADEALERT_HOME=/home/ubuntu/tradealert
+
+# ---------- Market Scan: 4x/giorno ----------
+30 7,12,15,20 * * *  cd $TRADEALERT_HOME && python -m jobs.morning_scan >> logs/scan.log 2>&1
+
+# ---------- Position Monitor: ogni 30 min, 7-22 IT ----------
+*/30 7-22 * * *      cd $TRADEALERT_HOME && python -m jobs.monitor >> logs/monitor.log 2>&1
+
+# ---------- Briefing: 3x/giorno con slot esplicito ----------
+0 8 * * *            cd $TRADEALERT_HOME && python -m jobs.briefing morning   >> logs/briefing.log 2>&1
+0 16 * * *           cd $TRADEALERT_HOME && python -m jobs.briefing afternoon >> logs/briefing.log 2>&1
+0 22 * * *           cd $TRADEALERT_HOME && python -m jobs.briefing evening   >> logs/briefing.log 2>&1
+
+# Il listener Telegram NON va in crontab: gira come daemon systemd
+# (vedi tradealert-listener.service) per latenza ~secondi sui comandi.

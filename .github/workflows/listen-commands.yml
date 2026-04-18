@@ -1,11 +1,8 @@
 name: Telegram Commands Listener
 
 on:
-  schedule:
-    # Ogni 30 min, TUTTI i giorni 06-21 UTC. Latenza max ~30 min sul comando
-    # /posizioni, accettabile per swing. Limite scelto per stare dentro il
-    # free tier GitHub Actions (2000 min/mese su repo privato).
-    - cron: "*/30 6-21 * * *"
+  # Schedule disattivato: listener gira su VM Oracle Free Tier come daemon
+  # (long polling continuo, latenza ~secondi). workflow_dispatch fallback.
   workflow_dispatch:
 
 concurrency:

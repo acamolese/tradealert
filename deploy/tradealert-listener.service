@@ -1,0 +1,18 @@
+[Unit]
+Description=TradeAlert Telegram listener (long polling per comandi /posizioni)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/tradealert
+Environment="LISTEN_SECONDS=600"
+ExecStart=/home/ubuntu/tradealert/.venv/bin/python -m jobs.listen
+Restart=always
+RestartSec=5
+StandardOutput=append:/home/ubuntu/tradealert/logs/listener.log
+StandardError=append:/home/ubuntu/tradealert/logs/listener.log
+
+[Install]
+WantedBy=multi-user.target

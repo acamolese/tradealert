@@ -1,10 +1,7 @@
 name: Position Monitor
 
 on:
-  schedule:
-    # Ogni 60 min, TUTTI i giorni (anche weekend per posizioni crypto).
-    # Lo script esce subito se non ci sono posizioni aperte e in quiet hours.
-    - cron: "0 6-21 * * *"
+  # Schedule disattivato: cron su VM Oracle Free Tier. workflow_dispatch fallback.
   workflow_dispatch:
 
 concurrency:

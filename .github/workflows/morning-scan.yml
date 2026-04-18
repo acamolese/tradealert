@@ -1,14 +1,10 @@
 name: Market Scan
 
 on:
-  schedule:
-    # 4 scan/giorno, TUTTI i giorni (weekend incluso per le crypto).
-    # Quiet hours interno blocca le ore notturne in modo idempotente.
-    # Slot italiani: 07:30 (apertura EU), 12:30 (pre-USA),
-    # 15:30 (post-apertura USA), 20:30 (pre-chiusura USA).
-    - cron: "30 5,10,13,18 * * *"  # CET (inverno)
-    - cron: "30 6,11,14,19 * * *"  # CEST (estate)
-  workflow_dispatch:  # esecuzione manuale dal tab Actions
+  # Schedule disattivato: i cron girano su VM Oracle Free Tier (cron classico,
+  # affidabilita' al 99.9%, niente quota mensile). Manteniamo workflow_dispatch
+  # come fallback manuale dal tab Actions o da CLI.
+  workflow_dispatch:
 
 jobs:
   scan:

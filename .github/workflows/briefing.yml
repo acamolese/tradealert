@@ -1,15 +1,7 @@
 name: Briefing 3x/giorno
 
 on:
-  schedule:
-    # 08:00 IT = 06:00 UTC (CET) o 07:00 UTC (CEST). Lanciamo entrambi gli orari
-    # e usiamo lo slot per disambiguare. Il singolo run e' veloce (~30s).
-    - cron: "0 6 * * *"   # mattina inverno
-    - cron: "0 7 * * *"   # mattina estate (in CEST il cron precedente parte alle 07 IT)
-    - cron: "0 14 * * *"  # pomeriggio inverno (16 IT in CET)
-    - cron: "0 15 * * *"  # pomeriggio estate
-    - cron: "0 20 * * *"  # sera inverno (22 IT in CET)
-    - cron: "0 21 * * *"  # sera estate
+  # Schedule disattivato: cron su VM Oracle Free Tier. workflow_dispatch fallback.
   workflow_dispatch:
     inputs:
       slot:
