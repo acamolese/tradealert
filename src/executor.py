@@ -115,7 +115,7 @@ def execute_signal(
     db: Database,
     signal_row: dict[str, Any],
     asset_features: dict[str, Any],
-    margin_budget_override: float | None = None,
+    exposure_override: float | None = None,
 ) -> ExecutionResult:
     epic = asset_features.get("epic")
     if not epic:
@@ -158,9 +158,9 @@ def execute_signal(
             False, reason="Margine disponibile zero o non leggibile"
         )
 
-    effective_budget = margin_budget_override or config.margin_budget_eur
+    effective_exposure = exposure_override or config.exposure_budget_eur
     sizing = calculate_size(
-        margin_budget=effective_budget,
+        exposure_budget=effective_exposure,
         entry_price=entry_price,
         margin_factor=meta["margin_factor"],
         min_size=meta["min_size"],
@@ -273,7 +273,7 @@ def execute_signal(
                 "notional": sizing.notional,
                 "margin_estimate": sizing.margin_estimate,
                 "risk_estimate": sizing.risk_estimate,
-                "margin_budget": effective_budget,
+                "exposure_budget": effective_exposure,
             },
         }
     )

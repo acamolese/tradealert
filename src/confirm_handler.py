@@ -16,12 +16,19 @@ from .capital_client import CapitalClient
 from .config import Config
 from .db import Database
 from .executor import ExecutionResult, execute_signal
+from .position_monitor import close_position_by_deal_id
 from .telegram_client import TelegramClient
 from .universe import UNIVERSE
 
 log = logging.getLogger(__name__)
 
-VALID_CALLBACK_PREFIXES = ("exec:", "skip:", "budget:")
+VALID_CALLBACK_PREFIXES = (
+    "exec:",
+    "skip:",
+    "budget:",
+    "mclose:",
+    "mhold:",
+)
 
 
 @dataclass
@@ -39,16 +46,53 @@ def _parse_data(data: str) -> tuple[str, dict[str, Any]] | None:
                 "signal_id": int(parts[2]),
             }
         if action == "exec":
-            # Formato: exec:<signal_id>:<budget_inline>
             return action, {
                 "signal_id": int(parts[1]),
                 "inline_budget": float(parts[2]) if len(parts) > 2 else None,
             }
         if action == "skip":
             return action, {"signal_id": int(parts[1])}
+        if action in ("mclose", "mhold"):
+            return action, {"deal_id": parts[1]}
     except (IndexError, ValueError):
         return None
     return None
+
+
+def _handle_monitor_callback(
+    action: str,
+    args: dict[str, Any],
+    cb: dict[str, Any],
+    config: Config,
+    db: Database,
+    telegram: TelegramClient,
+) -> None:
+    deal_id = args["deal_id"]
+    message_id = (cb.get("message") or {}).get("message_id")
+
+    if action == "mhold":
+        if message_id:
+            telegram.edit_message_text(
+                message_id, "⏸ <b>Posizione lasciata aperta</b>"
+            )
+        return
+
+    # mclose
+    if message_id:
+        telegram.edit_message_text(
+            message_id, "⏳ <b>Chiusura in corso...</b>"
+        )
+    capital = CapitalClient(config)
+    try:
+        capital.login()
+    except Exception as exc:
+        telegram.send_message(f"⚠️ Login Capital fallito: {exc}")
+        return
+    close_position_by_deal_id(
+        capital, db, telegram, deal_id,
+        reason="Richiesta utente da monitor",
+        message_id=message_id,
+    )
 
 
 def _find_epic(asset_name: str) -> str | None:
@@ -92,6 +136,11 @@ def handle_callback(
         log.warning("Callback data non riconosciuto: %s", data)
         return
     action, args = parsed
+
+    if action in ("mclose", "mhold"):
+        _handle_monitor_callback(action, args, cb, config, db, telegram)
+        return
+
     signal_id = args["signal_id"]
     message_id = (cb.get("message") or {}).get("message_id")
 
@@ -149,14 +198,14 @@ def handle_callback(
                     f"(status={status})",
                 )
             return
-        effective_budget = state.staged_budgets.get(
-            signal_id, args.get("inline_budget") or config.margin_budget_eur
+        effective_exposure = state.staged_budgets.get(
+            signal_id, args.get("inline_budget") or config.exposure_budget_eur
         )
         if message_id:
             telegram.edit_message_text(
                 message_id,
                 f"⏳ <b>Apertura posizione in corso</b> "
-                f"(signal {signal_id}, budget €{effective_budget:.0f})...",
+                f"(signal {signal_id}, esposizione €{effective_exposure:.0f})...",
             )
 
         epic = _find_epic(signal_row["asset"])
@@ -188,7 +237,7 @@ def handle_callback(
             db,
             signal_row,
             asset_features,
-            margin_budget_override=effective_budget,
+            exposure_override=effective_exposure,
         )
         telegram.send_message(_format_execution_message(result, signal_row))
         state.staged_budgets.pop(signal_id, None)

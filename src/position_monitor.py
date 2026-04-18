@@ -1,8 +1,13 @@
 """Monitor sistematico delle posizioni aperte.
 
-Per ogni posizione aperta, ricalcola feature tecniche aggiornate, le manda
-al LLM con la thesis originale del trade e chiede una decisione: HOLD,
-CLOSE, o (futuro) SWITCH. Notifica Telegram solo se serve agire (no spam).
+Passi per ogni posizione aperta:
+1. ``_apply_trailing_stop``: sposta lo SL server-side se il profit in
+   multipli R e' avanzato abbastanza (breakeven a 1R, +1R a 2R, ecc.).
+2. ``_evaluate_position``: il LLM decide HOLD o CLOSE su thesis +
+   feature aggiornate. Su CLOSE invia messaggio con bottoni (mclose/mhold).
+
+I bottoni sono gestiti in modo asincrono dal listener daemon (vedi
+``src.confirm_handler``), quindi qui niente polling inline.
 
 Schedulato ogni 30 min in orario mercato.
 """
@@ -11,7 +16,6 @@ from __future__ import annotations
 
 import json
 import logging
-import time
 from typing import Any
 
 from anthropic import Anthropic
@@ -66,6 +70,123 @@ def _resolve_epic(asset_name: str) -> str | None:
     return None
 
 
+def _apply_trailing_stop(
+    capital: CapitalClient,
+    db: Database,
+    telegram: TelegramClient,
+    position: dict[str, Any],
+) -> None:
+    """Trailing stop R-multiple:
+    - profit >= 1R -> SL a breakeven (entry)
+    - profit >= 2R -> SL a entry + 1R (long) / entry - 1R (short)
+    - profit >= NR -> SL a entry + (N-1)R
+    Solo migliorativo: se il calcolo darebbe uno SL peggiore dell'attuale,
+    non tocchiamo nulla. R e' derivato dallo stop originale del signal.
+    """
+    pos = position.get("position", {}) or {}
+    market = position.get("market", {}) or {}
+    deal_id = pos.get("dealId")
+    direction = pos.get("direction")  # "BUY" | "SELL"
+    entry = pos.get("level")
+    current_sl = pos.get("stopLevel")
+    asset_name = market.get("instrumentName") or pos.get("epic") or "?"
+
+    if not (deal_id and direction and entry and current_sl):
+        return
+
+    trade = db.get_trade_by_deal_id(deal_id)
+    signal = (
+        db.get_signal(trade["signal_id"])
+        if trade and trade.get("signal_id")
+        else None
+    )
+    if not signal or not signal.get("stop_loss"):
+        return
+
+    stop_pct = float(signal["stop_loss"])
+    entry = float(entry)
+    current_sl = float(current_sl)
+    if stop_pct <= 0:
+        return
+
+    r_distance = entry * stop_pct / 100
+
+    snapshot = market.get("bid") or market.get("offer")
+    if snapshot is None:
+        try:
+            m = capital.get_market(pos.get("epic"))
+            snap = m.get("snapshot", {}) or {}
+            bid = snap.get("bid")
+            offer = snap.get("offer")
+            current_price = (
+                (float(bid) + float(offer)) / 2 if bid and offer else None
+            )
+        except Exception:
+            current_price = None
+    else:
+        current_price = float(snapshot)
+
+    if current_price is None:
+        return
+
+    if direction == "BUY":
+        profit = current_price - entry
+    else:
+        profit = entry - current_price
+
+    profit_r = profit / r_distance
+    if profit_r < 1:
+        return
+
+    step = int(profit_r)  # quanti R completi
+    offset_r = step - 1  # new SL a entry +/- offset_r * R
+
+    if direction == "BUY":
+        new_sl = entry + offset_r * r_distance
+        if new_sl <= current_sl + 1e-9:
+            return
+    else:
+        new_sl = entry - offset_r * r_distance
+        if new_sl >= current_sl - 1e-9:
+            return
+
+    new_sl = round(new_sl, 5)
+    try:
+        capital.update_position(deal_id, stop_level=new_sl)
+    except Exception as exc:
+        log.warning("Trailing SL fallito per %s: %s", asset_name, exc)
+        return
+
+    log.info(
+        "Trailing SL %s: %s -> %s (profit %.1fR, offset +%dR)",
+        asset_name,
+        current_sl,
+        new_sl,
+        profit_r,
+        offset_r,
+    )
+    if trade:
+        db.insert_monitoring_event(
+            {
+                "trade_id": trade["id"],
+                "event_type": "trailing_sl",
+                "reason": f"Profit {profit_r:.1f}R, SL +{offset_r}R dall'entry",
+                "details": {
+                    "old_sl": current_sl,
+                    "new_sl": new_sl,
+                    "current_price": current_price,
+                    "r_distance": r_distance,
+                    "profit_r": profit_r,
+                },
+            }
+        )
+    telegram.send_message(
+        f"🛡 <b>Trailing SL</b> su {_esc(asset_name)}\n"
+        f"Profit attuale: <code>{profit_r:.1f}R</code>\n"
+        f"SL: <code>{current_sl}</code> → <code>{new_sl}</code>"
+    )
+
+
 def _evaluate_position(
     config: Config,
     capital: CapitalClient,
@@ -87,7 +208,6 @@ def _evaluate_position(
         log.warning("Posizione %s senza dati sufficienti", deal_id)
         return None
 
-    # Recupera trade dal DB per la thesis originale (se trovato)
     trade = db.get_trade_by_deal_id(deal_id) if deal_id else None
     thesis = ""
     if trade and trade.get("signal_id"):
@@ -95,7 +215,6 @@ def _evaluate_position(
         if signal:
             thesis = signal.get("thesis", "")
 
-    # Fetch dati aggiornati per re-evaluation
     try:
         candles = capital.get_prices(epic, resolution="HOUR_4", max_bars=60)
         snapshot = capital.get_market(epic)
@@ -168,15 +287,17 @@ def _format_close_proposal(decision: dict[str, Any]) -> str:
     )
 
 
-def _close_position_safely(
-    config: Config,
+def close_position_by_deal_id(
     capital: CapitalClient,
     db: Database,
     telegram: TelegramClient,
     deal_id: str,
-    decision: dict[str, Any],
-    message_id: int | None,
+    reason: str,
+    message_id: int | None = None,
 ) -> None:
+    """Chiude una posizione per deal_id e persiste l'evento. Riutilizzabile
+    sia dal monitor (quando l'LLM propone CLOSE) sia dal daemon (click
+    ``mclose:`` dell'utente)."""
     try:
         close_resp = capital.close_position(deal_id)
         deal_ref = close_resp.get("dealReference")
@@ -186,6 +307,7 @@ def _close_position_safely(
         pnl = float(pnl) if pnl is not None else None
 
         trade = db.get_trade_by_deal_id(deal_id)
+        asset_name = trade.get("asset") if trade else deal_id
         if trade:
             entry = float(trade.get("entry_price") or 0)
             pnl_pct = (
@@ -198,24 +320,20 @@ def _close_position_safely(
                 close_price=close_level,
                 pnl=pnl,
                 pnl_pct=pnl_pct,
-                exit_reason=f"monitor:{decision.get('reason','')[:80]}",
+                exit_reason=f"manual:{reason[:80]}" if reason else "manual",
             )
             db.insert_monitoring_event(
                 {
                     "trade_id": trade["id"],
-                    "event_type": "monitor_close",
-                    "reason": decision.get("reason", ""),
-                    "details": {
-                        "close_level": close_level,
-                        "pnl": pnl,
-                        "urgency": decision.get("urgency"),
-                    },
+                    "event_type": "manual_close",
+                    "reason": reason,
+                    "details": {"close_level": close_level, "pnl": pnl},
                 }
             )
 
         text = (
-            f"✅ <b>Posizione chiusa su tua autorizzazione</b>\n"
-            f"Asset: <b>{_esc(decision['asset'])}</b>\n"
+            f"✅ <b>Posizione chiusa</b>\n"
+            f"Asset: <b>{_esc(asset_name)}</b>\n"
             f"Prezzo chiusura: <code>{close_level}</code>\n"
             f"P&amp;L: <code>{pnl}</code>"
         )
@@ -224,7 +342,7 @@ def _close_position_safely(
         else:
             telegram.send_message(text)
     except Exception as exc:
-        log.exception("Chiusura monitor fallita")
+        log.exception("Chiusura fallita")
         telegram.send_message(
             f"⚠️ <b>Chiusura fallita</b>\n<i>{_esc(exc)}</i>"
         )
@@ -249,9 +367,16 @@ def monitor_positions(config: Config) -> None:
     log.info("Monitor su %d posizioni aperte", len(open_positions))
 
     for position in open_positions:
+        # 1. Trailing stop (server-side) prima della valutazione LLM
+        try:
+            _apply_trailing_stop(capital, db, telegram, position)
+        except Exception:
+            log.exception("Trailing SL fallito")
+
+        # 2. Valutazione LLM per eventuale proposta di chiusura
         try:
             decision = _evaluate_position(config, capital, db, position)
-        except Exception as exc:
+        except Exception:
             log.exception("Valutazione posizione fallita")
             continue
 
@@ -268,61 +393,24 @@ def monitor_positions(config: Config) -> None:
         if action != "CLOSE":
             continue
 
-        # CLOSE: notifica con bottoni e attendi click
         deal_id = decision.get("deal_id")
         if not deal_id:
             continue
 
-        buttons = [[
-            {
-                "text": "✅ Chiudi ora",
-                "callback_data": f"mclose:{deal_id}",
-            },
-            {
-                "text": "⏸ Lascia aperta",
-                "callback_data": f"mhold:{deal_id}",
-            },
-        ]]
-        start_offset = telegram.drain_updates()
-        sent = telegram.send_message_with_buttons(
+        # Invia proposta con bottoni mclose/mhold e ritorna.
+        # Il daemon listener gestira' il click (confirm_handler).
+        buttons = [
+            [
+                {
+                    "text": "✅ Chiudi ora",
+                    "callback_data": f"mclose:{deal_id}",
+                },
+                {
+                    "text": "⏸ Lascia aperta",
+                    "callback_data": f"mhold:{deal_id}",
+                },
+            ]
+        ]
+        telegram.send_message_with_buttons(
             _format_close_proposal(decision), buttons
         )
-        message_id = sent.get("message_id")
-
-        deadline = time.time() + min(config.confirm_timeout_sec, 240)
-        while True:
-            remaining = int(deadline - time.time())
-            if remaining <= 0:
-                if message_id:
-                    telegram.edit_message_text(
-                        message_id,
-                        f"⌛ <b>Proposta di chiusura scaduta</b>\n"
-                        f"Posizione lasciata aperta. Sara' rivalutata al prossimo monitor.",
-                    )
-                break
-            data, _, start_offset = telegram.wait_for_callback(
-                valid_prefixes=(f"mclose:{deal_id}", f"mhold:{deal_id}"),
-                timeout_sec=remaining,
-                start_offset=start_offset,
-            )
-            if data is None:
-                continue
-            action_kind = data.split(":")[0]
-            if action_kind == "mhold":
-                if message_id:
-                    telegram.edit_message_text(
-                        message_id,
-                        f"⏸ <b>Posizione lasciata aperta</b>\n"
-                        f"<i>{_esc(decision.get('reason',''))}</i>",
-                    )
-                break
-            # mclose
-            if message_id:
-                telegram.edit_message_text(
-                    message_id,
-                    f"⏳ <b>Chiusura in corso...</b>",
-                )
-            _close_position_safely(
-                config, capital, db, telegram, deal_id, decision, message_id
-            )
-            break

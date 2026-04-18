@@ -139,34 +139,26 @@ def _format_confirm_message(
     sizing: "SizingResult",
     timeout_sec: int,
 ) -> str:
-    min_entry = _min_entry_eur(asset_features)
-    min_line = (
-        f"<b>Margine minimo per entrare:</b> <code>{min_entry:.2f} EUR</code>\n\n"
-        if min_entry is not None
-        else ""
-    )
-
     if sizing.size is None:
         sizing_block = (
-            f"⚠️ <i>Con budget {current_budget:.0f} EUR il sizing non passa: "
+            f"⚠️ <i>Con esposizione {current_budget:.0f} EUR il sizing non passa: "
             f"{_esc(sizing.reason)}</i>"
         )
     else:
         sizing_block = (
-            f"<b>Preview con budget {current_budget:.0f} EUR:</b>\n"
+            f"<b>Preview con esposizione {current_budget:.0f} EUR:</b>\n"
             f"Size: <code>{sizing.size:g}</code>\n"
-            f"Margine impegnato: <code>{sizing.margin_estimate:.2f} EUR</code>\n"
-            f"Rischio se SL: <code>{sizing.risk_estimate:.2f} EUR</code>\n"
-            f"Notional: <code>{sizing.notional:.2f}</code>"
+            f"Esposizione effettiva: <code>{sizing.notional:.2f} EUR</code>\n"
+            f"Margine richiesto: <code>{sizing.margin_estimate:.2f} EUR</code>\n"
+            f"Rischio se SL: <code>{sizing.risk_estimate:.2f} EUR</code>"
         )
     return (
         f"🟡 <b>Conferma richiesta</b> (signal {signal_row['id']})\n\n"
         f"<b>{_esc(proposal.asset)}</b> "
         f"{proposal.direction.upper()} (score {proposal.score}/10)\n\n"
-        f"{min_line}"
         f"{sizing_block}\n\n"
-        f"<i>Cambia budget con i bottoni o conferma. "
-        f"Timeout {timeout_sec // 60} min.</i>"
+        f"<i>Scegli l'esposizione con i bottoni (valori in EUR) poi Esegui. "
+        f"Il click aggiorna la preview.</i>"
     )
 
 
@@ -288,10 +280,10 @@ def _format_no_setup_message(
 def _preview_sizing(
     proposal: SetupProposal,
     asset_features: dict[str, Any],
-    margin_budget: float,
+    exposure_budget: float,
 ) -> SizingResult:
     return calculate_size(
-        margin_budget=margin_budget,
+        exposure_budget=exposure_budget,
         entry_price=asset_features.get("last_price") or 0,
         margin_factor=asset_features.get("margin_factor") or 0.05,
         min_size=asset_features.get("min_size") or 0.01,
@@ -317,7 +309,7 @@ def _handle_confirm(
     Telegram concorrente.
     """
     signal_id = signal_row["id"]
-    current_budget = float(config.margin_budget_eur)
+    current_budget = float(config.exposure_budget_eur)
     sizing = _preview_sizing(proposal, asset_features, current_budget)
 
     telegram.send_message_with_buttons(

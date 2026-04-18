@@ -1,17 +1,21 @@
-"""Calcolo del sizing in base a un BUDGET DI MARGINE PER TRADE in EUR.
+"""Calcolo del sizing in base a un BUDGET DI ESPOSIZIONE in EUR.
 
-Logica (adatta a micro-capitale):
-- Decidi quanta cifra in EUR vuoi impegnare come margine per ogni trade
-  (es. 10-20 EUR su un capitale di 60-200 EUR).
-- Da li' calcoliamo la size massima ammessa data la margin factor del
-  broker. Se la size minima del broker richiederebbe piu' del budget,
-  tolleriamo fino a 1.5x (configurabile via tolerance).
-- Lo stop loss tecnico determina poi il rischio in EUR del trade.
-  Il rischio cresce o cala in base alla size, NON al budget margine.
+Logica:
+- Decidi quanta esposizione in EUR (notional) vuoi tenere su ogni trade.
+  Esempio: con exposure_budget=10 su BTC @ 76k USD, la size punta a
+  ~0.00013 BTC. Con exposure_budget=10 su un indice, la size e' molto
+  piu' alta perche' il valore unitario e' minore. L'esposizione in EUR
+  resta confrontabile tra asset diversi.
+- Il MARGINE richiesto per quella esposizione dipende dal margin_factor
+  del broker (es. 5% indici, 50-65% crypto) e viene solo riportato nella
+  preview; non limita il sizing a meno che il margine disponibile sul
+  conto non basti (caso 'margine insufficiente').
+- Lo stop loss tecnico determina poi il rischio in EUR del trade,
+  proporzionale a size * entry_price * stop_pct/100.
 
 API:
     SizingResult.size           -> size finale (None se rifiutata)
-    SizingResult.notional       -> esposizione in valuta (size * prezzo)
+    SizingResult.notional       -> esposizione effettiva in valuta
     SizingResult.margin_estimate-> margine impegnato stimato (EUR)
     SizingResult.risk_estimate  -> perdita stimata se scatta lo stop (EUR)
 """
@@ -37,7 +41,7 @@ def _round_to_step(value: float, step: float) -> float:
 
 
 def calculate_size(
-    margin_budget: float,
+    exposure_budget: float,
     entry_price: float,
     margin_factor: float,
     min_size: float,
@@ -46,13 +50,14 @@ def calculate_size(
     available_margin: float | None = None,
     tolerance: float = 1.5,
 ) -> SizingResult:
-    """margin_budget: EUR che vogliamo (al massimo) impegnare per questo trade."""
+    """``exposure_budget`` e' l'esposizione target in EUR (notional)."""
     if entry_price <= 0 or margin_factor <= 0:
-        return SizingResult(None, 0, 0, 0, reason="Prezzo o margin factor non validi")
+        return SizingResult(
+            None, 0, 0, 0, reason="Prezzo o margin factor non validi"
+        )
 
     step = size_step or min_size
-    target_notional = margin_budget / margin_factor
-    raw_size = target_notional / entry_price
+    raw_size = exposure_budget / entry_price
     sized = _round_to_step(raw_size, step)
     if sized < min_size:
         sized = min_size
@@ -60,21 +65,21 @@ def calculate_size(
     notional = sized * entry_price
     margin_est = notional * margin_factor
 
-    # Caso 1: la size minima del broker richiede piu' del budget oltre tolleranza
-    if margin_est > margin_budget * tolerance:
+    # Caso 1: la size minima del broker esplode l'esposizione oltre tolleranza
+    if notional > exposure_budget * tolerance:
         return SizingResult(
             None,
             notional,
             margin_est,
             sized * entry_price * stop_pct / 100,
             reason=(
-                f"Min size {min_size} impegna {margin_est:.2f} EUR > "
-                f"{tolerance}x budget {margin_budget:.2f} EUR. "
-                f"Asset non economicamente accessibile per questo budget."
+                f"Min size {min_size} genera notional {notional:.2f} EUR > "
+                f"{tolerance}x esposizione {exposure_budget:.2f} EUR. "
+                f"Asset non accessibile a questa size."
             ),
         )
 
-    # Caso 2: il margine richiesto sfora il margine effettivamente disponibile
+    # Caso 2: margine richiesto maggiore del margine disponibile sul conto
     if available_margin is not None and margin_est > available_margin:
         return SizingResult(
             None,

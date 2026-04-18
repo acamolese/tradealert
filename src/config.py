@@ -26,7 +26,7 @@ class Config:
 
     finnhub_api_key: str  # opzionale, "" se non configurato
 
-    margin_budget_eur: float  # EUR di margine massimo da impegnare per trade
+    exposure_budget_eur: float  # Esposizione target in EUR per trade (notional)
     max_open_positions: int
     min_score_threshold: float
     execution_mode: str  # "coach" | "confirm" | "auto"
@@ -61,7 +61,10 @@ def load_config() -> Config:
             "ANTHROPIC_MODEL", "claude-haiku-4-5-20251001"
         ),
         finnhub_api_key=os.environ.get("FINNHUB_API_KEY", ""),
-        margin_budget_eur=float(os.environ.get("MARGIN_BUDGET_EUR", "15")),
+        exposure_budget_eur=float(
+            os.environ.get("EXPOSURE_BUDGET_EUR")
+            or os.environ.get("MARGIN_BUDGET_EUR", "15")
+        ),
         max_open_positions=int(os.environ.get("MAX_OPEN_POSITIONS", "1")),
         min_score_threshold=float(os.environ.get("MIN_SCORE_THRESHOLD", "7")),
         execution_mode=os.environ.get("EXECUTION_MODE", "coach").lower(),
