@@ -32,10 +32,14 @@ from .watchlist import DISCOVERY_WATCHLIST
 log = logging.getLogger(__name__)
 
 
+_FEATURE_REQUEST_DELAY_SEC = 0.15
+
+
 def _collect_features(
     capital: CapitalClient, assets: list[Asset]
 ) -> dict[str, dict[str, Any]]:
-    """Per ogni asset, fetcha candele 4H e snapshot. Salta i fallimenti."""
+    """Per ogni asset, fetcha candele 4H e snapshot. Salta i fallimenti.
+    Throttle tra asset per restare sotto il rate limit Capital."""
     features: dict[str, dict[str, Any]] = {}
     for asset in assets:
         try:
@@ -45,6 +49,7 @@ def _collect_features(
             snapshot = capital.get_market(asset.epic)
             if not candles:
                 log.warning("Nessuna candela per %s (%s)", asset.name, asset.epic)
+                time.sleep(_FEATURE_REQUEST_DELAY_SEC)
                 continue
             features[asset.name] = compute_features(
                 asset.name, candles, snapshot=snapshot
@@ -55,6 +60,7 @@ def _collect_features(
             log.warning(
                 "Skip %s (%s): %s", asset.name, asset.epic, exc
             )
+        time.sleep(_FEATURE_REQUEST_DELAY_SEC)
     return features
 
 

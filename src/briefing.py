@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Any
 
 from anthropic import Anthropic
@@ -26,6 +27,10 @@ from .news import fetch_news, format_news_for_llm
 from .quiet_hours import is_quiet_now, quiet_reason
 from .telegram_client import TelegramClient
 from .universe import UNIVERSE
+
+# Capital rate-limit: ~10 req/s sul /markets/{epic}. Con 0.15s tra chiamate
+# restiamo ben sotto. Se aggiungiamo asset, tenere sotto soglia.
+MARKET_REQUEST_DELAY_SEC = 0.15
 
 log = logging.getLogger(__name__)
 
@@ -66,13 +71,15 @@ al punto."""
 
 
 def _capital_snapshot(capital: CapitalClient) -> dict[str, Any]:
-    """Per ogni asset universo, calcola variazione 24h e prezzo attuale."""
+    """Per ogni asset universo, calcola variazione 24h e prezzo attuale.
+    Throttle tra chiamate per restare sotto il rate limit Capital."""
     snap: dict[str, dict[str, Any]] = {}
     for asset in UNIVERSE:
         try:
             market = capital.get_market(asset.epic)
             s = market.get("snapshot", {})
             if s.get("marketStatus") not in ("TRADEABLE", "EDITS_ONLY"):
+                time.sleep(MARKET_REQUEST_DELAY_SEC)
                 continue
             bid = s.get("bid")
             offer = s.get("offer")
@@ -94,6 +101,7 @@ def _capital_snapshot(capital: CapitalClient) -> dict[str, Any]:
             log.warning("Skip %s nel briefing: %s", asset.name, exc)
         except Exception as exc:
             log.warning("Errore briefing su %s: %s", asset.name, exc)
+        time.sleep(MARKET_REQUEST_DELAY_SEC)
     return snap
 
 
