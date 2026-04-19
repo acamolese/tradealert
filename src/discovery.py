@@ -1,17 +1,23 @@
 """Discovery dinamica dei top mover del momento.
 
-Dato una watchlist ampia, chiama ``capital.get_market`` per ogni epic e
-legge ``snapshot.percentageChange`` (change % della sessione corrente).
-Ritorna top N gainers + top N losers sopra una soglia minima, filtrando
-fuori gli asset con mercato chiuso. Tollerante a 404 e rate limit: un
-asset non accessibile viene loggato e saltato senza bloccare il resto.
+Usa l'endpoint ``/marketnavigation`` di Capital.com che restituisce
+direttamente ``percentageChange``, ``bid/offer`` e ``marketStatus`` per
+tutti i mercati di una categoria (crypto, shares US popolari, ecc.)
+in una sola chiamata. Rispetto al vecchio approccio basato su una
+watchlist hardcoded, copre dinamicamente ogni asset listato da Capital
+senza doverlo mantenere manualmente.
+
+Fallback: se la chiamata fallisce per qualunque motivo, la discovery
+torna vuota e lo scanner procede solo sull'``UNIVERSE`` statico.
 """
 
 from __future__ import annotations
 
 import logging
-import time
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
+from zoneinfo import ZoneInfo
 
 from .capital_client import CapitalAPIError, CapitalClient
 from .universe import Asset
@@ -28,69 +34,132 @@ class MoverQuote:
     low: float | None
 
 
+_INSTRUMENT_TYPE_TO_CLASS = {
+    "CRYPTOCURRENCIES": "crypto",
+    "SHARES": "share",
+    "CURRENCIES": "fx",
+    "INDICES": "index",
+    "COMMODITIES": "commodity",
+}
+
+# Nodi Capital che vogliamo interrogare. Crypto: l'intero gruppo
+# (~265 mercati) cosi' scopriamo anche alt mid/small cap. Shares:
+# popular_shares copre ~400 azioni US/EU liquide, sufficiente per
+# momentum intraday. most_volatile cattura small cap con grossa
+# percentage change che popular potrebbe escludere.
+DEFAULT_CRYPTO_NODE = "hierarchy_v1.crypto_currencies"
+DEFAULT_SHARE_NODES = (
+    "hierarchy_v1.shares.popular_shares",
+    "hierarchy_v1.shares.us.most_volatile",
+)
+
+
+def _market_to_quote(market: dict[str, Any]) -> MoverQuote | None:
+    epic = market.get("epic")
+    pct = market.get("percentageChange")
+    instrument_type = market.get("instrumentType") or ""
+    if not epic or pct is None:
+        return None
+    asset_class = _INSTRUMENT_TYPE_TO_CLASS.get(instrument_type)
+    if not asset_class:
+        return None
+    bid = market.get("bid")
+    offer = market.get("offer")
+    last = (
+        (float(bid) + float(offer)) / 2
+        if bid is not None and offer is not None
+        else None
+    )
+    return MoverQuote(
+        asset=Asset(
+            name=market.get("instrumentName") or epic,
+            epic=epic,
+            asset_class=asset_class,
+        ),
+        percentage_change=float(pct),
+        last_price=last,
+        high=market.get("high"),
+        low=market.get("low"),
+    )
+
+
+def _fetch_node_markets(
+    capital: CapitalClient, node_id: str
+) -> list[dict[str, Any]]:
+    try:
+        data = capital.get_market_navigation(node_id)
+    except CapitalAPIError as exc:
+        log.warning("Navigation skip %s: %s", node_id, exc)
+        return []
+    except Exception as exc:
+        log.warning("Navigation errore %s: %s", node_id, exc)
+        return []
+    return data.get("markets") or []
+
+
+def _default_nodes(now: datetime | None = None) -> list[str]:
+    """Nel weekend i nodi share sono inutili (mercati chiusi): saltiamo
+    per risparmiare chiamate HTTP e tempo."""
+    now = now or datetime.now(ZoneInfo("Europe/Rome"))
+    is_weekend = now.weekday() >= 5
+    nodes = [DEFAULT_CRYPTO_NODE]
+    if not is_weekend:
+        nodes.extend(DEFAULT_SHARE_NODES)
+    return nodes
+
+
 def discover_top_movers(
     capital: CapitalClient,
-    watchlist: list[Asset],
+    watchlist: list[Asset] | None = None,  # retro-compat, ignorato
     top_n: int = 5,
     abs_min_pct: float = 2.0,
-    request_delay_sec: float = 0.15,
+    nodes: list[str] | None = None,
 ) -> tuple[list[Asset], list[MoverQuote]]:
-    """Ritorna (lista_asset, quote_details).
+    """Ritorna (lista_asset, quote_details) con i top mover del momento
+    letti dai nodi navigazione di Capital.
 
-    ``lista_asset`` e' pronta per l'unione con ``UNIVERSE``, nell'ordine
-    gainer prima (discending per pct), poi loser (ascending). Duplicati
-    sono rimossi preservando l'ordine.
+    Gli asset sono ordinati: prima i gainer (discending per pct), poi i
+    loser (ascending). Epic duplicati vengono rimossi preservando
+    l'ordine. Filtro: solo mercati TRADEABLE con |pct| >= abs_min_pct.
+
+    ``watchlist`` e' accettato per retro-compatibilita' ma ignorato:
+    la watchlist statica non e' piu' usata, la scoperta e' interamente
+    basata sui nodi Capital. ``nodes`` permette di sovrascrivere i
+    default (crypto + share popular) per test o casi speciali.
     """
-    quotes: list[MoverQuote] = []
+    nodes_to_fetch = nodes or _default_nodes()
+    all_quotes: dict[str, MoverQuote] = {}
+    total_markets = 0
+    for node_id in nodes_to_fetch:
+        markets = _fetch_node_markets(capital, node_id)
+        total_markets += len(markets)
+        for m in markets:
+            if m.get("marketStatus") != "TRADEABLE":
+                continue
+            q = _market_to_quote(m)
+            if q is None:
+                continue
+            # in caso di sovrapposizione fra nodi, tieni la quota con pct
+            # assoluto maggiore (piu' probabilmente rilevante)
+            existing = all_quotes.get(q.asset.epic)
+            if (
+                existing is None
+                or abs(q.percentage_change) > abs(existing.percentage_change)
+            ):
+                all_quotes[q.asset.epic] = q
 
-    for asset in watchlist:
-        try:
-            market = capital.get_market(asset.epic)
-        except CapitalAPIError as exc:
-            log.info(
-                "Discovery skip %s (%s): %s", asset.name, asset.epic, exc
-            )
-            time.sleep(request_delay_sec)
-            continue
-        except Exception as exc:
-            log.warning("Discovery errore %s: %s", asset.name, exc)
-            time.sleep(request_delay_sec)
-            continue
-
-        snap = market.get("snapshot", {}) or {}
-        if snap.get("marketStatus") != "TRADEABLE":
-            time.sleep(request_delay_sec)
-            continue
-
-        pct = snap.get("percentageChange")
-        if pct is None:
-            time.sleep(request_delay_sec)
-            continue
-
-        bid = snap.get("bid")
-        offer = snap.get("offer")
-        last = (
-            (float(bid) + float(offer)) / 2
-            if bid is not None and offer is not None
-            else None
+    if not all_quotes:
+        log.warning(
+            "Discovery: zero quote valide dai nodi %s (totale mercati letti: %d)",
+            nodes_to_fetch,
+            total_markets,
         )
-
-        quotes.append(
-            MoverQuote(
-                asset=asset,
-                percentage_change=float(pct),
-                last_price=last,
-                high=snap.get("high"),
-                low=snap.get("low"),
-            )
-        )
-        time.sleep(request_delay_sec)
-
-    if not quotes:
-        log.warning("Discovery: zero quote valide dalla watchlist (%d asset)", len(watchlist))
         return [], []
 
-    filtered = [q for q in quotes if abs(q.percentage_change) >= abs_min_pct]
+    filtered = [
+        q for q in all_quotes.values()
+        if abs(q.percentage_change) >= abs_min_pct
+    ]
 
     gainers = sorted(
         filtered, key=lambda q: q.percentage_change, reverse=True
@@ -105,10 +174,11 @@ def discover_top_movers(
             seen.add(q.asset.epic)
 
     log.info(
-        "Discovery su %d asset: %d quote valide, %d sopra soglia %.1f%%, "
-        "%d gainers, %d losers, %d selezionati",
-        len(watchlist),
-        len(quotes),
+        "Discovery nav: nodi=%s, %d mercati totali, %d TRADEABLE, "
+        "%d sopra soglia %.1f%%, %d gainers, %d losers, %d selezionati",
+        nodes_to_fetch,
+        total_markets,
+        len(all_quotes),
         len(filtered),
         abs_min_pct,
         len(gainers),
@@ -116,6 +186,5 @@ def discover_top_movers(
         len(selected),
     )
 
-    # Ritorno anche i details per logging/Telegram, ordine = gainers + losers
-    details = [q for q in gainers + losers]
+    details = list(gainers) + list(losers)
     return selected, details

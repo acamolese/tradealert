@@ -27,7 +27,6 @@ from .quiet_hours import is_quiet_now, quiet_reason
 from .risk import SizingResult, calculate_size
 from .telegram_client import TelegramClient
 from .universe import UNIVERSE, Asset
-from .watchlist import DISCOVERY_WATCHLIST
 
 log = logging.getLogger(__name__)
 
@@ -578,10 +577,12 @@ def run_morning_scan(config: Config) -> None:
     except Exception as exc:
         log.warning("Snapshot account fallito: %s", exc)
 
-    # Discovery dinamica: top movers del momento dalla watchlist estesa.
+    # Discovery dinamica: top mover letti direttamente da
+    # /marketnavigation (crypto group + shares popolari). Copertura
+    # ampia senza hardcoded watchlist.
     try:
         movers, mover_quotes = discover_top_movers(
-            capital, DISCOVERY_WATCHLIST, top_n=5, abs_min_pct=2.0
+            capital, top_n=7, abs_min_pct=2.0
         )
     except Exception:
         log.exception("Discovery fallita, uso solo universo statico")

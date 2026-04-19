@@ -119,6 +119,26 @@ class CapitalClient:
         _raise_for_status(response)
         return response.json()
 
+    def get_market_navigation(
+        self, node_id: str | None = None
+    ) -> dict[str, Any]:
+        """Naviga la gerarchia mercati Capital.com. Senza ``node_id``
+        ritorna i gruppi top-level (crypto, shares, forex, ecc.).
+        Con un ``node_id`` ritorna ``nodes`` (sotto-categorie) e ``markets``
+        (foglie con metadati: epic, percentageChange, bid/offer,
+        marketStatus, instrumentType). Utile per la discovery dinamica
+        senza hardcoded watchlist."""
+        path = "/marketnavigation"
+        if node_id:
+            path = f"{path}/{node_id}"
+        response = self._session.get(
+            self._url(path),
+            headers=self._auth_headers(),
+            timeout=15,
+        )
+        _raise_for_status(response)
+        return response.json()
+
     def get_prices(
         self,
         epic: str,
