@@ -35,6 +35,33 @@ log = logging.getLogger(__name__)
 _FEATURE_REQUEST_DELAY_SEC = 0.15
 
 
+def _log_run(
+    db: Database,
+    outcome: str,
+    *,
+    top_asset: str | None = None,
+    top_score: float | None = None,
+    candidates_count: int | None = None,
+    open_positions_count: int | None = None,
+    notes: dict[str, Any] | None = None,
+) -> None:
+    """Persiste l'esito della run dello scanner. Silenzia eventuali errori
+    DB per non impattare la logica principale."""
+    try:
+        db.insert_scanner_run(
+            {
+                "outcome": outcome,
+                "top_asset": top_asset,
+                "top_score": top_score,
+                "candidates_count": candidates_count,
+                "open_positions_count": open_positions_count,
+                "notes": notes,
+            }
+        )
+    except Exception:
+        log.exception("insert_scanner_run fallito (outcome=%s)", outcome)
+
+
 def _collect_features(
     capital: CapitalClient, assets: list[Asset]
 ) -> dict[str, dict[str, Any]]:
@@ -578,6 +605,7 @@ def run_morning_scan(config: Config) -> None:
         telegram.send_message(
             "⚠️ Scanner mattutino: nessun dato di mercato disponibile."
         )
+        _log_run(db, "no_data", notes={"scan_set": len(scan_set)})
         return
 
     # Arricchimento con news per asset (RSS pubblici + Finnhub company-news
@@ -653,6 +681,19 @@ def run_morning_scan(config: Config) -> None:
             len(recent_assets),
             len(eligible),
         )
+        best = eligible[0] if eligible else None
+        _log_run(
+            db,
+            "no_setup",
+            top_asset=best.asset if best else None,
+            top_score=best.score if best else None,
+            candidates_count=len(eligible),
+            notes={
+                "recent_dedup_count": len(recent_assets),
+                "min_score_threshold": config.min_score_threshold,
+                "scan_set": len(scan_set),
+            },
+        )
         return
 
     # Se gli slot di posizione sono pieni, il signal ha senso SOLO se la
@@ -691,6 +732,18 @@ def run_morning_scan(config: Config) -> None:
             ),
             _rotation_buttons(signal_row["id"], rotation["deal_id"]),
         )
+        _log_run(
+            db,
+            "rotation_proposed",
+            top_asset=top.asset,
+            top_score=top.score,
+            candidates_count=len(eligible),
+            open_positions_count=open_count,
+            notes={
+                "rotation_target": rotation.get("asset"),
+                "rotation_delta": rotation.get("delta"),
+            },
+        )
         return
 
     if open_count >= config.max_open_positions:
@@ -702,12 +755,30 @@ def run_morning_scan(config: Config) -> None:
             config.max_open_positions,
         )
         db.update_signal_status(signal_row["id"], "expired")
+        _log_run(
+            db,
+            "slots_full",
+            top_asset=top.asset,
+            top_score=top.score,
+            candidates_count=len(eligible),
+            open_positions_count=open_count,
+            notes={"max_open_positions": config.max_open_positions},
+        )
         return
 
     telegram.send_message(
         _format_telegram_message(
             top, asset_features, execution_mode=config.execution_mode
         )
+    )
+    _log_run(
+        db,
+        "signal_sent",
+        top_asset=top.asset,
+        top_score=top.score,
+        candidates_count=len(eligible),
+        open_positions_count=open_count,
+        notes={"execution_mode": config.execution_mode},
     )
 
     if config.execution_mode == "auto":

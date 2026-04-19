@@ -24,11 +24,14 @@ from .confirm_handler import (
 )
 from .db import Database
 from .positions import manage_positions
+from .status import send_status
 from .telegram_client import TelegramClient
 
 log = logging.getLogger(__name__)
 
-KNOWN_COMMANDS = ("/posizioni", "/positions")
+POSITIONS_COMMANDS = ("/posizioni", "/positions")
+STATUS_COMMANDS = ("/status", "/stato")
+KNOWN_COMMANDS = POSITIONS_COMMANDS + STATUS_COMMANDS
 
 
 def _answer_callback(telegram: TelegramClient, cb_id: str, text: str = "Ricevuto") -> None:
@@ -51,9 +54,13 @@ def _process_message(
     if str(msg.get("chat", {}).get("id")) != expected_chat:
         return None
     text = (msg.get("text") or "").strip().lower()
-    if text in KNOWN_COMMANDS:
+    if text in POSITIONS_COMMANDS:
         log.info("Comando %s ricevuto, lancio gestione posizioni", text)
         manage_positions(config)
+        return text
+    if text in STATUS_COMMANDS:
+        log.info("Comando %s ricevuto, invio status", text)
+        send_status(config)
         return text
     return None
 

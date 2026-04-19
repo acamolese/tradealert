@@ -84,6 +84,37 @@ class Database:
     def insert_monitoring_event(self, event: dict[str, Any]) -> None:
         self._client.table("monitoring_events").insert(event).execute()
 
+    def insert_scanner_run(self, row: dict[str, Any]) -> dict[str, Any]:
+        """Traccia l'esito di una run dello scanner per /status."""
+        response = self._client.table("scanner_runs").insert(row).execute()
+        return response.data[0] if response.data else {}
+
+    def last_scanner_run(self) -> dict[str, Any] | None:
+        response = (
+            self._client.table("scanner_runs")
+            .select("*")
+            .order("ran_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        return response.data[0] if response.data else None
+
+    def recent_signals(self, hours: int = 24) -> list[dict[str, Any]]:
+        """Signal completi creati nelle ultime ``hours`` (qualsiasi status)."""
+        from datetime import datetime, timedelta, timezone
+
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(hours=hours)
+        ).isoformat()
+        response = (
+            self._client.table("signals")
+            .select("asset,direction,score,status,created_at")
+            .gte("created_at", cutoff)
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return response.data or []
+
     def recent_signal_assets(self, hours: int = 24) -> set[str]:
         """Asset per cui e' stato creato un signal nelle ultime ``hours``
         (qualsiasi status). Usato per evitare di riproporre ripetutamente
