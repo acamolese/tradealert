@@ -43,6 +43,18 @@ Regole su asset class CRYPTO:
   diventano l'opzione principale e possono essere proposte anche con score 6-7.
 - Tieni conto di "is_weekend" e "tradeable_count" nel contesto fornito.
 
+Momentum intraday (campo "daily_pct_change"):
+- |daily_pct_change| >= 5%: asset in movimento forte oggi. Dagli priorita'
+  nell'analisi anche se il trend 4H multi-giorno e' opposto, perche' il
+  movimento del giorno puo' anticipare un cambio di regime o essere un
+  breakout/capitulation attendibile.
+- daily_pct_change > 10% o < -10%: momentum eccezionale, valuta sempre il
+  setup (long se salita + conferma tecnica, short sulla vendita forte +
+  rifiuto). Non scartare senza motivazione esplicita nei risks.
+- Esempio: una alt-coin con slope 4H negativo ma daily_pct_change +20%
+  puo' essere un reversal da considerare, non un "trend discendente" da
+  ignorare. Cita daily_pct_change nella thesis quando e' decisivo.
+
 Produci un ranking dei top 3 setup. Per ognuno indichi:
 - direction: "long", "short" o "skip" (skip se nessun setup chiaro)
 - score 0-10 (8+ solo per setup eccellenti, 6-7 buoni, sotto 6 mediocri)

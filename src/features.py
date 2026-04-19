@@ -119,6 +119,29 @@ def compute_features(
 
         features["market_status"] = snap.get("marketStatus", "UNKNOWN")
 
+        # Momentum del giorno: Capital restituisce percentageChange gia'
+        # calcolato sulla sessione corrente. Senza questo il LLM non ha
+        # visibilita' sui mover intraday (es. alt-coin a +25% oggi).
+        pct_change = snap.get("percentageChange")
+        if pct_change is not None:
+            try:
+                features["daily_pct_change"] = round(float(pct_change), 2)
+            except (TypeError, ValueError):
+                pass
+        daily_high = snap.get("high")
+        daily_low = snap.get("low")
+        if daily_high is not None and daily_low is not None and last:
+            try:
+                dh = float(daily_high)
+                dl = float(daily_low)
+                if dh > 0:
+                    features["daily_range_pct"] = round((dh - dl) / dh * 100, 2)
+                    features["pct_from_daily_high"] = round(
+                        (last - dh) / dh * 100, 2
+                    )
+            except (TypeError, ValueError):
+                pass
+
         # Dati per sizing/feasibility check
         rules = snapshot.get("dealingRules", {}) or {}
         min_size_field = rules.get("minDealSize", {}) or {}
