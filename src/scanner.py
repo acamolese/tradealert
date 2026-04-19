@@ -34,6 +34,30 @@ log = logging.getLogger(__name__)
 _FEATURE_REQUEST_DELAY_SEC = 0.15
 
 
+def _proposals_summary(
+    proposals: list[SetupProposal] | None,
+) -> list[dict[str, Any]]:
+    """Compatta i proposals del LLM per il logging in scanner_runs.notes:
+    asset, direction, score e thesis troncata. Utile per analisi
+    retrospettive (capire perche' un asset non e' stato promosso)."""
+    if not proposals:
+        return []
+    out: list[dict[str, Any]] = []
+    for p in proposals:
+        thesis = p.thesis or ""
+        if len(thesis) > 180:
+            thesis = thesis[:177] + "..."
+        out.append(
+            {
+                "asset": p.asset,
+                "direction": p.direction,
+                "score": p.score,
+                "thesis": thesis,
+            }
+        )
+    return out
+
+
 def _log_run(
     db: Database,
     outcome: str,
@@ -693,6 +717,7 @@ def run_morning_scan(config: Config) -> None:
                 "recent_dedup_count": len(recent_assets),
                 "min_score_threshold": config.min_score_threshold,
                 "scan_set": len(scan_set),
+                "proposals": _proposals_summary(proposals),
             },
         )
         return
@@ -743,6 +768,7 @@ def run_morning_scan(config: Config) -> None:
             notes={
                 "rotation_target": rotation.get("asset"),
                 "rotation_delta": rotation.get("delta"),
+                "proposals": _proposals_summary(proposals),
             },
         )
         return
@@ -763,7 +789,10 @@ def run_morning_scan(config: Config) -> None:
             top_score=top.score,
             candidates_count=len(eligible),
             open_positions_count=open_count,
-            notes={"max_open_positions": config.max_open_positions},
+            notes={
+                "max_open_positions": config.max_open_positions,
+                "proposals": _proposals_summary(proposals),
+            },
         )
         return
 
@@ -779,7 +808,10 @@ def run_morning_scan(config: Config) -> None:
         top_score=top.score,
         candidates_count=len(eligible),
         open_positions_count=open_count,
-        notes={"execution_mode": config.execution_mode},
+        notes={
+            "execution_mode": config.execution_mode,
+            "proposals": _proposals_summary(proposals),
+        },
     )
 
     if config.execution_mode == "auto":
