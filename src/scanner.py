@@ -188,7 +188,7 @@ def _format_telegram_message(
         )
 
     return (
-        f"🎯 <b>Setup del giorno</b>\n\n"
+        f"🎯 <b>Setup individuato</b>\n\n"
         f"<b>{_esc(proposal.asset)}</b>  (score {proposal.score}/10)\n"
         f"{direction_line}\n"
         f"Prezzo: <code>{_esc(last)}</code>\n"
