@@ -77,9 +77,11 @@ def _apply_trailing_stop(
     position: dict[str, Any],
 ) -> None:
     """Trailing stop R-multiple:
-    - profit >= 1R -> SL a breakeven (entry)
-    - profit >= 2R -> SL a entry + 1R (long) / entry - 1R (short)
-    - profit >= NR -> SL a entry + (N-1)R
+    - profit >= 0.5R -> SL a entry - 0.5R (long) / entry + 0.5R (short):
+      half-risk protection, riduce il peggio a meta' del rischio iniziale.
+    - profit >= 1R  -> SL a breakeven (entry): rischio zero.
+    - profit >= 2R  -> SL a entry + 1R (long) / entry - 1R (short).
+    - profit >= NR  -> SL a entry + (N-1)R.
     Solo migliorativo: se il calcolo darebbe uno SL peggiore dell'attuale,
     non tocchiamo nulla. R e' derivato dallo stop originale del signal.
     """
@@ -137,11 +139,14 @@ def _apply_trailing_stop(
         profit = entry - current_price
 
     profit_r = profit / r_distance
-    if profit_r < 1:
+    if profit_r < 0.5:
         return
 
-    step = int(profit_r)  # quanti R completi
-    offset_r = step - 1  # new SL a entry +/- offset_r * R
+    # Scelta del checkpoint: half-risk fra 0.5R e 1R, poi 1R in 1R.
+    if profit_r < 1:
+        offset_r = -0.5  # SL a entry - 0.5R (long) / entry + 0.5R (short)
+    else:
+        offset_r = int(profit_r) - 1
 
     if direction == "BUY":
         new_sl = entry + offset_r * r_distance
@@ -167,24 +172,35 @@ def _apply_trailing_stop(
         profit_r,
         offset_r,
     )
+    offset_sign = "+" if offset_r >= 0 else ""
+    reason_text = (
+        f"Profit {profit_r:.2f}R, SL {offset_sign}{offset_r}R dall'entry"
+    )
     if trade:
         db.insert_monitoring_event(
             {
                 "trade_id": trade["id"],
                 "event_type": "trailing_sl",
-                "reason": f"Profit {profit_r:.1f}R, SL +{offset_r}R dall'entry",
+                "reason": reason_text,
                 "details": {
                     "old_sl": current_sl,
                     "new_sl": new_sl,
                     "current_price": current_price,
                     "r_distance": r_distance,
                     "profit_r": profit_r,
+                    "offset_r": offset_r,
                 },
             }
         )
+    if offset_r < 0:
+        label = "half-risk (rischio dimezzato)"
+    elif offset_r == 0:
+        label = "breakeven (rischio zero)"
+    else:
+        label = f"+{offset_r}R in profitto"
     telegram.send_message(
         f"🛡 <b>Trailing SL</b> su {_esc(asset_name)}\n"
-        f"Profit attuale: <code>{profit_r:.1f}R</code>\n"
+        f"Profit: <code>{profit_r:.2f}R</code> → SL {label}\n"
         f"SL: <code>{current_sl}</code> → <code>{new_sl}</code>"
     )
 
@@ -348,6 +364,33 @@ def close_position_by_deal_id(
         telegram.send_message(
             f"⚠️ <b>Chiusura fallita</b>\n<i>{_esc(exc)}</i>"
         )
+
+
+def run_trailing_stops(config: Config) -> None:
+    """Versione leggera del monitor: applica solo il trailing stop a
+    tutte le posizioni aperte. Nessuna chiamata LLM, solo aritmetica e
+    ``update_position`` quando uno SL va spostato. Pensato per girare
+    spesso (ogni 5 min) per proteggere rapidamente il breakeven senza
+    incidere sui costi."""
+    if is_quiet_now():
+        log.info("Skip trailing: %s", quiet_reason())
+        return
+
+    capital = CapitalClient(config)
+    telegram = TelegramClient(config)
+    db = Database(config)
+
+    capital.login()
+    positions = capital.get_open_positions()
+    if not positions:
+        return
+
+    log.info("Trailing scan su %d posizioni", len(positions))
+    for position in positions:
+        try:
+            _apply_trailing_stop(capital, db, telegram, position)
+        except Exception:
+            log.exception("Trailing SL fallito")
 
 
 def monitor_positions(config: Config) -> None:
