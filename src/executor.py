@@ -12,6 +12,7 @@ Safety hardcoded:
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -211,39 +212,92 @@ def execute_signal(
     if not deal_reference:
         return ExecutionResult(False, reason="dealReference mancante in risposta")
 
-    # 7. Conferma esito (Capital lavora in modo asincrono)
+    # 7. Conferma esito (Capital lavora in modo asincrono).
+    # Se confirm_deal fallisce non vuol dire che l'ordine sia stato
+    # rifiutato: Capital a volte risponde 404 sul dealReference ma la
+    # posizione e' stata comunque aperta. Facciamo fallback su
+    # get_open_positions cercando un match per dealReference o, se
+    # assente, per epic+direction+size (race window piccola).
+    confirm: dict[str, Any] = {}
+    confirm_failed = False
     try:
         confirm = capital.confirm_deal(deal_reference)
     except Exception as exc:
-        return ExecutionResult(
-            False, reason=f"confirm_deal fallita: {exc}"
+        log.warning(
+            "confirm_deal fallita (%s), provo fallback via get_open_positions",
+            exc,
         )
+        confirm_failed = True
 
     status = confirm.get("dealStatus") or confirm.get("status")
-    # Il dealId della POSIZIONE (utile per close) e' in affectedDeals[0].dealId.
-    # confirm.dealId e' invece l'ID dell'ordine, che Capital non accetta su DELETE.
     affected = confirm.get("affectedDeals") or []
     deal_id = (affected[0].get("dealId") if affected else None) or confirm.get(
         "dealId"
     )
     fill_level = float(confirm.get("level") or entry_price)
 
-    if status != "ACCEPTED":
+    if not confirm_failed and status and status != "ACCEPTED":
         return ExecutionResult(
             False,
             reason=f"Deal non accettato: status={status}, reason={confirm.get('reason')}",
         )
 
-    # Verifica che la posizione sia effettivamente leggibile, e in caso
-    # rimpiazza il deal_id col vero position id.
-    try:
-        for pos_wrapper in capital.get_open_positions():
+    # Fallback / verifica: cerca la posizione reale. Serve sia per
+    # rimpiazzare deal_id col position id (quello usato per DELETE), sia
+    # come fallback quando confirm_deal ha fallito.
+    matched_position: dict[str, Any] | None = None
+    for attempt in range(3):
+        if attempt > 0:
+            time.sleep(0.5)
+        try:
+            positions = capital.get_open_positions()
+        except Exception as exc:
+            log.warning("Lookup posizione post-apertura fallito: %s", exc)
+            positions = []
+        for pos_wrapper in positions:
             pos = pos_wrapper.get("position", {}) or {}
+            market = pos_wrapper.get("market", {}) or {}
+            # Match diretto su dealReference (caso ideale)
             if pos.get("dealReference") == deal_reference:
-                deal_id = pos.get("dealId") or deal_id
+                matched_position = pos_wrapper
                 break
-    except Exception as exc:
-        log.warning("Lookup posizione post-apertura fallito: %s", exc)
+            # Match indiretto: stesso epic, stessa direzione, size molto
+            # vicina alla nostra size calcolata. Tolleranza 1% per gestire
+            # eventuali arrotondamenti lato broker.
+            same_epic = (
+                market.get("epic") == epic or pos.get("epic") == epic
+            )
+            same_dir = pos.get("direction") == direction_api
+            pos_size = float(pos.get("size") or 0)
+            size_ok = (
+                sizing.size > 0
+                and abs(pos_size - sizing.size) / sizing.size < 0.01
+            )
+            if same_epic and same_dir and size_ok:
+                matched_position = pos_wrapper
+        if matched_position:
+            break
+
+    if confirm_failed and not matched_position:
+        return ExecutionResult(
+            False,
+            reason=(
+                f"confirm_deal fallita e posizione non trovata fra le aperte "
+                f"(dealReference={deal_reference}). Verifica manualmente su Capital."
+            ),
+        )
+
+    if matched_position:
+        pos = matched_position.get("position", {}) or {}
+        if pos.get("dealId"):
+            deal_id = pos["dealId"]
+        # Aggiorna fill_level/stop/tp con i valori effettivi del broker.
+        if pos.get("level"):
+            fill_level = float(pos["level"])
+        if pos.get("stopLevel"):
+            stop_level = float(pos["stopLevel"])
+        if pos.get("profitLevel"):
+            profit_level = float(pos["profitLevel"])
 
     # 8. Persistenza trade + signal status
     trade_row = db.insert_trade(
