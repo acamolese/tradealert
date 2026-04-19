@@ -124,6 +124,28 @@ def _esc(text: object) -> str:
     )
 
 
+def _direction_label(direction: str, short: bool = False) -> str:
+    """Etichetta esplicita per la direzione del trade.
+
+    ``short=False`` restituisce la versione completa in italiano con
+    indicazione del payoff (usata nei messaggi di setup e conferma).
+    ``short=True`` restituisce la versione compatta con freccia (usata
+    negli stati intermedi e nei riepiloghi di esecuzione).
+    """
+    d = (direction or "").lower()
+    if d == "long":
+        return (
+            "🟢 LONG ↑" if short
+            else "🟢 <b>LONG</b> — guadagno se il prezzo SALE ↑"
+        )
+    if d == "short":
+        return (
+            "🔴 SHORT ↓" if short
+            else "🔴 <b>SHORT</b> — guadagno se il prezzo SCENDE ↓"
+        )
+    return d.upper()
+
+
 def _format_telegram_message(
     proposal: SetupProposal,
     asset_features: dict[str, Any],
@@ -131,7 +153,7 @@ def _format_telegram_message(
 ) -> str:
     last = asset_features.get("last_price")
     spread = asset_features.get("spread_pct")
-    arrow = "🟢 LONG" if proposal.direction == "long" else "🔴 SHORT"
+    direction_line = _direction_label(proposal.direction)
 
     sl_line = ""
     tp_line = ""
@@ -167,7 +189,8 @@ def _format_telegram_message(
 
     return (
         f"🎯 <b>Setup del giorno</b>\n\n"
-        f"<b>{_esc(proposal.asset)}</b> {arrow}  (score {proposal.score}/10)\n"
+        f"<b>{_esc(proposal.asset)}</b>  (score {proposal.score}/10)\n"
+        f"{direction_line}\n"
         f"Prezzo: <code>{_esc(last)}</code>\n"
         f"{spread_line}"
         f"{sl_line}"
@@ -246,8 +269,8 @@ def _format_confirm_message(
     reasoning = _format_reasoning_block(proposal, asset_features)
     return (
         f"🟡 <b>Conferma richiesta</b> (signal {signal_row['id']})\n\n"
-        f"<b>{_esc(proposal.asset)}</b> "
-        f"{proposal.direction.upper()} (score {proposal.score}/10)\n\n"
+        f"<b>{_esc(proposal.asset)}</b>  (score {proposal.score}/10)\n"
+        f"{_direction_label(proposal.direction)}\n\n"
         f"{reasoning}\n\n"
         f"{sizing_block}\n\n"
         f"<i>I bottoni sotto sono l'importo in EUR da bloccare come margine. "
@@ -306,7 +329,7 @@ def _format_execution_message(
     if result.executed:
         return (
             f"✅ <b>Posizione aperta su Capital.com</b>\n\n"
-            f"<b>{_esc(proposal.asset)}</b> {proposal.direction.upper()}\n"
+            f"<b>{_esc(proposal.asset)}</b> {_direction_label(proposal.direction, short=True)}\n"
             f"Size: <code>{result.size}</code>\n"
             f"Entry: <code>{result.entry_price}</code>\n"
             f"SL: <code>{result.stop_level}</code>\n"
@@ -500,8 +523,8 @@ def _format_rotation_message(
     req = rotation.get("required_delta", ROTATION_DELTA)
     return (
         f"🔄 <b>Proposta di rotation</b> (signal {signal_row['id']})\n\n"
-        f"<b>Nuovo setup:</b> {_esc(proposal.asset)} "
-        f"{proposal.direction.upper()} (score {proposal.score}/10)\n"
+        f"<b>Nuovo setup:</b> {_esc(proposal.asset)} (score {proposal.score}/10)\n"
+        f"{_direction_label(proposal.direction)}\n"
         f"<b>Posizione da chiudere:</b> {_esc(rotation['asset'])}\n"
         f"  score originale: <code>{rotation['score']}/10</code>\n"
         f"  P&amp;L attuale: <code>{pnl_str}</code>\n"

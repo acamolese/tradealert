@@ -145,8 +145,9 @@ def _build_confirm_text(
 ) -> str:
     """Versione leggera di _format_confirm_message per il ri-edit on
     budget click: non ha key_factors/risks/news (non persistiti)."""
+    from .scanner import _direction_label
     asset = signal_row.get("asset", "?")
-    direction = (signal_row.get("direction") or "").upper()
+    direction_line = _direction_label(signal_row.get("direction") or "")
     score = signal_row.get("score", "?")
     thesis = signal_row.get("thesis", "") or ""
 
@@ -167,7 +168,8 @@ def _build_confirm_text(
 
     return (
         f"🟡 <b>Conferma richiesta</b> (signal {signal_row.get('id')})\n\n"
-        f"<b>{asset}</b> {direction} (score {score}/10)\n\n"
+        f"<b>{asset}</b>  (score {score}/10)\n"
+        f"{direction_line}\n\n"
         f"<i>Thesis:</i>\n{thesis}\n\n"
         f"{sizing_block}\n\n"
         f"<i>I bottoni sotto sono l'importo in EUR da bloccare come margine.</i>"
@@ -279,11 +281,12 @@ def _handle_rotation_callback(
                 return
 
     # Apertura nuova posizione (rot:exec dopo la chiusura, rot:open diretta).
+    from .scanner import _direction_label
     if message_id:
         telegram.edit_message_text(
             message_id,
             f"⏳ <b>Apertura nuova posizione</b>\n"
-            f"{signal_row['asset']} {signal_row['direction'].upper()}...",
+            f"{signal_row['asset']} {_direction_label(signal_row['direction'], short=True)}...",
         )
     effective_budget = state.staged_budgets.get(
         signal_id, config.exposure_budget_eur
@@ -307,11 +310,12 @@ def _handle_rotation_callback(
 def _format_execution_message(
     result: ExecutionResult, signal_row: dict[str, Any]
 ) -> str:
+    from .scanner import _direction_label
     if result.executed:
         return (
             f"✅ <b>Posizione aperta su Capital.com</b>\n\n"
             f"<b>{signal_row['asset']}</b> "
-            f"{signal_row['direction'].upper()}\n"
+            f"{_direction_label(signal_row['direction'], short=True)}\n"
             f"Size: <code>{result.size}</code>\n"
             f"Entry: <code>{result.entry_price}</code>\n"
             f"SL: <code>{result.stop_level}</code>\n"
