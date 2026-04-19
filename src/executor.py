@@ -158,9 +158,9 @@ def execute_signal(
             False, reason="Margine disponibile zero o non leggibile"
         )
 
-    effective_exposure = exposure_override or config.exposure_budget_eur
+    effective_budget = exposure_override or config.exposure_budget_eur
     sizing = calculate_size(
-        exposure_budget=effective_exposure,
+        margin_budget=effective_budget,
         entry_price=entry_price,
         margin_factor=meta["margin_factor"],
         min_size=meta["min_size"],
@@ -273,7 +273,7 @@ def execute_signal(
                 "notional": sizing.notional,
                 "margin_estimate": sizing.margin_estimate,
                 "risk_estimate": sizing.risk_estimate,
-                "exposure_budget": effective_exposure,
+                "margin_budget": effective_budget,
             },
         }
     )
