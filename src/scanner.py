@@ -735,6 +735,7 @@ def run_morning_scan(config: Config) -> None:
     signal_row = db.insert_signal(
         {
             "asset": top.asset,
+            "epic": asset_features.get("epic"),
             "direction": top.direction,
             "score": top.score,
             "thesis": top.thesis,

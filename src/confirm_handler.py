@@ -20,7 +20,6 @@ from .position_monitor import close_position_by_deal_id
 from .risk import calculate_size
 from .telegram_client import TelegramClient
 from .universe import UNIVERSE
-from .watchlist import DISCOVERY_WATCHLIST
 
 log = logging.getLogger(__name__)
 
@@ -107,15 +106,35 @@ def _handle_monitor_callback(
     )
 
 
-def _find_epic(asset_name: str) -> str | None:
-    """Cerca l'epic per asset_name in UNIVERSE prima, poi nella
-    DISCOVERY_WATCHLIST. Signal possono provenire da entrambi."""
+def _resolve_epic(
+    signal_row: dict[str, Any], capital: CapitalClient | None = None
+) -> str | None:
+    """Risolve l'epic in questo ordine:
+    1. ``signal_row['epic']`` se presente (signal nuovi dopo migration)
+    2. UNIVERSE statico per nome (signal vecchi)
+    3. Capital ``search_market`` come ultima risorsa (signal discovery
+       dinamica pre-migration: cerca per nome e prende il primo match
+       con instrumentType coerente).
+    """
+    epic = signal_row.get("epic")
+    if epic:
+        return epic
+    name = signal_row.get("asset") or ""
     for a in UNIVERSE:
-        if a.name == asset_name:
+        if a.name == name:
             return a.epic
-    for a in DISCOVERY_WATCHLIST:
-        if a.name == asset_name:
-            return a.epic
+    if capital is None:
+        return None
+    try:
+        # Estrai il simbolo "principale" dal nome: "GTC/USD" -> "GTC"
+        query = name.split("/")[0].strip() or name
+        for market in capital.search_market(query):
+            if market.get("instrumentName") == name:
+                return market.get("epic")
+        # Nessun match esatto sul nome: abbandono, piu' sicuro che
+        # aprire posizione sull'epic sbagliato.
+    except Exception:
+        log.exception("search_market fallita per %s", name)
     return None
 
 
@@ -161,12 +180,16 @@ def _recompute_sizing_for_signal(
     margin_budget: float,
 ):
     """Fetch market Capital + ricalcola sizing. Ritorna SizingResult o None."""
-    epic = _find_epic(signal_row.get("asset") or "")
-    if not epic:
-        return None
     capital = CapitalClient(config)
     try:
         capital.login()
+    except Exception:
+        log.exception("Recompute sizing: login fallito")
+        return None
+    epic = _resolve_epic(signal_row, capital)
+    if not epic:
+        return None
+    try:
         market = capital.get_market(epic)
     except Exception:
         log.exception("Recompute sizing: fetch market fallito")
@@ -214,20 +237,20 @@ def _handle_rotation_callback(
             )
         return
 
-    epic = _find_epic(signal_row["asset"])
+    capital = CapitalClient(config)
+    try:
+        capital.login()
+    except Exception as exc:
+        telegram.send_message(f"⚠️ Login Capital fallito: {exc}")
+        return
+
+    epic = _resolve_epic(signal_row, capital)
     if not epic:
         telegram.send_message(
             f"⚠️ Signal {signal_id}: epic per "
             f"{signal_row['asset']} non trovato"
         )
         db.update_signal_status(signal_id, "expired")
-        return
-
-    capital = CapitalClient(config)
-    try:
-        capital.login()
-    except Exception as exc:
-        telegram.send_message(f"⚠️ Login Capital fallito: {exc}")
         return
 
     if sub == "exec":
@@ -406,16 +429,6 @@ def handle_callback(
                 f"(signal {signal_id}, esposizione €{effective_exposure:.0f})...",
             )
 
-        epic = _find_epic(signal_row["asset"])
-        if not epic:
-            msg = (
-                f"⚠️ Signal {signal_id}: epic per "
-                f"{signal_row['asset']} non trovato in universo/watchlist"
-            )
-            telegram.send_message(msg)
-            db.update_signal_status(signal_id, "expired")
-            return
-
         capital = CapitalClient(config)
         try:
             capital.login()
@@ -423,6 +436,15 @@ def handle_callback(
             telegram.send_message(
                 f"⚠️ Signal {signal_id}: login Capital fallito: {exc}"
             )
+            return
+
+        epic = _resolve_epic(signal_row, capital)
+        if not epic:
+            telegram.send_message(
+                f"⚠️ Signal {signal_id}: epic per "
+                f"{signal_row['asset']} non risolvibile"
+            )
+            db.update_signal_status(signal_id, "expired")
             return
 
         asset_features = {
