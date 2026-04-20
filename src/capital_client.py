@@ -59,23 +59,41 @@ class CapitalClient:
 
     def login(self, max_retries: int = 3) -> None:
         """Autentica e memorizza CST + security token nei session header.
-        Retry con backoff esponenziale in caso di 429 (rate limit su
-        /session: Capital ammette ~1 req/sec su login)."""
+        Retry con backoff esponenziale su 429 (rate limit, ~1 req/sec
+        ammesso da Capital) e su errori di rete transitori (connect/read
+        timeout, ConnectionError) per assorbire i blip dell'uplink."""
         import time
 
         for attempt in range(max_retries):
-            response = self._session.post(
-                self._url("/session"),
-                headers={
-                    "X-CAP-API-KEY": self._cfg.capital_api_key,
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "identifier": self._cfg.capital_identifier,
-                    "password": self._cfg.capital_password,
-                },
-                timeout=15,
-            )
+            try:
+                response = self._session.post(
+                    self._url("/session"),
+                    headers={
+                        "X-CAP-API-KEY": self._cfg.capital_api_key,
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "identifier": self._cfg.capital_identifier,
+                        "password": self._cfg.capital_password,
+                    },
+                    timeout=15,
+                )
+            except (
+                requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout,
+            ) as exc:
+                if attempt >= max_retries - 1:
+                    raise
+                wait = 2 * (2**attempt)  # 2s, 4s, 8s
+                log.warning(
+                    "Login Capital: errore di rete (%s), retry %d/%d tra %ds",
+                    type(exc).__name__,
+                    attempt + 1,
+                    max_retries - 1,
+                    wait,
+                )
+                time.sleep(wait)
+                continue
             if response.status_code == 429 and attempt < max_retries - 1:
                 wait = 5 * (2**attempt)  # 5s, 10s, 20s
                 time.sleep(wait)
