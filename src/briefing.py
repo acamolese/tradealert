@@ -132,7 +132,7 @@ def generate_briefing(config: Config, slot: str) -> str:
     )
 
     response = client.messages.create(
-        model=config.anthropic_model,
+        model=config.anthropic_model_fast,
         max_tokens=1500,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_block}],

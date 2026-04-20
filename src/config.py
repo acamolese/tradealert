@@ -23,6 +23,7 @@ class Config:
 
     anthropic_api_key: str
     anthropic_model: str
+    anthropic_model_fast: str  # modello cheap per task non critici (briefing)
 
     finnhub_api_key: str  # opzionale, "" se non configurato
 
@@ -59,6 +60,9 @@ def load_config() -> Config:
         anthropic_api_key=_required("ANTHROPIC_API_KEY"),
         anthropic_model=os.environ.get(
             "ANTHROPIC_MODEL", "claude-haiku-4-5-20251001"
+        ),
+        anthropic_model_fast=os.environ.get(
+            "ANTHROPIC_MODEL_FAST", "claude-haiku-4-5-20251001"
         ),
         finnhub_api_key=os.environ.get("FINNHUB_API_KEY", ""),
         exposure_budget_eur=float(
