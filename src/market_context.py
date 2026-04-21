@@ -96,6 +96,97 @@ def get_critical_events(
     return out
 
 
+# ---------------- Lettura/scrittura raw del file ----------------
+
+def _load_events_file(path: Path | None = None) -> dict[str, Any]:
+    """Legge l'intero JSON preservando _comment e _example. Se manca o
+    e' malformato, ritorna un dict minimo valido."""
+    p = path or _DEFAULT_PATH
+    if not p.exists():
+        return {"events": []}
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"events": []}
+    if not isinstance(data, dict):
+        return {"events": []}
+    data.setdefault("events", [])
+    return data
+
+
+def _save_events_file(data: dict[str, Any], path: Path | None = None) -> None:
+    p = path or _DEFAULT_PATH
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+
+def append_manual_event(
+    event: dict[str, Any], path: Path | None = None
+) -> None:
+    """Aggiunge un evento con source='manual' al file."""
+    event = {**event, "source": "manual"}
+    data = _load_events_file(path)
+    events = data.get("events") or []
+    if not isinstance(events, list):
+        events = []
+    events.append(event)
+    data["events"] = events
+    _save_events_file(data, path)
+
+
+def list_all_events(path: Path | None = None) -> list[dict[str, Any]]:
+    """Tutti gli eventi nel file (passati inclusi), per comandi di
+    amministrazione tipo ``/eventi``. Include il campo ``source``
+    se presente."""
+    data = _load_events_file(path)
+    events = data.get("events") or []
+    return events if isinstance(events, list) else []
+
+
+def replace_auto_events(
+    new_auto: list[dict[str, Any]], path: Path | None = None
+) -> None:
+    """Rimpiazza tutti gli eventi con source='auto' con la nuova lista.
+    Gli eventi manuali (source assente o 'manual') restano intatti.
+    Usato dal job macro_scan per aggiornare la parte automatica."""
+    data = _load_events_file(path)
+    events = data.get("events") or []
+    if not isinstance(events, list):
+        events = []
+    kept = [e for e in events if isinstance(e, dict) and e.get("source") != "auto"]
+    for ev in new_auto:
+        kept.append({**ev, "source": "auto"})
+    data["events"] = kept
+    _save_events_file(data, path)
+
+
+def prune_past_events(path: Path | None = None) -> int:
+    """Rimuove eventi con date nel passato. Ritorna il conteggio dei
+    rimossi. Da chiamare periodicamente per non far crescere il file."""
+    data = _load_events_file(path)
+    events = data.get("events") or []
+    if not isinstance(events, list):
+        return 0
+    now = datetime.now(timezone.utc)
+    kept: list[dict[str, Any]] = []
+    removed = 0
+    for ev in events:
+        if not isinstance(ev, dict):
+            continue
+        dt = _parse_date(ev.get("date"))
+        if dt is None or dt < now:
+            removed += 1
+            continue
+        kept.append(ev)
+    if removed:
+        data["events"] = kept
+        _save_events_file(data, path)
+    return removed
+
+
 # ---------------- Finnhub economic calendar ----------------
 
 _FINNHUB_CALENDAR_URL = "https://finnhub.io/api/v1/calendar/economic"

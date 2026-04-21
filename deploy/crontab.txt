@@ -35,5 +35,8 @@ TRADEALERT_HOME=/home/ubuntu/tradealert
 # ---------- Weekly report: domenica 20:00 Europe/Rome ----------
 0 20 * * 0           cd $TRADEALERT_HOME && python -m jobs.weekly_report >> logs/weekly.log 2>&1
 
+# ---------- Macro scan eventi critici dalle news: 06:50 prima del primo scanner ----------
+50 6 * * *           cd $TRADEALERT_HOME && python -m jobs.macro_scan >> logs/macro.log 2>&1
+
 # Il listener Telegram NON va in crontab: gira come daemon systemd
 # (vedi tradealert-listener.service) per latenza ~secondi sui comandi.

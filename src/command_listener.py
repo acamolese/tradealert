@@ -23,6 +23,7 @@ from .confirm_handler import (
     handle_callback,
 )
 from .db import Database
+from .event_commands import try_handle_event_command
 from .positions import manage_positions
 from .status import send_status
 from .telegram_client import TelegramClient
@@ -53,7 +54,8 @@ def _process_message(
         return None
     if str(msg.get("chat", {}).get("id")) != expected_chat:
         return None
-    text = (msg.get("text") or "").strip().lower()
+    raw_text = (msg.get("text") or "").strip()
+    text = raw_text.lower()
     if text in POSITIONS_COMMANDS:
         log.info("Comando %s ricevuto, lancio gestione posizioni", text)
         manage_positions(config)
@@ -62,6 +64,11 @@ def _process_message(
         log.info("Comando %s ricevuto, invio status", text)
         send_status(config)
         return text
+    # Comandi gestione eventi critici (case-insensitive, con argomenti)
+    handled = try_handle_event_command(config, raw_text)
+    if handled:
+        log.info("Comando %s ricevuto, gestione evento", handled)
+        return handled
     return None
 
 
