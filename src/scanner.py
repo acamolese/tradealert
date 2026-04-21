@@ -708,9 +708,10 @@ def run_morning_scan(config: Config) -> None:
         if af.get("asset_class") != "crypto"
         and af.get("market_status") in ("TRADEABLE", "EDITS_ONLY")
     )
-    from .market_context import get_critical_events
+    from .market_context import get_critical_events, get_economic_calendar
 
     critical_events = get_critical_events(hours_ahead=72)
+    economic_calendar = get_economic_calendar(config, hours_ahead=72)
     context = {
         "is_weekend": is_weekend,
         "weekday": now.strftime("%A"),
@@ -721,6 +722,7 @@ def run_morning_scan(config: Config) -> None:
             if af.get("market_status") in ("TRADEABLE", "EDITS_ONLY")
         ),
         "critical_events": critical_events,
+        "economic_calendar": economic_calendar,
     }
     proposals = llm.rank_setups(features, context=context)
 

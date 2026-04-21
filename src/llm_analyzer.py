@@ -73,21 +73,36 @@ Sii selettivo. Se nessun asset ha setup decente, restituisci tutti score sotto 6
 Privilegia setup con trigger tecnici chiari e asimmetria rischio/rendimento
 minimo 2:1. Se hai news recenti che CONTRADDICONO il setup, abbassa lo score.
 
-Eventi macro imminenti (campo "critical_events" nel contesto):
-- Se ricevi una lista "critical_events" non vuota, contiene scadenze binarie
-  note nelle prossime 72h (FOMC, CPI, tregue, summit, ecc) con "date",
-  "hours_until", "description", "impact_assets", "direction_hint".
-- Per ogni candidato, controlla se il suo nome e' in "impact_assets" di
-  qualche evento. Se si':
-  - Se hours_until < 24: cita esplicitamente l'evento nei "risks" e aumenta
-    "suggested_stop_pct" di circa il 50% per assorbire lo spike previsto.
-  - Se direction_hint e' "risk_off_if_fails" o "risk_on_if_fails": il
-    setup va proposto SOLO se score >= 8 e se la direzione proposta e'
-    coerente con lo scenario negativo (cioe' la tesi regge anche se
-    l'evento va male).
-  - Se l'evento ha direction_hint opposta alla direzione proposta (es.
-    long US500 con evento "risk_off"): riduci lo score di 2 punti.
-- Se "critical_events" e' lista vuota, ignora questa sezione.
+Eventi macro imminenti:
+Il contesto puo' includere due liste di eventi nelle prossime 72h.
+
+(A) "critical_events": scadenze binarie curate a mano (summit, tregue,
+eventi geopolitici). Ogni voce ha "hours_until", "description",
+"impact_assets", "direction_hint" (risk_on/risk_off/risk_off_if_fails/
+risk_on_if_fails/unknown).
+
+(B) "economic_calendar": appuntamenti ufficiali high-impact da Finnhub
+(FOMC, CPI, NFP, BCE, BoE, rate decisions). Ogni voce ha "hours_until",
+"event", "country", "impact", "estimate", "prev". I paesi piu' comuni
+mappano cosi' sugli asset:
+  - US -> US500, Nasdaq 100, USD/JPY, Gold, Silver, WTI, Brent
+  - EU -> DAX 40, EUR/USD
+  - GB -> GBP/USD
+  - JP -> USD/JPY
+
+Regole unificate per entrambe le liste:
+- Se il candidato e' esposto a un evento entro 24h: cita l'evento nei
+  "risks" e aumenta "suggested_stop_pct" del 50% circa.
+- Se un critical_events ha direction_hint "risk_off_if_fails" o
+  "risk_on_if_fails": proponi il setup SOLO con score >= 8 e direzione
+  coerente con lo scenario negativo.
+- Se critical_events ha direction_hint esplicitamente opposta alla
+  direzione proposta (long su US500 con evento "risk_off"): riduci
+  lo score di 2 punti.
+- Se un evento FOMC/BCE/BoE e' atteso entro 12h e il setup va contro
+  la direzione ritenuta probabile dal mercato (usa "estimate" vs "prev"
+  come indicazione grezza): riduci lo score di 1 punto.
+- Se entrambe le liste sono vuote, ignora queste regole.
 
 Rispondi SOLO con JSON valido in questo formato:
 {
