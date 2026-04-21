@@ -16,7 +16,6 @@ Il reconcile:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from .capital_client import CapitalAPIError, CapitalClient
@@ -135,12 +134,12 @@ def reconcile_open_trades(config: Config) -> dict[str, int]:
     if not stale:
         return counters
 
-    # Fetch history una sola volta per tutti gli stale
-    now = datetime.now(timezone.utc)
+    # Fetch history una sola volta per tutti gli stale. Usiamo lastPeriod
+    # (secondi) invece di from/to perche' il demo env Capital rifiuta
+    # range arbitrari con error.invalid.daterange anche su finestre brevi.
     try:
         activities = capital.get_activity_history(
-            from_date=(now - timedelta(days=30)).isoformat(),
-            to_date=now.isoformat(),
+            last_period_sec=7 * 24 * 3600,
             detailed=True,
         )
     except (CapitalAPIError, Exception) as exc:
