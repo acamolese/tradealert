@@ -200,9 +200,6 @@ def _format_telegram_message(
     )
 
 
-_BUDGET_OPTIONS = [10, 15, 20, 25, 30]
-
-
 def _min_entry_eur(asset_features: dict[str, Any]) -> float | None:
     """Margine minimo (EUR) per aprire la size minima del broker su questo asset.
 
@@ -281,9 +278,10 @@ def _format_confirm_message(
 def _confirm_buttons(
     signal_id: int,
     current_budget: float,
+    budget_options: list[float],
     min_entry: float | None = None,
 ) -> list[list[dict[str, str]]]:
-    options = list(_BUDGET_OPTIONS)
+    options = [int(round(b)) for b in budget_options]
     # Aggiungi bottone "minimo" se diverso dai preset standard
     if min_entry is not None:
         rounded_min = max(1, int(round(min_entry)))
@@ -350,11 +348,16 @@ def _pick_top_setup(
     features: dict[str, dict[str, Any]],
     min_score: float,
     exclude_assets: set[str] | None = None,
+    max_affordable_eur: float | None = None,
+    skipped_reasons: list[str] | None = None,
 ) -> SetupProposal | None:
     """Ritorna il primo setup sopra soglia con mercato aperto e tradeable.
-    Scarta asset gia' proposti di recente (``exclude_assets``) per
-    evitare di riproporre in loop lo stesso nome nello stesso giorno.
-    """
+    Scarta asset gia' proposti di recente (``exclude_assets``), e scarta
+    i setup con ``min_entry`` broker sopra ``max_affordable_eur`` (se
+    fornito) per non proporre strumenti troppo cari rispetto ai budget
+    preset. Le motivazioni dei setup scartati per accessibilita' vengono
+    accodate a ``skipped_reasons`` (se passato) per essere mostrate
+    all'utente nel messaggio 'no setup'."""
     exclude_assets = exclude_assets or set()
     for p in proposals:
         if p.score < min_score:
@@ -367,6 +370,15 @@ def _pick_top_setup(
         status = af.get("market_status", "UNKNOWN")
         if status not in ("TRADEABLE", "UNKNOWN"):
             continue  # CLOSED, SUSPENDED, OFFLINE...
+        if max_affordable_eur is not None:
+            min_entry = _min_entry_eur(af)
+            if min_entry is not None and min_entry > max_affordable_eur:
+                if skipped_reasons is not None:
+                    skipped_reasons.append(
+                        f"{p.asset}: servono ~{min_entry:.0f} EUR di margine "
+                        f"minimo (tuo budget max {max_affordable_eur:.0f} EUR)"
+                    )
+                continue
         return p
     return None
 
@@ -590,7 +602,10 @@ def _handle_confirm(
             config.confirm_timeout_sec,
         ),
         _confirm_buttons(
-            signal_id, current_budget, _min_entry_eur(asset_features)
+            signal_id,
+            current_budget,
+            config.budget_options,
+            _min_entry_eur(asset_features),
         ),
     )
 
@@ -715,20 +730,30 @@ def run_morning_scan(config: Config) -> None:
         log.exception("Lookup signal recenti fallito, skip dedup")
         recent_assets = set()
 
+    max_affordable = (
+        max(config.budget_options) if config.budget_options else None
+    )
+    skipped_reasons: list[str] = []
     top = _pick_top_setup(
         eligible,
         features,
         min_score=config.min_score_threshold,
         exclude_assets=recent_assets,
+        max_affordable_eur=max_affordable,
+        skipped_reasons=skipped_reasons,
     )
 
     if not top:
         # Silenzio: nessuna opportunita' nuova sopra soglia.
         log.info(
-            "Scan: nessun top nuovo (recent_assets=%d, eligible=%d)",
+            "Scan: nessun top nuovo (recent_assets=%d, eligible=%d, "
+            "scartati_per_budget=%d)",
             len(recent_assets),
             len(eligible),
+            len(skipped_reasons),
         )
+        for reason in skipped_reasons:
+            log.info("  skip budget: %s", reason)
         best = eligible[0] if eligible else None
         _log_run(
             db,
@@ -741,6 +766,7 @@ def run_morning_scan(config: Config) -> None:
                 "min_score_threshold": config.min_score_threshold,
                 "scan_set": len(scan_set),
                 "proposals": _proposals_summary(proposals),
+                "skipped_for_budget": skipped_reasons,
             },
         )
         return

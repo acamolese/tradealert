@@ -104,6 +104,14 @@ def _apply_trailing_stop(
         else None
     )
     if not signal or not signal.get("stop_loss"):
+        # Posizione aperta a mano su Capital o senza signal originale nel DB:
+        # niente R-distance di riferimento, SL resta dell'utente.
+        log.warning(
+            "Trailing SKIP: posizione %s (%s) senza signal nel DB, "
+            "SL manuale non gestito automaticamente",
+            deal_id,
+            asset_name,
+        )
         return
 
     stop_pct = float(signal["stop_loss"])

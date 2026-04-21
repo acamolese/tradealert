@@ -33,6 +33,7 @@ class Config:
     execution_mode: str  # "coach" | "confirm" | "auto"
     confirm_timeout_sec: int  # quanto attendere il click su Telegram
     min_rr_at_entry: float  # R:R minimo (vs livelli originali) per aprire al click
+    budget_options: list[float]  # preset EUR per bottoni budget Telegram
 
     @property
     def capital_base_url(self) -> str:
@@ -46,6 +47,21 @@ def _required(name: str) -> str:
     if not value:
         raise RuntimeError(f"Variabile d'ambiente mancante: {name}")
     return value
+
+
+def _parse_budget_options(raw: str) -> list[float]:
+    values: list[float] = []
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            v = float(part)
+        except ValueError:
+            continue
+        if v > 0:
+            values.append(v)
+    return sorted(set(values)) or [10.0, 15.0, 20.0, 25.0, 30.0]
 
 
 def load_config() -> Config:
@@ -75,4 +91,7 @@ def load_config() -> Config:
         execution_mode=os.environ.get("EXECUTION_MODE", "coach").lower(),
         confirm_timeout_sec=int(os.environ.get("CONFIRM_TIMEOUT_SEC", "240")),
         min_rr_at_entry=float(os.environ.get("MIN_RR_AT_ENTRY", "1.2")),
+        budget_options=_parse_budget_options(
+            os.environ.get("BUDGET_OPTIONS", "10,15,20,25,30")
+        ),
     )

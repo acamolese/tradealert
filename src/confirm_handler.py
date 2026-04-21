@@ -486,7 +486,10 @@ def handle_callback(
                 )
             try:
                 telegram.edit_message_reply_markup(
-                    message_id, _confirm_buttons(signal_id, new_budget)
+                    message_id,
+                    _confirm_buttons(
+                        signal_id, new_budget, config.budget_options
+                    ),
                 )
             except Exception:
                 log.exception(
