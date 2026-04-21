@@ -98,23 +98,72 @@ def _apply_trailing_stop(
         return
 
     trade = db.get_trade_by_deal_id(deal_id)
+
+    # Posizione aperta fuori-bot (manuale su Capital): la importiamo nel
+    # DB come orphan trade (signal_id=None), usando lo SL attuale come
+    # riferimento per la R-distance. Dal prossimo ciclo il trailing
+    # procede normalmente.
+    if not trade:
+        if not current_sl:
+            log.warning(
+                "Trailing SKIP: posizione manuale %s (%s) senza SL, "
+                "impossibile derivare R-distance",
+                deal_id,
+                asset_name,
+            )
+            return
+        try:
+            size = pos.get("size") or 0
+            direction_norm = "long" if direction == "BUY" else "short"
+            profit_level = pos.get("profitLevel")
+            trade = db.insert_trade(
+                {
+                    "signal_id": None,
+                    "capital_deal_id": deal_id,
+                    "asset": asset_name,
+                    "direction": direction_norm,
+                    "size": float(size),
+                    "entry_price": float(entry),
+                    "current_sl": float(current_sl),
+                    "current_tp": (
+                        float(profit_level) if profit_level else None
+                    ),
+                    "status": "open",
+                    "exit_reason": "manual_import:trailing",
+                }
+            )
+            log.warning(
+                "Posizione manuale %s (%s) importata in trades come "
+                "orphan: trailing attivo dal prossimo ciclo",
+                deal_id,
+                asset_name,
+            )
+        except Exception:
+            log.exception(
+                "Import orphan fallito per posizione %s", deal_id
+            )
+            return
+
+    # Deriva lo stop_pct: se c'e un signal originale usa il suo, altrimenti
+    # lo ricava dallo SL iniziale salvato sul trade (stabile nel tempo).
     signal = (
         db.get_signal(trade["signal_id"])
-        if trade and trade.get("signal_id")
+        if trade.get("signal_id") is not None
         else None
     )
-    if not signal or not signal.get("stop_loss"):
-        # Posizione aperta a mano su Capital o senza signal originale nel DB:
-        # niente R-distance di riferimento, SL resta dell'utente.
+    if signal and signal.get("stop_loss"):
+        stop_pct = float(signal["stop_loss"])
+    elif trade.get("entry_price") and trade.get("current_sl"):
+        ref_entry = float(trade["entry_price"])
+        ref_sl = float(trade["current_sl"])
+        stop_pct = abs(ref_entry - ref_sl) / ref_entry * 100 if ref_entry else 0.0
+    else:
         log.warning(
-            "Trailing SKIP: posizione %s (%s) senza signal nel DB, "
-            "SL manuale non gestito automaticamente",
+            "Trailing SKIP: stop_pct non derivabile per %s (%s)",
             deal_id,
             asset_name,
         )
         return
-
-    stop_pct = float(signal["stop_loss"])
     entry = float(entry)
     current_sl = float(current_sl)
     if stop_pct <= 0:
@@ -448,6 +497,19 @@ def monitor_positions(config: Config) -> None:
 
         deal_id = decision.get("deal_id")
         if not deal_id:
+            continue
+
+        # Non proporre CLOSE se il mercato non e' attualmente tradeable:
+        # l'utente non potrebbe eseguire nemmeno cliccando, e la proposta
+        # tornerebbe a ogni run finche' il mercato riapre (loop di alert).
+        market = position.get("market", {}) or {}
+        market_status = (market.get("marketStatus") or "").upper()
+        if market_status and market_status not in ("TRADEABLE",):
+            log.info(
+                "Skip alert CLOSE su %s: mercato %s, attendere riapertura",
+                decision.get("asset"),
+                market_status,
+            )
             continue
 
         # Invia proposta con bottoni mclose/mhold e ritorna.

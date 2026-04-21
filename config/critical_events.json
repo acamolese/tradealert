@@ -1,0 +1,12 @@
+{
+  "_comment": "Eventi macro critici gestiti a mano. Il loader (src/market_context.py) filtra gli eventi con 'date' nelle prossime 72h e li passa al contesto LLM. Aggiungi scadenze binarie note (summit, tregue, FOMC, CPI, NFP, BCE) che il sistema non puo' scoprire da solo. Schema per evento: { date (ISO-8601 UTC), description (testo breve), impact_assets (lista nomi asset da universe), direction_hint (risk_on | risk_off | risk_off_if_fails | risk_on_if_fails | unknown) }.",
+  "_example": [
+    {
+      "date": "2026-04-22T22:00:00Z",
+      "description": "Scadenza tregua USA-Iran, no deal",
+      "impact_assets": ["Brent Oil", "WTI Oil", "Gold", "Silver", "US500"],
+      "direction_hint": "risk_off_if_fails"
+    }
+  ],
+  "events": []
+}

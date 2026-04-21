@@ -56,21 +56,37 @@ def sanitize_telegram_html(text: str) -> str:
 class TelegramClient:
     def __init__(self, config: Config) -> None:
         self._token = config.telegram_bot_token
-        self._chat_id = config.telegram_chat_id
+        self._chat_id = config.telegram_chat_id  # owner (bottoni, edit, comandi)
+        self._chat_ids = list(config.telegram_chat_ids or [self._chat_id])
         self._base = f"https://api.telegram.org/bot{self._token}"
 
     # ---------- send ----------
 
-    def send_message(self, text: str, parse_mode: str = "HTML") -> dict[str, Any]:
+    def send_message(
+        self, text: str, parse_mode: str = "HTML"
+    ) -> dict[str, Any]:
+        """Broadcast su tutti i chat configurati in TELEGRAM_CHAT_IDS.
+        Ritorna la response del chat owner (il primo) per retrocompat."""
         if parse_mode == "HTML":
             text = sanitize_telegram_html(text)
-        payload = {
-            "chat_id": self._chat_id,
-            "text": text,
-            "parse_mode": parse_mode,
-            "disable_web_page_preview": True,
-        }
-        return self._post("/sendMessage", payload)
+        first_result: dict[str, Any] = {}
+        for chat_id in self._chat_ids:
+            payload = {
+                "chat_id": chat_id,
+                "text": text,
+                "parse_mode": parse_mode,
+                "disable_web_page_preview": True,
+            }
+            try:
+                result = self._post("/sendMessage", payload)
+                if not first_result:
+                    first_result = result
+            except Exception:
+                log.exception(
+                    "send_message fallito su chat_id %s (continuo con gli altri)",
+                    chat_id,
+                )
+        return first_result
 
     def send_message_with_buttons(
         self,

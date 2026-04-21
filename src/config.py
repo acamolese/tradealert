@@ -16,7 +16,8 @@ class Config:
     capital_env: str
 
     telegram_bot_token: str
-    telegram_chat_id: str
+    telegram_chat_id: str  # owner chat: riceve bottoni e comandi
+    telegram_chat_ids: list[str]  # broadcast list per i messaggi informativi
 
     supabase_url: str
     supabase_anon_key: str
@@ -49,6 +50,12 @@ def _required(name: str) -> str:
     return value
 
 
+def _parse_chat_ids(raw: str) -> list[str]:
+    """Parse una lista CSV di chat_id Telegram. Ritorna lista pulita
+    (stringhe, valori vuoti scartati)."""
+    return [p.strip() for p in raw.split(",") if p.strip()]
+
+
 def _parse_budget_options(raw: str) -> list[float]:
     values: list[float] = []
     for part in raw.split(","):
@@ -65,13 +72,20 @@ def _parse_budget_options(raw: str) -> list[float]:
 
 
 def load_config() -> Config:
+    owner_chat_id = _required("TELEGRAM_CHAT_ID")
+    raw_chat_ids = os.environ.get("TELEGRAM_CHAT_IDS", "").strip()
+    chat_ids = _parse_chat_ids(raw_chat_ids) if raw_chat_ids else [owner_chat_id]
+    # L'owner deve sempre essere nella lista di broadcast.
+    if owner_chat_id not in chat_ids:
+        chat_ids = [owner_chat_id] + chat_ids
     return Config(
         capital_api_key=_required("CAPITAL_API_KEY"),
         capital_password=_required("CAPITAL_API_PASSWORD"),
         capital_identifier=_required("CAPITAL_IDENTIFIER"),
         capital_env=os.environ.get("CAPITAL_ENV", "demo"),
         telegram_bot_token=_required("TELEGRAM_BOT_TOKEN"),
-        telegram_chat_id=_required("TELEGRAM_CHAT_ID"),
+        telegram_chat_id=owner_chat_id,
+        telegram_chat_ids=chat_ids,
         supabase_url=_required("SUPABASE_URL"),
         supabase_anon_key=_required("SUPABASE_ANON_KEY"),
         anthropic_api_key=_required("ANTHROPIC_API_KEY"),
