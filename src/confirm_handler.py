@@ -176,6 +176,66 @@ def _build_confirm_text(
     )
 
 
+def _check_entry_still_valid(
+    signal_row: dict[str, Any],
+    current_price: float,
+    min_rr: float,
+) -> tuple[bool, str]:
+    """Verifica che il R:R rispetto ai livelli originali del setup sia
+    ancora >= min_rr al prezzo corrente. Tra messaggio e click puo'
+    passare tempo: se l'edge e' gia' stato consumato, meglio rinunciare
+    invece di entrare in ritardo. Ritorna (ok, motivo_se_skip)."""
+    direction = (signal_row.get("direction") or "").upper()
+    entry_orig = float(signal_row.get("entry_price") or 0)
+    sl_pct = float(signal_row.get("stop_loss") or 0)
+    tp_pct = float(signal_row.get("take_profit") or 0)
+    if entry_orig <= 0 or sl_pct <= 0 or tp_pct <= 0:
+        return True, ""  # dati mancanti: non blocco l'apertura
+
+    if direction == "LONG":
+        sl_orig = entry_orig * (1 - sl_pct / 100)
+        tp_orig = entry_orig * (1 + tp_pct / 100)
+        risk_live = current_price - sl_orig
+        reward_live = tp_orig - current_price
+    elif direction == "SHORT":
+        sl_orig = entry_orig * (1 + sl_pct / 100)
+        tp_orig = entry_orig * (1 - tp_pct / 100)
+        risk_live = sl_orig - current_price
+        reward_live = current_price - tp_orig
+    else:
+        return True, ""
+
+    if risk_live <= 0:
+        return False, (
+            f"prezzo {current_price:g} oltre lo SL originale "
+            f"{sl_orig:g}: setup invalidato"
+        )
+    if reward_live <= 0:
+        return False, (
+            f"prezzo {current_price:g} ha già raggiunto il TP originale "
+            f"{tp_orig:g}: edge consumato"
+        )
+    rr_live = reward_live / risk_live
+    if rr_live < min_rr:
+        return False, (
+            f"R:R degradato a {rr_live:.2f} (soglia {min_rr:.2f}), "
+            f"entry mossa da {entry_orig:g} a {current_price:g}"
+        )
+    return True, ""
+
+
+def _fetch_current_mid(
+    capital: CapitalClient, epic: str
+) -> float | None:
+    """Mid price corrente per epic, None se fetch fallisce."""
+    try:
+        market = capital.get_market(epic)
+    except Exception:
+        log.exception("Fetch market %s fallito", epic)
+        return None
+    return _market_meta(market).get("mid_price")
+
+
 def _recompute_sizing_for_signal(
     config: Config,
     signal_row: dict[str, Any],
@@ -282,6 +342,26 @@ def _handle_rotation_callback(
 
     # Apertura nuova posizione (rot:exec dopo la chiusura, rot:open diretta).
     from .scanner import _direction_label
+
+    current_price = _fetch_current_mid(capital, epic)
+    if current_price:
+        ok, reason = _check_entry_still_valid(
+            signal_row, current_price, config.min_rr_at_entry
+        )
+        if not ok:
+            db.update_signal_status(signal_id, "skipped")
+            state.staged_budgets.pop(signal_id, None)
+            msg = (
+                f"⏭ <b>Rotation annullata</b> (signal {signal_id})\n\n"
+                f"<b>{signal_row['asset']}</b>\n"
+                f"Motivo: <i>{reason}</i>"
+            )
+            if message_id:
+                telegram.edit_message_text(message_id, msg)
+            else:
+                telegram.send_message(msg)
+            return
+
     if message_id:
         telegram.edit_message_text(
             message_id,
@@ -293,7 +373,7 @@ def _handle_rotation_callback(
     )
     asset_features = {
         "epic": epic,
-        "last_price": signal_row.get("entry_price"),
+        "last_price": current_price or signal_row.get("entry_price"),
     }
     result = execute_signal(
         config,
@@ -451,9 +531,28 @@ def handle_callback(
             db.update_signal_status(signal_id, "expired")
             return
 
+        current_price = _fetch_current_mid(capital, epic)
+        if current_price:
+            ok, reason = _check_entry_still_valid(
+                signal_row, current_price, config.min_rr_at_entry
+            )
+            if not ok:
+                db.update_signal_status(signal_id, "skipped")
+                state.staged_budgets.pop(signal_id, None)
+                msg = (
+                    f"⏭ <b>Apertura annullata</b> (signal {signal_id})\n\n"
+                    f"<b>{signal_row['asset']}</b>\n"
+                    f"Motivo: <i>{reason}</i>"
+                )
+                if message_id:
+                    telegram.edit_message_text(message_id, msg)
+                else:
+                    telegram.send_message(msg)
+                return
+
         asset_features = {
             "epic": epic,
-            "last_price": signal_row.get("entry_price"),
+            "last_price": current_price or signal_row.get("entry_price"),
         }
         result = execute_signal(
             config,

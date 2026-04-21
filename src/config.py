@@ -32,6 +32,7 @@ class Config:
     min_score_threshold: float
     execution_mode: str  # "coach" | "confirm" | "auto"
     confirm_timeout_sec: int  # quanto attendere il click su Telegram
+    min_rr_at_entry: float  # R:R minimo (vs livelli originali) per aprire al click
 
     @property
     def capital_base_url(self) -> str:
@@ -73,4 +74,5 @@ def load_config() -> Config:
         min_score_threshold=float(os.environ.get("MIN_SCORE_THRESHOLD", "7")),
         execution_mode=os.environ.get("EXECUTION_MODE", "coach").lower(),
         confirm_timeout_sec=int(os.environ.get("CONFIRM_TIMEOUT_SEC", "240")),
+        min_rr_at_entry=float(os.environ.get("MIN_RR_AT_ENTRY", "1.2")),
     )
