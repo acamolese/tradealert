@@ -265,6 +265,34 @@ class CapitalClient:
         _raise_for_status(response)
         return response.json()
 
+    def get_activity_history(
+        self,
+        from_date: str | None = None,
+        to_date: str | None = None,
+        last_period_sec: int = 24 * 3600,
+        detailed: bool = True,
+    ) -> list[dict[str, Any]]:
+        """History delle attivita' account (aperture, chiusure, modifiche SL).
+
+        Se ``from_date`` e ``to_date`` sono forniti (ISO-8601), ha la
+        precedenza sul ``last_period_sec``. Il flag ``detailed`` include i
+        dettagli del deal (incl. level di chiusura e amount P&L).
+        """
+        params: dict[str, Any] = {"detailed": "true" if detailed else "false"}
+        if from_date and to_date:
+            params["from"] = from_date
+            params["to"] = to_date
+        else:
+            params["lastPeriod"] = last_period_sec
+        response = self._session.get(
+            self._url("/history/activity"),
+            headers=self._auth_headers(),
+            params=params,
+            timeout=20,
+        )
+        _raise_for_status(response)
+        return response.json().get("activities", [])
+
     def update_position(
         self,
         deal_id: str,

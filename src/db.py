@@ -74,7 +74,7 @@ class Database:
     def close_trade(
         self,
         deal_id: str,
-        close_price: float,
+        close_price: float | None,
         pnl: float | None,
         pnl_pct: float | None,
         exit_reason: str,
