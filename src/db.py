@@ -1,19 +1,33 @@
-"""Wrapper Supabase per le operazioni MVP su signals/trades/snapshots."""
+"""Wrapper Supabase per le operazioni MVP su signals/trades/snapshots.
+
+Usa la service_role key se configurata (bypassa RLS, corretto per
+processi server-side come questo bot). Fallback alla anon key per
+non rompere installazioni vecchie, ma in produzione con RLS abilitato
+SOLO la service_role key permette letture/scritture: l'anon key
+restituirebbe sempre liste vuote o errori 401.
+"""
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from supabase import Client, create_client
 
 from .config import Config
 
+log = logging.getLogger(__name__)
+
 
 class Database:
     def __init__(self, config: Config) -> None:
-        self._client: Client = create_client(
-            config.supabase_url, config.supabase_anon_key
-        )
+        key = config.supabase_service_role_key or config.supabase_anon_key
+        if not config.supabase_service_role_key:
+            log.warning(
+                "Database: SUPABASE_SERVICE_ROLE_KEY non configurata, uso "
+                "anon key. Con RLS abilitato le scritture FALLIRANNO."
+            )
+        self._client: Client = create_client(config.supabase_url, key)
 
     def insert_signal(self, signal: dict[str, Any]) -> dict[str, Any]:
         response = self._client.table("signals").insert(signal).execute()

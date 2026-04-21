@@ -21,6 +21,7 @@ class Config:
 
     supabase_url: str
     supabase_anon_key: str
+    supabase_service_role_key: str  # preferito lato server: bypassa RLS
 
     anthropic_api_key: str
     anthropic_model: str
@@ -88,6 +89,9 @@ def load_config() -> Config:
         telegram_chat_ids=chat_ids,
         supabase_url=_required("SUPABASE_URL"),
         supabase_anon_key=_required("SUPABASE_ANON_KEY"),
+        supabase_service_role_key=os.environ.get(
+            "SUPABASE_SERVICE_ROLE_KEY", ""
+        ),
         anthropic_api_key=_required("ANTHROPIC_API_KEY"),
         anthropic_model=os.environ.get(
             "ANTHROPIC_MODEL", "claude-haiku-4-5-20251001"
