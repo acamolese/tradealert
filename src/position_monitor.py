@@ -75,15 +75,18 @@ def _apply_trailing_stop(
     db: Database,
     telegram: TelegramClient,
     position: dict[str, Any],
+    step_r: float = 0.5,
 ) -> None:
-    """Trailing stop R-multiple:
-    - profit >= 0.5R -> SL a entry - 0.5R (long) / entry + 0.5R (short):
-      half-risk protection, riduce il peggio a meta' del rischio iniziale.
-    - profit >= 1R  -> SL a breakeven (entry): rischio zero.
-    - profit >= 2R  -> SL a entry + 1R (long) / entry - 1R (short).
-    - profit >= NR  -> SL a entry + (N-1)R.
-    Solo migliorativo: se il calcolo darebbe uno SL peggiore dell'attuale,
-    non tocchiamo nulla. R e' derivato dallo stop originale del signal.
+    """Trailing stop R-multiple. Logica:
+    - profit >= 0.5R                     -> SL a entry +/- 0.5R (half-risk).
+    - profit >= 1R                       -> SL a entry (breakeven).
+    - poi step di ``step_r`` sopra il BE -> SL a entry + (n*step_r)
+      con n = floor((profit_r - 1) / step_r).
+    Esempio con step_r=0.5: 1R -> BE, 1.5R -> +0.5R, 2R -> +1R,
+    2.5R -> +1.5R, ecc. Con step_r=1.0 (vecchio comportamento): 1R -> BE,
+    2R -> +1R, 3R -> +2R.
+    Solo migliorativo: se il nuovo SL e' peggiore dell'attuale non tocca.
+    R e' derivato dallo stop originale del signal o dal trade orphan.
     """
     pos = position.get("position", {}) or {}
     market = position.get("market", {}) or {}
@@ -199,11 +202,14 @@ def _apply_trailing_stop(
     if profit_r < 0.5:
         return
 
-    # Scelta del checkpoint: half-risk fra 0.5R e 1R, poi 1R in 1R.
+    # Half-risk fra 0.5R e 1R, poi step di step_r partendo da BE a 1R.
     if profit_r < 1:
         offset_r = -0.5  # SL a entry - 0.5R (long) / entry + 0.5R (short)
     else:
-        offset_r = int(profit_r) - 1
+        # extra = quanto siamo sopra il breakeven, in unita' di R.
+        extra = profit_r - 1.0
+        n_steps = int(extra / step_r) if step_r > 0 else 0
+        offset_r = n_steps * step_r
 
     if direction == "BUY":
         new_sl = entry + offset_r * r_distance
@@ -222,16 +228,15 @@ def _apply_trailing_stop(
         return
 
     log.info(
-        "Trailing SL %s: %s -> %s (profit %.1fR, offset +%dR)",
+        "Trailing SL %s: %s -> %s (profit %.2fR, offset %+0.2fR)",
         asset_name,
         current_sl,
         new_sl,
         profit_r,
         offset_r,
     )
-    offset_sign = "+" if offset_r >= 0 else ""
     reason_text = (
-        f"Profit {profit_r:.2f}R, SL {offset_sign}{offset_r}R dall'entry"
+        f"Profit {profit_r:.2f}R, SL {offset_r:+.2f}R dall'entry"
     )
     if trade:
         db.insert_monitoring_event(
@@ -443,10 +448,16 @@ def run_trailing_stops(config: Config) -> None:
     if not positions:
         return
 
-    log.info("Trailing scan su %d posizioni", len(positions))
+    log.info(
+        "Trailing scan su %d posizioni (step_r=%.2f)",
+        len(positions),
+        config.trailing_step_r,
+    )
     for position in positions:
         try:
-            _apply_trailing_stop(capital, db, telegram, position)
+            _apply_trailing_stop(
+                capital, db, telegram, position, step_r=config.trailing_step_r
+            )
         except Exception:
             log.exception("Trailing SL fallito")
 
@@ -472,7 +483,9 @@ def monitor_positions(config: Config) -> None:
     for position in open_positions:
         # 1. Trailing stop (server-side) prima della valutazione LLM
         try:
-            _apply_trailing_stop(capital, db, telegram, position)
+            _apply_trailing_stop(
+                capital, db, telegram, position, step_r=config.trailing_step_r
+            )
         except Exception:
             log.exception("Trailing SL fallito")
 

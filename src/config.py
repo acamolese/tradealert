@@ -36,6 +36,7 @@ class Config:
     confirm_timeout_sec: int  # quanto attendere il click su Telegram
     min_rr_at_entry: float  # R:R minimo (vs livelli originali) per aprire al click
     budget_options: list[float]  # preset EUR per bottoni budget Telegram
+    trailing_step_r: float  # step in unita' di R per il trailing stop (1.0 conservativo, 0.5 aggressivo)
 
     @property
     def capital_base_url(self) -> str:
@@ -112,4 +113,5 @@ def load_config() -> Config:
         budget_options=_parse_budget_options(
             os.environ.get("BUDGET_OPTIONS", "10,15,20,25,30")
         ),
+        trailing_step_r=float(os.environ.get("TRAILING_STEP_R", "0.5")),
     )
