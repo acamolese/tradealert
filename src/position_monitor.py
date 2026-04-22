@@ -326,9 +326,12 @@ def _evaluate_position(
         "current_features": features,
     }
 
+    # Monitor task: HOLD/CLOSE su una singola posizione, payload piccolo
+    # e output strutturato corto. Haiku basta e taglia ~80% del costo
+    # rispetto a Sonnet sulle ~16 chiamate giornaliere in finestra attiva.
     client = Anthropic(api_key=config.anthropic_api_key)
     response = client.messages.create(
-        model=config.anthropic_model,
+        model=config.anthropic_model_fast,
         max_tokens=400,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": json.dumps(payload, default=str)}],

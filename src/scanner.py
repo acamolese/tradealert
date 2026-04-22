@@ -380,6 +380,75 @@ def _format_execution_message(
     )
 
 
+def _prefilter_candidates(
+    features: dict[str, dict[str, Any]],
+    min_candidates: int = 3,
+    fallback_n: int = 5,
+) -> tuple[dict[str, dict[str, Any]], dict[str, int]]:
+    """Filtro deterministico pre-LLM per ridurre i token.
+
+    Passa solo asset che soddisfano almeno uno di questi criteri:
+      - abs(daily_pct_change) >= 2 (movimento forte oggi)
+      - rsi_14 <= 30 o >= 70 (estremi momentum)
+      - abs(pct_from_high_20) <= 1 (lateralita' vicino ai massimi =
+        potenziale breakout) oppure pct_from_high_20 <= -8 (correzione
+        profonda = potenziale bounce)
+      - bb_width_pct <= 1.5 (compressione volatilita')
+
+    Safety net: se il filtro lascia < ``min_candidates`` asset (giornata
+    piatta), passa i top ``fallback_n`` per abs(daily_pct_change) come
+    fallback. Evita di "spegnere" lo scanner nei giorni morti.
+
+    Ritorna (filtered, counters) dove counters ha i motivi per cui
+    ogni asset e' passato: utile per tunare le soglie a posteriori.
+    """
+    selected: dict[str, dict[str, Any]] = {}
+    counters = {
+        "daily_pct": 0,
+        "rsi_extreme": 0,
+        "near_high": 0,
+        "correction": 0,
+        "bb_compression": 0,
+    }
+
+    for name, af in features.items():
+        reasons: list[str] = []
+        daily = af.get("daily_pct_change")
+        if daily is not None and abs(float(daily)) >= 2.0:
+            reasons.append("daily_pct")
+        rsi = af.get("rsi_14")
+        if rsi is not None and (float(rsi) <= 30 or float(rsi) >= 70):
+            reasons.append("rsi_extreme")
+        pct_high = af.get("pct_from_high_20")
+        if pct_high is not None:
+            pct = float(pct_high)
+            if abs(pct) <= 1.0:
+                reasons.append("near_high")
+            elif pct <= -8.0:
+                reasons.append("correction")
+        bb = af.get("bb_width_pct")
+        if bb is not None and float(bb) <= 1.5:
+            reasons.append("bb_compression")
+
+        if reasons:
+            selected[name] = af
+            for r in reasons:
+                counters[r] += 1
+
+    # Safety net: se troppo pochi, prendi i top per daily_pct_change
+    if len(selected) < min_candidates:
+        ranked = sorted(
+            features.items(),
+            key=lambda kv: abs(float(kv[1].get("daily_pct_change") or 0)),
+            reverse=True,
+        )
+        for name, af in ranked[:fallback_n]:
+            if name not in selected:
+                selected[name] = af
+        counters["fallback_used"] = 1
+    return selected, counters
+
+
 def _pick_top_setup(
     proposals: list[SetupProposal],
     features: dict[str, dict[str, Any]],
@@ -763,7 +832,20 @@ def run_morning_scan(config: Config) -> None:
         "critical_events": critical_events,
         "economic_calendar": economic_calendar,
     }
-    proposals = llm.rank_setups(features, context=context)
+    # Pre-filtro deterministico: riduce gli asset passati al LLM dai 33
+    # tipici (universe + discovery) a 6-12 candidati "interessanti" secondo
+    # regole tecniche. Abbatte i token di input del 60-70% con un safety
+    # net che evita di spegnere lo scanner nei giorni piatti.
+    pre_n = len(features)
+    filtered_features, filter_counts = _prefilter_candidates(features)
+    log.info(
+        "Pre-filter: %d -> %d (%s)",
+        pre_n,
+        len(filtered_features),
+        ", ".join(f"{k}={v}" for k, v in filter_counts.items() if v),
+    )
+
+    proposals = llm.rank_setups(filtered_features, context=context)
 
     # Guardrail deterministici: il prompt chiede al LLM di applicare
     # le regole macro, ma a volte le ignora quando il setup tecnico
@@ -835,6 +917,11 @@ def run_morning_scan(config: Config) -> None:
                 "scan_set": len(scan_set),
                 "proposals": _proposals_summary(proposals),
                 "skipped_for_budget": skipped_reasons,
+                "pre_filter": {
+                    "before": pre_n,
+                    "after": len(filtered_features),
+                    "reasons": filter_counts,
+                },
             },
         )
         return
@@ -887,6 +974,11 @@ def run_morning_scan(config: Config) -> None:
                 "rotation_target": rotation.get("asset"),
                 "rotation_delta": rotation.get("delta"),
                 "proposals": _proposals_summary(proposals),
+                "pre_filter": {
+                    "before": pre_n,
+                    "after": len(filtered_features),
+                    "reasons": filter_counts,
+                },
             },
         )
         return
@@ -910,6 +1002,11 @@ def run_morning_scan(config: Config) -> None:
             notes={
                 "max_open_positions": config.max_open_positions,
                 "proposals": _proposals_summary(proposals),
+                "pre_filter": {
+                    "before": pre_n,
+                    "after": len(filtered_features),
+                    "reasons": filter_counts,
+                },
             },
         )
         return
@@ -942,6 +1039,11 @@ def run_morning_scan(config: Config) -> None:
         notes={
             "execution_mode": config.execution_mode,
             "proposals": _proposals_summary(proposals),
+            "pre_filter": {
+                "before": pre_n,
+                "after": len(filtered_features),
+                "reasons": filter_counts,
+            },
         },
     )
 

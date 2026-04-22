@@ -121,7 +121,10 @@ def generate_briefing(config: Config, slot: str) -> str:
                 {
                     "source": n["source"],
                     "headline": n["headline"],
-                    "summary": n.get("summary", ""),
+                    # Tronca i summary RSS (spesso lunghi 500+ char) a 150
+                    # per ridurre i token in input. Le headline + 150 char
+                    # bastano al LLM per capire il contesto.
+                    "summary": (n.get("summary") or "")[:150],
                     "datetime": n.get("datetime"),
                 }
                 for n in news
