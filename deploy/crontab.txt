@@ -21,8 +21,8 @@ TRADEALERT_HOME=/home/ubuntu/tradealert
 # ---------- Position Monitor: ogni 30 min, 7-22 IT (con LLM per close) ----------
 */30 7-22 * * *      cd $TRADEALERT_HOME && python -m jobs.monitor >> logs/monitor.log 2>&1
 
-# ---------- Trailing stop leggero: ogni 5 min, 7-22 IT (no LLM) ----------
-*/5 7-22 * * *       cd $TRADEALERT_HOME && python -m jobs.trailing_stop >> logs/trailing.log 2>&1
+# ---------- Trailing stop leggero: ogni 5 min H24 (no LLM, solo migliorativo) ----------
+*/5 * * * *          cd $TRADEALERT_HOME && python -m jobs.trailing_stop >> logs/trailing.log 2>&1
 
 # ---------- Briefing: 3x/giorno, sfasato dal monitor per evitare 429 Capital ----------
 2 8 * * *            cd $TRADEALERT_HOME && python -m jobs.briefing morning   >> logs/briefing.log 2>&1

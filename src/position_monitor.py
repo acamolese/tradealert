@@ -427,12 +427,13 @@ def run_trailing_stops(config: Config) -> None:
     """Versione leggera del monitor: applica solo il trailing stop a
     tutte le posizioni aperte. Nessuna chiamata LLM, solo aritmetica e
     ``update_position`` quando uno SL va spostato. Pensato per girare
-    spesso (ogni 5 min) per proteggere rapidamente il breakeven senza
-    incidere sui costi."""
-    if is_quiet_now():
-        log.info("Skip trailing: %s", quiet_reason())
-        return
+    spesso (ogni 5 min, H24) per proteggere rapidamente il breakeven
+    senza incidere sui costi.
 
+    NIENTE check quiet_hours: la protezione dello SL e' migliorativa
+    per definizione (uno SL viene spostato solo se piu' protettivo del
+    precedente) e crypto/forex sono aperti H24, quindi blocchiamo solo
+    quando non c'e' niente da fare (no posizioni)."""
     capital = CapitalClient(config)
     telegram = TelegramClient(config)
     db = Database(config)
