@@ -49,10 +49,22 @@ Per ogni evento produci:
 - date: ISO-8601 in UTC (es. "2026-04-22T22:00:00Z"). Se hai solo la
   data senza ora precisa, usa 12:00:00Z.
 - description: frase breve in italiano (max 80 caratteri).
-- impact_assets: lista di nomi asset tra questi:
+- impact_assets: lista di nomi asset SOLO fra questi:
   ["Gold", "Silver", "WTI Oil", "Brent Oil", "US500", "Nasdaq 100",
    "DAX 40", "EUR/USD", "GBP/USD", "USD/JPY", "Bitcoin", "Ethereum"].
-  Scegli 2-5 asset davvero impattati.
+  Regole OBBLIGATORIE per scegliere gli asset, non derogabili:
+  * Evento geopolitico RISK-OFF (guerre, tregue, sanzioni, crisi):
+    DEVI includere SEMPRE anche i principali indici azionari
+    (US500, Nasdaq 100) se l'evento coinvolge USA/Occidente, e/o
+    DAX 40 se coinvolge UE. Non limitarti a Gold/Oil/JPY.
+  * Evento RISK-ON (accordo, pace, stimoli economici): stessa
+    logica, aggiungi sempre gli indici coinvolti.
+  * Evento solo energetico (es. OPEC, outage impianto): WTI/Brent
+    prioritari, indici opzionali.
+  * Evento solo FX-specifico (es. SNB): coppia FX pertinente,
+    niente indici salvo impatto sistemico.
+  Minimo 3 asset, massimo 6. Gli indici NON vanno mai omessi nei
+  casi geopolitici broad-impact.
 - direction_hint: uno di
   "risk_on", "risk_off", "risk_off_if_fails", "risk_on_if_fails",
   "unknown".
