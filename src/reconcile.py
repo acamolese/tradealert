@@ -134,12 +134,13 @@ def reconcile_open_trades(config: Config) -> dict[str, int]:
     if not stale:
         return counters
 
-    # Fetch history una sola volta per tutti gli stale. Usiamo lastPeriod
-    # (secondi) invece di from/to perche' il demo env Capital rifiuta
-    # range arbitrari con error.invalid.daterange anche su finestre brevi.
+    # Fetch history: Capital demo limita lastPeriod a 86400s (24h) e
+    # rifiuta range arbitrari con from/to. Con cron orario il reconcile
+    # intercetta comunque ogni chiusura entro 24h: se un trade risulta
+    # stale da piu' di un giorno viene chiuso nel DB senza close/pnl.
     try:
         activities = capital.get_activity_history(
-            last_period_sec=7 * 24 * 3600,
+            last_period_sec=24 * 3600,
             detailed=True,
         )
     except (CapitalAPIError, Exception) as exc:
