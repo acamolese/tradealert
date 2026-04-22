@@ -146,10 +146,39 @@ def _direction_label(direction: str, short: bool = False) -> str:
     return d.upper()
 
 
+def _format_macro_events_block(
+    events: list[dict[str, Any]] | None,
+) -> str:
+    """Blocco informativo su eventi macro imminenti per l'asset.
+    Il LLM dovrebbe gia' citarli nei risks, ma li stampiamo comunque
+    qui in modo strutturato cosi' l'utente non deve fidarsi solo della
+    thesis per avere il quadro."""
+    if not events:
+        return ""
+    lines: list[str] = ["<b>📅 Contesto macro entro 24h</b>"]
+    for ev in events[:4]:
+        hours = ev.get("hours_until", "?")
+        if ev.get("source") == "critical":
+            desc = ev.get("description", "?")
+            hint = ev.get("direction_hint", "unknown")
+            lines.append(f"  • {_esc(desc)} tra {hours}h — <i>{hint}</i>")
+        else:
+            country = ev.get("country", "")
+            name = ev.get("event", "?")
+            est = ev.get("estimate")
+            prev = ev.get("prev")
+            est_block = f" (est {est} vs prev {prev})" if est is not None else ""
+            lines.append(
+                f"  • {country} {_esc(name)} tra {hours}h{est_block}"
+            )
+    return "\n".join(lines)
+
+
 def _format_telegram_message(
     proposal: SetupProposal,
     asset_features: dict[str, Any],
     execution_mode: str = "coach",
+    macro_events_near: list[dict[str, Any]] | None = None,
 ) -> str:
     last = asset_features.get("last_price")
     spread = asset_features.get("spread_pct")
@@ -187,6 +216,9 @@ def _format_telegram_message(
             "<i>Esegui manualmente su Capital.com (modalita Coach).</i>"
         )
 
+    macro_block = _format_macro_events_block(macro_events_near)
+    macro_section = f"\n{macro_block}\n" if macro_block else ""
+
     return (
         f"🎯 <b>Setup individuato</b>\n\n"
         f"<b>{_esc(proposal.asset)}</b>  (score {proposal.score}/10)\n"
@@ -195,7 +227,8 @@ def _format_telegram_message(
         f"{spread_line}"
         f"{sl_line}"
         f"{tp_line}\n"
-        f"<i>Thesis:</i>\n{_esc(proposal.thesis)}\n\n"
+        f"<i>Thesis:</i>\n{_esc(proposal.thesis)}\n"
+        f"{macro_section}\n"
         f"{footer}"
     )
 
@@ -249,6 +282,7 @@ def _format_confirm_message(
     current_budget: float,
     sizing: "SizingResult",
     timeout_sec: int,
+    macro_events_near: list[dict[str, Any]] | None = None,
 ) -> str:
     if sizing.size is None:
         sizing_block = (
@@ -264,12 +298,15 @@ def _format_confirm_message(
             f"Rischio se SL: <code>{sizing.risk_estimate:.2f} EUR</code>"
         )
     reasoning = _format_reasoning_block(proposal, asset_features)
+    macro_block = _format_macro_events_block(macro_events_near)
+    macro_section = f"\n\n{macro_block}" if macro_block else ""
     return (
         f"🟡 <b>Conferma richiesta</b> (signal {signal_row['id']})\n\n"
         f"<b>{_esc(proposal.asset)}</b>  (score {proposal.score}/10)\n"
         f"{_direction_label(proposal.direction)}\n\n"
         f"{reasoning}\n\n"
-        f"{sizing_block}\n\n"
+        f"{sizing_block}"
+        f"{macro_section}\n\n"
         f"<i>I bottoni sotto sono l'importo in EUR da bloccare come margine. "
         f"Clicca un valore poi Esegui.</i>"
     )
@@ -582,6 +619,7 @@ def _handle_confirm(
     signal_row: dict[str, Any],
     proposal: SetupProposal,
     asset_features: dict[str, Any],
+    macro_events_near: list[dict[str, Any]] | None = None,
 ) -> None:
     """Invia il messaggio di conferma con bottoni e ritorna. I callback
     dei bottoni (Esegui/Salta/Budget) sono gestiti in modo asincrono dal
@@ -600,6 +638,7 @@ def _handle_confirm(
             current_budget,
             sizing,
             config.confirm_timeout_sec,
+            macro_events_near=macro_events_near,
         ),
         _confirm_buttons(
             signal_id,
@@ -725,6 +764,29 @@ def run_morning_scan(config: Config) -> None:
         "economic_calendar": economic_calendar,
     }
     proposals = llm.rank_setups(features, context=context)
+
+    # Guardrail deterministici: il prompt chiede al LLM di applicare
+    # le regole macro, ma a volte le ignora quando il setup tecnico
+    # gli piace. Qui le imponiamo in Python prima del ranking finale.
+    from .macro_guard import apply_macro_guardrails
+
+    try:
+        open_position_assets = [
+            (p.get("market", {}) or {}).get("instrumentName") or ""
+            for p in capital.get_open_positions()
+        ]
+    except Exception:
+        log.exception("Fetch open positions per guardrails fallito")
+        open_position_assets = []
+
+    proposals, guardrail_logs = apply_macro_guardrails(
+        proposals,
+        critical_events=critical_events,
+        economic_calendar=economic_calendar,
+        open_position_assets=open_position_assets,
+    )
+    for gl in guardrail_logs:
+        log.info("Guardrail %s [%s]: %s", gl.action, gl.asset, gl.details)
 
     eligible = [p for p in proposals if p.direction in ("long", "short")]
     eligible.sort(key=lambda p: p.score, reverse=True)
@@ -852,9 +914,22 @@ def run_morning_scan(config: Config) -> None:
         )
         return
 
+    # Eventi macro rilevanti per l'asset scelto (stampati in modo
+    # strutturato nei messaggi, oltre a quanto il LLM ha scritto).
+    from .macro_guard import events_affecting_asset
+
+    macro_events_near = events_affecting_asset(
+        top.asset,
+        critical_events=critical_events,
+        economic_calendar=economic_calendar,
+        within_hours=24.0,
+    )
     telegram.send_message(
         _format_telegram_message(
-            top, asset_features, execution_mode=config.execution_mode
+            top,
+            asset_features,
+            execution_mode=config.execution_mode,
+            macro_events_near=macro_events_near,
         )
     )
     _log_run(
@@ -884,7 +959,14 @@ def run_morning_scan(config: Config) -> None:
             signal_row["id"],
         )
         _handle_confirm(
-            config, capital, db, telegram, signal_row, top, asset_features
+            config,
+            capital,
+            db,
+            telegram,
+            signal_row,
+            top,
+            asset_features,
+            macro_events_near=macro_events_near,
         )
     else:
         log.info("EXECUTION_MODE=coach, solo notifica")
