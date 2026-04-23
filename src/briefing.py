@@ -24,6 +24,7 @@ from anthropic import Anthropic
 from .capital_client import CapitalAPIError, CapitalClient
 from .config import Config
 from .news import fetch_news, format_news_for_llm
+from .news_analyzer import analyze_news
 from .quiet_hours import is_quiet_now, quiet_reason
 from .telegram_client import TelegramClient
 from .universe import UNIVERSE
@@ -57,12 +58,14 @@ ricevere solo crypto: produci comunque il briefing.
 
 Il briefing deve:
 - essere conciso ma denso, max 5 paragrafi
-- citare 1-2 news rilevanti che possono muovere mercati nelle prossime ore
+- citare 1-2 news rilevanti che possono muovere mercati nelle prossime ore,
+  privilegiando quelle con 'relevance' >= 7 e 'assets' che compaiono nello snapshot
 - segnalare se ci sono eventi macro previsti (FOMC, CPI, ECB, NFP)
 - commentare i movimenti significativi degli asset nello snapshot
 - chiudere con 1-3 watchlist specifici (asset + livello chiave + perche')
 - evitare hype, frasi tipo "il mercato e' in fermento", e claim non supportati
 - usare un tono pratico, da analista che parla a un suo collega
+- IGNORARE news con category='noise' o relevance < 4: sono rumore gia' filtrato
 
 Format output: testo per Telegram con HTML LIMITATO. Tag ammessi SOLO:
 <b>, <i>, <code>. Per andare a capo usa newline (\n), MAI <br>, MAI <p>,
@@ -110,7 +113,16 @@ def generate_briefing(config: Config, slot: str) -> str:
     capital.login()
 
     market_snapshot = _capital_snapshot(capital)
-    news = fetch_news(config, limit=20)
+    news_raw = fetch_news(config, limit=25)
+    universe_names = [a.name for a in UNIVERSE]
+    news_enriched = analyze_news(config, news_raw, universe_names)
+
+    # Filtra via il noise e prioritizza per relevance. Se tutto viene
+    # classificato noise (fallback safe) teniamo almeno le prime 12 news
+    # per non svuotare il payload al briefing.
+    scored = [n for n in news_enriched if n.get("category") != "noise" and n.get("relevance", 0) >= 4]
+    scored.sort(key=lambda n: n.get("relevance", 0), reverse=True)
+    top_news = scored[:12] if scored else news_enriched[:12]
 
     client = Anthropic(api_key=config.anthropic_api_key)
     user_block = json.dumps(
@@ -126,8 +138,12 @@ def generate_briefing(config: Config, slot: str) -> str:
                     # bastano al LLM per capire il contesto.
                     "summary": (n.get("summary") or "")[:150],
                     "datetime": n.get("datetime"),
+                    "assets": n.get("assets", []),
+                    "category": n.get("category", ""),
+                    "sentiment": n.get("sentiment", ""),
+                    "relevance": n.get("relevance", 0),
                 }
-                for n in news
+                for n in top_news
             ],
         },
         indent=2,
