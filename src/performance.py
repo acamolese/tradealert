@@ -25,13 +25,24 @@ from .universe import UNIVERSE
 
 
 # --- Bucket di score per l'analisi di calibrazione ---
+# Granularita' fissa 0.5 per leggere la calibrazione con piu' risoluzione:
+# un bucket "8.0-9.0" nascondeva salti enormi fra 8.1 e 8.9. Con 0.5 la
+# curva di hit-rate vs score diventa leggibile anche con poche decine di
+# trade, a patto di marcare i bucket con n<3 come 'poco affidabili'.
 SCORE_BUCKETS: list[tuple[float, float, str]] = [
-    (6.0, 7.0, "6.0-7.0"),
+    (6.0, 6.5, "6.0-6.5"),
+    (6.5, 7.0, "6.5-7.0"),
     (7.0, 7.5, "7.0-7.5"),
     (7.5, 8.0, "7.5-8.0"),
-    (8.0, 9.0, "8.0-9.0"),
-    (9.0, 10.01, "9.0-10"),
+    (8.0, 8.5, "8.0-8.5"),
+    (8.5, 9.0, "8.5-9.0"),
+    (9.0, 9.5, "9.0-9.5"),
+    (9.5, 10.01, "9.5-10"),
 ]
+
+# Soglia minima di sample sotto la quale un bucket non e' statisticamente
+# affidabile: il report lo mostra ma con un flag esplicito.
+MIN_RELIABLE_SAMPLE = 3
 
 
 # --- Mappa asset_name -> asset_class (fallback quando non in UNIVERSE) ---
@@ -221,13 +232,21 @@ def suggest_from_score_buckets(
             f"Alza MIN_SCORE_THRESHOLD a 7.5: bucket 7.0-7.5 ha "
             f"hit rate {low.hit_rate:.0%} su {low.n} trade."
         )
-    high = next((b for b in buckets if b.label == "8.0-9.0"), None)
-    if high and high.n >= min_sample and high.hit_rate >= 0.60:
-        out.append(
-            f"Bucket 8.0-9.0 sta performando bene "
-            f"({high.hit_rate:.0%} su {high.n}): considera di aumentare "
-            f"esposizione sui setup con score >= 8."
-        )
+    # Aggrega i bucket >=8.0 per valutare se gli score alti performano
+    # davvero: con granularita' 0.5 il singolo bucket potrebbe avere
+    # sample troppo basso.
+    high_labels = {"8.0-8.5", "8.5-9.0", "9.0-9.5", "9.5-10"}
+    high_buckets = [b for b in buckets if b.label in high_labels]
+    n_high = sum(b.n for b in high_buckets)
+    wins_high = sum(b.wins for b in high_buckets)
+    if n_high >= min_sample:
+        hit_rate_high = wins_high / n_high
+        if hit_rate_high >= 0.60:
+            out.append(
+                f"Score >= 8 sta performando bene "
+                f"({hit_rate_high:.0%} su {n_high}): considera di aumentare "
+                f"esposizione sui setup con score >= 8."
+            )
     return out
 
 

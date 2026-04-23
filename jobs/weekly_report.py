@@ -17,6 +17,7 @@ import sys
 from src.config import load_config
 from src.db import Database
 from src.performance import (
+    MIN_RELIABLE_SAMPLE,
     BucketStats,
     compute_hit_rate_by_asset_class,
     compute_hit_rate_by_score,
@@ -42,6 +43,12 @@ def _fmt_pct(x: float) -> str:
     return f"{x * 100:.0f}%"
 
 
+def _reliability_flag(b: BucketStats) -> str:
+    """Marca i bucket con sample <3 come non affidabili, cosi' il
+    lettore non costruisce euristiche su 1-2 trade."""
+    return " ⚠" if b.n < MIN_RELIABLE_SAMPLE else ""
+
+
 def _fmt_score_table(buckets: list[BucketStats]) -> str:
     rows = [b for b in buckets if b.n > 0]
     if not rows:
@@ -51,6 +58,7 @@ def _fmt_score_table(buckets: list[BucketStats]) -> str:
         out.append(
             f"  <code>{b.label}</code>: {b.wins}/{b.n} "
             f"({_fmt_pct(b.hit_rate)})  avg {_fmt_eur(b.avg_pnl)}"
+            f"{_reliability_flag(b)}"
         )
     return "\n".join(out)
 
@@ -64,12 +72,14 @@ def _fmt_asset_table(buckets: list[BucketStats]) -> str:
         out.append(
             f"  <code>{b.label}</code>: {b.wins}/{b.n} "
             f"({_fmt_pct(b.hit_rate)})  tot {_fmt_eur(b.total_pnl)}"
+            f"{_reliability_flag(b)}"
         )
     return "\n".join(out)
 
 
 def build_report(db: Database) -> str:
     summary_7 = compute_weekly_summary(db, days=7)
+    summary_30 = compute_weekly_summary(db, days=30)
     score_30, n_30 = compute_hit_rate_by_score(db, days=30)
     asset_30 = compute_hit_rate_by_asset_class(db, days=30)
 
@@ -80,7 +90,13 @@ def build_report(db: Database) -> str:
         f"({summary_7.wins}W / {summary_7.losses}L)\n"
         f"  P&amp;L netto: <b>{_fmt_eur(summary_7.total_pnl)}</b>\n"
         f"  Win rate: {_fmt_pct(summary_7.win_rate)}\n"
-        f"  Max drawdown: {_fmt_eur(summary_7.max_drawdown)}"
+        f"  Max drawdown: {_fmt_eur(summary_7.max_drawdown)}\n"
+        f"\n<b>Rolling 30 giorni (contesto):</b>\n"
+        f"  Trade chiusi: {summary_30.n_trades} "
+        f"({summary_30.wins}W / {summary_30.losses}L)\n"
+        f"  P&amp;L netto: <b>{_fmt_eur(summary_30.total_pnl)}</b>\n"
+        f"  Win rate: {_fmt_pct(summary_30.win_rate)}\n"
+        f"  Max drawdown: {_fmt_eur(summary_30.max_drawdown)}"
     )
 
     # Se la finestra 30gg e' scarna, affianchiamo i dati 'dall'inizio'.
@@ -124,7 +140,12 @@ def build_report(db: Database) -> str:
             "automatico affidabile per ora.</i>"
         )
 
-    return header + body_30 + fallback_section + suggest_block
+    legend = (
+        f"\n\n<i>⚠ = bucket con meno di {MIN_RELIABLE_SAMPLE} trade, "
+        f"hit rate non affidabile.</i>"
+    )
+
+    return header + body_30 + fallback_section + suggest_block + legend
 
 
 def main() -> int:
