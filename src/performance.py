@@ -179,6 +179,7 @@ class WeeklySummary:
     n_trades: int
     wins: int
     losses: int
+    breakeven: int  # trade chiusi con P&L == 0 (SL+commissioni, BE-stop, ecc.)
     total_pnl: float
     max_drawdown: float  # peggior drawdown in EUR sulla equity curve
 
@@ -194,6 +195,7 @@ def compute_weekly_summary(
     pnls = [_pnl_of(t) for t in trades]
     wins = sum(1 for p in pnls if p > 0)
     losses = sum(1 for p in pnls if p < 0)
+    breakeven = sum(1 for p in pnls if p == 0)
     total = sum(pnls)
     # Max drawdown: min sulla curva cumulata meno il suo running peak.
     equity = 0.0
@@ -211,6 +213,7 @@ def compute_weekly_summary(
         n_trades=len(trades),
         wins=wins,
         losses=losses,
+        breakeven=breakeven,
         total_pnl=total,
         max_drawdown=max_dd,
     )

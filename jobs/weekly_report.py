@@ -77,23 +77,35 @@ def _fmt_asset_table(buckets: list[BucketStats]) -> str:
     return "\n".join(out)
 
 
+def _fmt_wlbe(s) -> str:
+    """Formatta W/L/BE omettendo BE se zero, per non sporcare il report
+    quando non ci sono trade chiusi a pareggio."""
+    base = f"{s.wins}W / {s.losses}L"
+    if s.breakeven:
+        base += f" / {s.breakeven}BE"
+    return base
+
+
 def build_report(db: Database) -> str:
     summary_7 = compute_weekly_summary(db, days=7)
     summary_30 = compute_weekly_summary(db, days=30)
     score_30, n_30 = compute_hit_rate_by_score(db, days=30)
     asset_30 = compute_hit_rate_by_asset_class(db, days=30)
+    open_trades = db.get_open_trades()
+    n_open = len(open_trades)
 
     header = (
         f"📊 <b>Report settimanale TradeAlert</b>\n\n"
+        f"<b>Posizioni aperte ora:</b> {n_open}\n\n"
         f"<b>Ultimi 7 giorni:</b>\n"
         f"  Trade chiusi: {summary_7.n_trades} "
-        f"({summary_7.wins}W / {summary_7.losses}L)\n"
+        f"({_fmt_wlbe(summary_7)})\n"
         f"  P&amp;L netto: <b>{_fmt_eur(summary_7.total_pnl)}</b>\n"
         f"  Win rate: {_fmt_pct(summary_7.win_rate)}\n"
         f"  Max drawdown: {_fmt_eur(summary_7.max_drawdown)}\n"
         f"\n<b>Rolling 30 giorni (contesto):</b>\n"
         f"  Trade chiusi: {summary_30.n_trades} "
-        f"({summary_30.wins}W / {summary_30.losses}L)\n"
+        f"({_fmt_wlbe(summary_30)})\n"
         f"  P&amp;L netto: <b>{_fmt_eur(summary_30.total_pnl)}</b>\n"
         f"  Win rate: {_fmt_pct(summary_30.win_rate)}\n"
         f"  Max drawdown: {_fmt_eur(summary_30.max_drawdown)}"
