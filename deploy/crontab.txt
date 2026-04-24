@@ -24,10 +24,13 @@ TRADEALERT_HOME=/home/ubuntu/tradealert
 # ---------- Trailing stop leggero: ogni 5 min H24 (no LLM, solo migliorativo) ----------
 */5 * * * *          cd $TRADEALERT_HOME && python -m jobs.trailing_stop >> logs/trailing.log 2>&1
 
-# ---------- Briefing: 3x/giorno, sfasato dal monitor per evitare 429 Capital ----------
-2 8 * * *            cd $TRADEALERT_HOME && python -m jobs.briefing morning   >> logs/briefing.log 2>&1
-2 16 * * *           cd $TRADEALERT_HOME && python -m jobs.briefing afternoon >> logs/briefing.log 2>&1
-2 22 * * *           cd $TRADEALERT_HOME && python -m jobs.briefing evening   >> logs/briefing.log 2>&1
+# ---------- Briefing: DISABILITATI (2026-04-24) per taglio costi API (~€6/mese).
+# Doppio gate: crontab commentato qui + guard BRIEFING_ENABLED in jobs/briefing.py.
+# Per riabilitare: scommenta le 3 righe sotto, imposta BRIEFING_ENABLED=true nel
+# .env della VM e reinstalla il crontab (crontab deploy/crontab.txt).
+# 2 8 * * *            cd $TRADEALERT_HOME && python -m jobs.briefing morning   >> logs/briefing.log 2>&1
+# 2 16 * * *           cd $TRADEALERT_HOME && python -m jobs.briefing afternoon >> logs/briefing.log 2>&1
+# 2 22 * * *           cd $TRADEALERT_HOME && python -m jobs.briefing evening   >> logs/briefing.log 2>&1
 
 # ---------- Health VM Oracle: 1x/giorno (banda, disco, RAM, listener) ----------
 10 9 * * *           cd $TRADEALERT_HOME && python -m jobs.health_check >> logs/health.log 2>&1

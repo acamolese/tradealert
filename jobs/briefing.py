@@ -15,6 +15,12 @@ import logging
 import os
 import sys
 
+# Kill switch: disabilitato di default dal 2026-04-24 per taglio costi API.
+# Per riabilitare impostare BRIEFING_ENABLED=true nell'ambiente (.env sulla VM).
+if os.environ.get("BRIEFING_ENABLED", "false").lower() != "true":
+    print("[briefing] disabled via BRIEFING_ENABLED env var")
+    sys.exit(0)
+
 from src.briefing import run_briefing
 from src.config import load_config
 
