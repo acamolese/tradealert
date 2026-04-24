@@ -384,6 +384,7 @@ def _prefilter_candidates(
     features: dict[str, dict[str, Any]],
     min_candidates: int = 3,
     fallback_n: int = 5,
+    max_candidates: int = 8,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, int]]:
     """Filtro deterministico pre-LLM per ridurre i token.
 
@@ -398,6 +399,12 @@ def _prefilter_candidates(
     Safety net: se il filtro lascia < ``min_candidates`` asset (giornata
     piatta), passa i top ``fallback_n`` per abs(daily_pct_change) come
     fallback. Evita di "spegnere" lo scanner nei giorni morti.
+
+    Cap superiore: mai oltre ``max_candidates`` asset (default 8) alla
+    LLM per contenere i token di input. Se il filtro produce di piu',
+    si tengono i top ``max_candidates`` per abs(daily_pct_change) e
+    counters["pre_filter_capped"] segnala l'evento (per tunare il
+    cap a posteriori).
 
     Ritorna (filtered, counters) dove counters ha i motivi per cui
     ogni asset e' passato: utile per tunare le soglie a posteriori.
@@ -446,6 +453,17 @@ def _prefilter_candidates(
             if name not in selected:
                 selected[name] = af
         counters["fallback_used"] = 1
+
+    # Cap superiore: oltre max_candidates tieni solo i top per daily_pct_change.
+    if len(selected) > max_candidates:
+        capped = sorted(
+            selected.items(),
+            key=lambda kv: abs(float(kv[1].get("daily_pct_change") or 0)),
+            reverse=True,
+        )[:max_candidates]
+        selected = dict(capped)
+        counters["pre_filter_capped"] = 1
+
     return selected, counters
 
 

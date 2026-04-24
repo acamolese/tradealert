@@ -16,6 +16,37 @@ from anthropic import Anthropic
 from .config import Config
 
 
+def _compress_features(
+    features: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Arrotonda i float a 2 decimali per ridurre i token in input alla LLM.
+    I prezzi assoluti (level_*, last_price) restano a 4 decimali perche'
+    forex/metalli hanno precisione necessaria sotto la seconda cifra.
+    Non rinomina i campi: il system prompt si aspetta i nomi originali.
+    """
+    price_keys = {
+        "last_price",
+        "level_support",
+        "level_resistance",
+        "bb_upper",
+        "bb_lower",
+        "bb_middle",
+        "ema_20",
+        "ema_50",
+        "ema_200",
+    }
+    out: dict[str, dict[str, Any]] = {}
+    for asset, af in features.items():
+        compact: dict[str, Any] = {}
+        for k, v in af.items():
+            if isinstance(v, float):
+                compact[k] = round(v, 4 if k in price_keys else 2)
+            else:
+                compact[k] = v
+        out[asset] = compact
+    return out
+
+
 @dataclass
 class SetupProposal:
     asset: str
@@ -137,10 +168,12 @@ class LLMAnalyzer:
         context puo' contenere: is_weekend, weekday, tradeable_count,
         traditional_markets_open, ecc.
         """
-        payload = {"asset_features": market_features}
+        payload = {"asset_features": _compress_features(market_features)}
         if context:
             payload["context"] = context
-        user_message = json.dumps(payload, indent=2, default=str)
+        # Serializzazione compatta (no indent) per ridurre ulteriormente
+        # i token di input: il modello non ha bisogno del pretty-print.
+        user_message = json.dumps(payload, default=str, separators=(",", ":"))
 
         response = self._client.messages.create(
             model=self._model,
