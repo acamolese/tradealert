@@ -34,6 +34,41 @@ log = logging.getLogger(__name__)
 _FEATURE_REQUEST_DELAY_SEC = 0.15
 
 
+# Weekend: solo crypto major. Esclude alt-coin micro-cap (BOBA, BLUR, GTC,
+# BOME, GRIFFAIN, MERL, GUN, CPOOL, API3, AXS, ecc.) pescate dal Capital
+# /marketnavigation perche' su micro-capitale il loro spread + slippage +
+# pattern pump/dump produce winrate empirico zero (vedi analisi 2026-04-25,
+# 5 chiusi 0 win -2.19 EUR). Le 4 alt-coin secondary in universe.py
+# (Ethereum Classic, EthereumFi, EthereumPoW, ARPA) sono escluse dal weekend
+# perche' non sono tra le 9 major elencate qui sotto.
+WEEKEND_CRYPTO_MAJOR_ALLOWLIST = frozenset({
+    "Bitcoin",
+    "Ethereum",
+    "Solana",
+    "Ripple",
+    "Cardano",
+    "Avalanche",
+    "Polkadot",
+    "Chainlink",
+    "Dogecoin",
+})
+
+
+def _filter_weekend_allowlist(
+    features: dict[str, dict[str, Any]],
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """Restringe il bacino asset weekend ai soli 9 crypto major.
+    Ritorna (filtered, removed_assets) per logging."""
+    kept: dict[str, dict[str, Any]] = {}
+    removed: list[str] = []
+    for name, af in features.items():
+        if name in WEEKEND_CRYPTO_MAJOR_ALLOWLIST:
+            kept[name] = af
+        else:
+            removed.append(name)
+    return kept, removed
+
+
 def _proposals_summary(
     proposals: list[SetupProposal] | None,
 ) -> list[dict[str, Any]]:
@@ -385,6 +420,7 @@ def _prefilter_candidates(
     min_candidates: int = 3,
     fallback_n: int = 5,
     max_candidates: int = 8,
+    is_weekend: bool = False,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, int]]:
     """Filtro deterministico pre-LLM per ridurre i token.
 
@@ -395,6 +431,13 @@ def _prefilter_candidates(
         potenziale breakout) oppure pct_from_high_20 <= -8 (correzione
         profonda = potenziale bounce)
       - bb_width_pct <= 1.5 (compressione volatilita')
+
+    Cintura di sicurezza weekend (``is_weekend=True``): blocca a monte i
+    pattern blow-off top, ovvero asset con ``rsi_14 > 75`` e
+    ``abs(daily_pct_change) > 15`` simultaneamente. Statisticamente sono
+    mean reversion ad alta probabilita', non continuation: vale anche per
+    BTC/ETH (un +20% intraday su BTC con RSI 80 e' blow-off come su una
+    micro-cap). counters["blow_off_blocked"] li conta.
 
     Safety net: se il filtro lascia < ``min_candidates`` asset (giornata
     piatta), passa i top ``fallback_n`` per abs(daily_pct_change) come
@@ -410,13 +453,41 @@ def _prefilter_candidates(
     ogni asset e' passato: utile per tunare le soglie a posteriori.
     """
     selected: dict[str, dict[str, Any]] = {}
-    counters = {
+    counters: dict[str, int] = {
         "daily_pct": 0,
         "rsi_extreme": 0,
         "near_high": 0,
         "correction": 0,
         "bb_compression": 0,
     }
+
+    # Blow-off top filter: gira PRIMA dei criteri di passaggio cosi' un
+    # asset blow-off non puo' nemmeno passare via daily_pct >= 2.
+    if is_weekend:
+        counters["blow_off_blocked"] = 0
+        kept_features: dict[str, dict[str, Any]] = {}
+        for name, af in features.items():
+            rsi = af.get("rsi_14")
+            daily = af.get("daily_pct_change")
+            try:
+                rsi_f = float(rsi) if rsi is not None else None
+                daily_f = float(daily) if daily is not None else None
+            except (TypeError, ValueError):
+                rsi_f, daily_f = None, None
+            if (
+                rsi_f is not None
+                and daily_f is not None
+                and rsi_f > 75
+                and abs(daily_f) > 15
+            ):
+                counters["blow_off_blocked"] += 1
+                log.info(
+                    "[blow_off_top] blocco %s: rsi=%.1f daily_pct=%+.1f",
+                    name, rsi_f, daily_f,
+                )
+                continue
+            kept_features[name] = af
+        features = kept_features
 
     for name, af in features.items():
         reasons: list[str] = []
@@ -797,6 +868,39 @@ def run_morning_scan(config: Config) -> None:
         _log_run(db, "no_data", notes={"scan_set": len(scan_set)})
         return
 
+    # Calcolo is_weekend una volta sola e lo riuso per: (a) restringere il
+    # bacino asset weekend ai 9 crypto major, (b) attivare il filtro blow-off
+    # nel pre-filter, (c) popolare il context per la LLM.
+    from datetime import datetime as _dt, timezone as _tz
+    is_weekend = _dt.now(_tz.utc).weekday() >= 5
+
+    if is_weekend:
+        pre_allowlist_n = len(features)
+        features, removed_assets = _filter_weekend_allowlist(features)
+        log.info(
+            "[weekend_allowlist] bacino: %d -> %d (kept=%s removed=%d)",
+            pre_allowlist_n,
+            len(features),
+            sorted(features.keys()),
+            len(removed_assets),
+        )
+        if not features:
+            telegram.send_message(
+                "ℹ️ Scanner weekend: nessun crypto major nel bacino. Skip."
+            )
+            _log_run(
+                db,
+                "no_setup",
+                notes={
+                    "scan_set": len(scan_set),
+                    "weekend_allowlist": {
+                        "before": pre_allowlist_n,
+                        "after": 0,
+                    },
+                },
+            )
+            return
+
     # Arricchimento con news per asset (RSS pubblici + Finnhub company-news
     # per le azioni). Le news vanno nel payload LLM come contesto per
     # validare o scartare un momentum senza catalyst.
@@ -827,7 +931,8 @@ def run_morning_scan(config: Config) -> None:
     from datetime import datetime, timezone
 
     now = datetime.now(timezone.utc)
-    is_weekend = now.weekday() >= 5  # 5=sat, 6=sun
+    # is_weekend gia' calcolato in cima al flow per applicare l'allowlist;
+    # qui lo riusiamo nel context senza ricalcolarlo.
     traditional_open = sum(
         1
         for name, af in features.items()
@@ -855,7 +960,9 @@ def run_morning_scan(config: Config) -> None:
     # regole tecniche. Abbatte i token di input del 60-70% con un safety
     # net che evita di spegnere lo scanner nei giorni piatti.
     pre_n = len(features)
-    filtered_features, filter_counts = _prefilter_candidates(features)
+    filtered_features, filter_counts = _prefilter_candidates(
+        features, is_weekend=is_weekend
+    )
     log.info(
         "Pre-filter: %d -> %d (%s)",
         pre_n,

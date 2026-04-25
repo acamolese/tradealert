@@ -66,12 +66,32 @@ considerando trend, momentum, volatilità, livelli chiave, news recenti e
 contesto generale. Alcuni asset includono un campo "news" con titoli
 recenti: usali per validare o smorzare l'ipotesi di trend.
 
-Regole su asset class CRYPTO:
-- In giorni feriali (lun-ven): le crypto hanno PRIORITA' RIDOTTA. Considerale
-  solo se il setup e' eccellente (score >= 8) e meglio degli altri asset
-  tradizionali. Privilegia oro, indici, forex, commodities a parita' di qualita'.
-- Nel weekend (sab-dom) o quando i mercati tradizionali sono chiusi: le crypto
-  diventano l'opzione principale e possono essere proposte anche con score 6-7.
+Regole su asset class CRYPTO (stessi standard di qualita' in weekday e weekend):
+- Le crypto vengono valutate con gli STESSI criteri di qualita' di oro,
+  indici, forex e commodities. Score 8+ resta riservato a setup eccellenti,
+  score 7 a setup solidi. NON esiste deroga "weekend": uno score 7 deve
+  significare la stessa cosa il sabato e il martedi'.
+- Nei weekday le crypto restano in secondo piano: a parita' di qualita'
+  privilegia oro, indici, forex, commodities (asset class tradizionali con
+  liquidita' e narrative piu' robuste).
+- Nei weekend l'universo crypto e' ristretto (solo major: BTC, ETH, SOL,
+  XRP, ADA, AVAX, DOT, LINK, DOGE) e i mercati tradizionali sono chiusi.
+  Per proporre un setup crypto weekend deve soddisfare TUTTI questi
+  criteri di qualita' rigorosi:
+    * Trend coerente: slope EMA20/50 4H allineato alla direzione proposta
+      (no controtrend a meno di evidente reversal con volume).
+    * RSI non estremo: 4H tra 35 e 70 per setup long, tra 30 e 65 per
+      short. Sopra 75 o sotto 25 indica esaurimento, NON continuazione.
+    * Bollinger Band direzionali: prezzo che si appoggia/respinge alla
+      banda nel verso del trend, non scollegato.
+    * daily_pct_change non blow-off: |daily_pct| > 12% e RSI 4H > 70
+      e' un esaurimento, non un breakout. Scarta.
+    * Catalyst chiaro: una news/event/macro che spiega il movimento, o
+      un livello tecnico chiave da rompere/respingere. NO "il momentum
+      e' positivo" senza un perche' identificabile.
+- Se NESSUN crypto major weekend soddisfa TUTTI i criteri sopra, restituisci
+  proposals con direction="skip" o lista vuota. NON forzare un setup mediocre
+  solo per riempire l'output: nel weekend non serve sempre proporre qualcosa.
 - Tieni conto di "is_weekend" e "tradeable_count" nel contesto fornito.
 
 Momentum intraday (campo "daily_pct_change"):
