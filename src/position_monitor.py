@@ -477,6 +477,28 @@ def monitor_positions(config: Config) -> None:
     capital.login()
     open_positions = capital.get_open_positions()
 
+    # Reconcile inline: chiude in DB i trade che il broker ha gia' chiuso
+    # (stop, tp, chiusura manuale dal frontend). Riusa la sessione Capital
+    # e le live_positions appena recuperate per evitare HTTP duplicati.
+    # Il job h24 jobs.reconcile resta come safety net fuori dalla finestra
+    # attiva del monitor (notte e prima/dopo 7-22).
+    try:
+        from .reconcile import reconcile_open_trades
+
+        rec = reconcile_open_trades(
+            config, capital=capital, db=db, live_positions=open_positions
+        )
+        if rec.get("closed", 0) > 0:
+            log.info(
+                "[reconcile] inline: checked=%d stale=%d closed=%d with_pnl=%d",
+                rec.get("checked", 0),
+                rec.get("stale", 0),
+                rec.get("closed", 0),
+                rec.get("closed_with_pnl", 0),
+            )
+    except Exception:
+        log.exception("Reconcile inline fallito (continuo col monitor)")
+
     if not open_positions:
         log.info("Nessuna posizione aperta, nulla da monitorare")
         return

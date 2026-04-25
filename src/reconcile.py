@@ -104,14 +104,27 @@ def _extract_close_info(
     )
 
 
-def reconcile_open_trades(config: Config) -> dict[str, int]:
+def reconcile_open_trades(
+    config: Config,
+    capital: CapitalClient | None = None,
+    db: Database | None = None,
+    live_positions: list[dict[str, Any]] | None = None,
+) -> dict[str, int]:
     """Allinea DB con broker. Ritorna contatori {checked, stale, closed,
-    closed_with_pnl}. Loggare l'outcome e' compito del job entry point."""
-    capital = CapitalClient(config)
-    db = Database(config)
+    closed_with_pnl}. Loggare l'outcome e' compito del job entry point.
 
-    capital.login()
-    live_positions = capital.get_open_positions()
+    Parametri opzionali per riuso da chiamanti che hanno gia' una sessione
+    Capital aperta (es. position_monitor): se ``capital`` e' passato, non
+    si fa un nuovo login; se ``live_positions`` e' passata, non si rifa
+    la chiamata HTTP /positions."""
+    if capital is None:
+        capital = CapitalClient(config)
+        capital.login()
+    if db is None:
+        db = Database(config)
+
+    if live_positions is None:
+        live_positions = capital.get_open_positions()
     live_deal_ids = {
         (p.get("position") or {}).get("dealId")
         for p in live_positions
