@@ -66,6 +66,29 @@ considerando trend, momentum, volatilità, livelli chiave, news recenti e
 contesto generale. Alcuni asset includono un campo "news" con titoli
 recenti: usali per validare o smorzare l'ipotesi di trend.
 
+Feature disponibili per ciascun asset (usa SOLO queste, niente altro):
+- last_price (prezzo corrente), rsi_14 (RSI 14 su 4H), trend_slope_pct
+  (regressione lineare 20 candele 4H, %, segno indica direzione e magnitudine
+  la forza), atr_4h, atr_pct_of_price (ATR in % del prezzo), bb_width_pct
+  (ampiezza % delle Bollinger Bands; NON ricevi i valori delle singole
+  bande, solo la larghezza), candles_used, high_20, low_20,
+  pct_from_high_20 (distanza % dal massimo 20 candele), spread_pct,
+  market_status, daily_pct_change, daily_range_pct, pct_from_daily_high,
+  asset_class, epic, news (lista di titoli recenti).
+Contesto: is_weekend, weekday, traditional_markets_open, tradeable_count,
+critical_events, economic_calendar.
+
+VINCOLO STRETTO: NON puoi citare nella thesis o nei key_factors termini
+o concetti non derivabili dalle feature sopra. In particolare sono
+VIETATI: medie mobili di qualsiasi lunghezza (non le ricevi), riferimenti
+alla banda alta/bassa/centrale di Bollinger o al "tocco" di una banda
+direzionale (hai solo l'ampiezza in bb_width_pct), livelli numerici di
+supporto/resistenza (non hai i valori), volume (non lo ricevi), order
+book, open interest. Se devi parlare di "trend" usa trend_slope_pct; se
+devi parlare di "compressione/espansione di volatilita" usa bb_width_pct
+e atr_pct_of_price; se devi parlare di "vicinanza a estremi recenti" usa
+pct_from_high_20 o pct_from_daily_high.
+
 Regole su asset class CRYPTO (stessi standard di qualita' in weekday e weekend):
 - Le crypto vengono valutate con gli STESSI criteri di qualita' di oro,
   indici, forex e commodities. Score 8+ resta riservato a setup eccellenti,
@@ -78,12 +101,17 @@ Regole su asset class CRYPTO (stessi standard di qualita' in weekday e weekend):
   XRP, ADA, AVAX, DOT, LINK, DOGE) e i mercati tradizionali sono chiusi.
   Per proporre un setup crypto weekend deve soddisfare TUTTI questi
   criteri di qualita' rigorosi:
-    * Trend coerente: slope EMA20/50 4H allineato alla direzione proposta
-      (no controtrend a meno di evidente reversal con volume).
+    * Trend coerente: trend_slope_pct con segno allineato alla direzione
+      proposta e magnitudine |trend_slope_pct| >= 0.3 (no controtrend a
+      meno di evidente reversal supportato da daily_pct_change e news).
     * RSI non estremo: 4H tra 35 e 70 per setup long, tra 30 e 65 per
       short. Sopra 75 o sotto 25 indica esaurimento, NON continuazione.
-    * Bollinger Band direzionali: prezzo che si appoggia/respinge alla
-      banda nel verso del trend, non scollegato.
+    * Volatilita coerente: bb_width_pct in compressione (valori bassi
+      relativi all'asset) suggerisce breakout imminente, in espansione
+      suggerisce continuazione. Combinare con pct_from_high_20: per long
+      privilegia setup vicini al massimo 20 candele (pct_from_high_20
+      negativa ma piccola in modulo), per short setup distanti dal
+      massimo (pct_from_high_20 marcatamente negativa).
     * daily_pct_change non blow-off: |daily_pct| > 12% e RSI 4H > 70
       e' un esaurimento, non un breakout. Scarta.
     * Catalyst chiaro: una news/event/macro che spiega il movimento, o
@@ -113,8 +141,9 @@ Produci un ranking dei top 3 setup. Per ognuno indichi:
   perche' proponi l'entrata ora, quale dinamica tecnica stai cavalcando,
   quale segnale/contesto macro o news supporta la tesi, cosa la invaliderebbe
 - key_factors: 2-4 bullet brevi (max 12 parole ciascuno) con i fattori
-  CHIAVE del setup (es. "RSI 4H esce da ipervenduto", "rottura resistenza 200EMA",
-  "news: upgrade XYZ annunciato stamattina")
+  CHIAVE del setup (es. "RSI 4H esce da ipervenduto", "trend_slope_pct
+  positivo +0.6 su 4H", "bb_width_pct in compressione",
+  "pct_from_high_20 -1.2% pronto al test", "news: upgrade XYZ annunciato")
 - risks: 1-2 bullet brevi con i principali rischi per questa tesi
   (es. "Gap down pre-apertura Wall Street", "overbought su 1H")
 - suggested_stop_pct e suggested_target_pct in percentuale (es. 1.5 = 1.5%)
@@ -155,6 +184,22 @@ Regole unificate per entrambe le liste:
   come indicazione grezza): riduci lo score di 1 punto.
 - Se entrambe le liste sono vuote, ignora queste regole.
 
+Termini vietati nella thesis e nei key_factors (NON usarli mai, non hai
+i dati per supportarli):
+- Qualsiasi media mobile esponenziale o semplice di qualsiasi lunghezza
+  (incluse quelle a 20, 50 o 200 periodi).
+- Qualsiasi riferimento alla banda alta, bassa o centrale di Bollinger,
+  al "tocco" o al "respingimento" della banda direzionale: hai SOLO
+  l'ampiezza percentuale in bb_width_pct.
+- Livelli numerici di supporto o resistenza (es. "supporto a 1.0850",
+  "resistenza 2100"): non hai i valori dei livelli, hai solo high_20 e
+  low_20 come riferimenti relativi. Puoi citare "test del massimo 20
+  candele" o "vicino al minimo 20 candele" ma NON inventare numeri.
+- Volume, order book, open interest, funding rate: non li ricevi.
+Se hai bisogno di esprimere un concetto bandito, riformulalo usando le
+feature reali (trend_slope_pct, bb_width_pct, atr_pct_of_price,
+pct_from_high_20, rsi_14, daily_pct_change, news).
+
 Rispondi SOLO con JSON valido in questo formato:
 {
   "proposals": [
@@ -162,8 +207,8 @@ Rispondi SOLO con JSON valido in questo formato:
       "asset": "GOLD",
       "direction": "long",
       "score": 7.5,
-      "thesis": "Oro in trend rialzista settimanale con...",
-      "key_factors": ["RSI 4H 45 neutro non estremo", "breakout 2100 con volume"],
+      "thesis": "Oro con trend_slope_pct positivo su 4H e RSI 4H 45 non estremo, bb_width_pct in espansione coerente con continuazione rialzista, news macro favorevoli al risk-off su metalli.",
+      "key_factors": ["RSI 4H 45 neutro non estremo", "trend_slope_pct +0.5 coerente long", "bb_width_pct in espansione"],
       "risks": ["FOMC mercoledi' alle 20 IT"],
       "suggested_stop_pct": 1.2,
       "suggested_target_pct": 2.8
