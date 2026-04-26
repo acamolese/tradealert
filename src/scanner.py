@@ -1158,6 +1158,10 @@ def run_morning_scan(config: Config) -> None:
         open_count = 0
 
     asset_features = features.get(top.asset, {})
+    # Sprint 1 (Fix 1.4): persistiamo le feature al momento della decisione
+    # in JSONB per analisi retrospettive (correlazione score/pnl, debug
+    # confabulazioni LLM, backtest delle regole). Le news vengono
+    # serializzate come liste di dict, JSON-compatibili.
     signal_row = db.insert_signal(
         {
             "asset": top.asset,
@@ -1171,6 +1175,7 @@ def run_morning_scan(config: Config) -> None:
             "size": None,
             "expected_cost": None,
             "status": "pending",
+            "features_at_decision": asset_features or None,
         }
     )
     log.info("Signal salvato id=%s", signal_row.get("id"))
