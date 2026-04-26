@@ -48,15 +48,13 @@ _FEATURE_REQUEST_DELAY_SEC = 0.15
 # perche' non sono tra le 9 major elencate qui sotto.
 WEEKEND_CRYPTO_MAJOR_ALLOWLIST = frozenset({
     "Bitcoin",
-    "Ethereum",
-    "Solana",
-    "Ripple",
-    "Cardano",
-    "Avalanche",
-    "Polkadot",
-    "Chainlink",
-    "Dogecoin",
 })
+
+
+# Sprint 1 (Fix 1.3): discovery dinamica disabilitata finche' non
+# matura il sample size sui 5 asset core dell'universo. La funzione
+# discover_top_movers resta importabile per riattivazione futura.
+ENABLE_DISCOVERY = False
 
 
 def _check_drawdown_cap(
@@ -931,16 +929,20 @@ def run_morning_scan(config: Config) -> None:
     if _check_drawdown_cap(db, telegram):
         return
 
-    # Discovery dinamica: top mover letti direttamente da
-    # /marketnavigation (crypto group + shares popolari). Copertura
-    # ampia senza hardcoded watchlist.
-    try:
-        movers, mover_quotes = discover_top_movers(
-            capital, top_n=7, abs_min_pct=2.0
-        )
-    except Exception:
-        log.exception("Discovery fallita, uso solo universo statico")
-        movers, mover_quotes = [], []
+    # Discovery dinamica disabilitata in Sprint 1 (Fix 1.3): l'universo
+    # statico di 5 asset core e' sufficiente per validare l'edge prima di
+    # allargare. Riattivare ENABLE_DISCOVERY per ripristinare il vecchio
+    # comportamento (top mover da /marketnavigation).
+    movers: list[Asset] = []
+    mover_quotes: dict[str, dict[str, Any]] = {}
+    if ENABLE_DISCOVERY:
+        try:
+            movers, mover_quotes = discover_top_movers(
+                capital, top_n=7, abs_min_pct=2.0
+            )
+        except Exception:
+            log.exception("Discovery fallita, uso solo universo statico")
+            movers, mover_quotes = [], []
 
     scan_set: list[Asset] = list(UNIVERSE)
     seen_epics = {a.epic for a in scan_set}
