@@ -12,8 +12,13 @@ import time
 from typing import Any
 
 from .capital_client import CapitalClient
-from .config import Config
-from .db import Database
+from .config import Config, WEEKLY_DRAWDOWN_CAP_EUR
+from .db import (
+    Database,
+    record_risk_cap_notification,
+    risk_cap_notified_today,
+    weekly_realized_pnl,
+)
 from .discovery import discover_top_movers
 from .executor import ExecutionResult
 from .features import compute_features
@@ -52,6 +57,88 @@ WEEKEND_CRYPTO_MAJOR_ALLOWLIST = frozenset({
     "Chainlink",
     "Dogecoin",
 })
+
+
+def _check_drawdown_cap(
+    db: Database, telegram: TelegramClient
+) -> bool:
+    """Ritorna True se il cap di drawdown settimanale e' scattato.
+    In quel caso registra la run come ``risk_cap`` in scanner_runs
+    e (al massimo una volta per giorno solare UTC) notifica Telegram.
+
+    Soglia: se ``weekly_realized_pnl(db) <= -WEEKLY_DRAWDOWN_CAP_EUR``
+    lo scanner si auto-stoppa. Il cap in config e' positivo (valore
+    assoluto), il segno negativo viene applicato qui.
+
+    Trade aperti esclusi via filtro status='closed' a livello query
+    (vedi ``weekly_realized_pnl``).
+    """
+    try:
+        realized = weekly_realized_pnl(db)
+    except Exception:
+        log.exception(
+            "[risk_cap] Lookup pnl 7gg fallito, proseguo senza guard"
+        )
+        return False
+
+    if realized > -WEEKLY_DRAWDOWN_CAP_EUR:
+        log.info(
+            "[risk_cap] weekly pnl %+.2f € > cap %+.2f €, scanner OK",
+            realized,
+            -WEEKLY_DRAWDOWN_CAP_EUR,
+        )
+        return False
+
+    log.warning(
+        "[risk_cap] weekly drawdown %+.2f €, scanner DISABLED",
+        realized,
+    )
+    # Anti-spam Telegram: notifica una sola volta per giorno solare UTC.
+    # I run successivi nello stesso giorno loggano comunque ma non
+    # rinotificano. Stato persistito in monitoring_events, non file lock,
+    # per coerenza con altri eventi del sistema.
+    try:
+        already_notified = risk_cap_notified_today(db)
+    except Exception:
+        log.exception("[risk_cap] Lookup notifica precedente fallito")
+        already_notified = False
+
+    if not already_notified:
+        try:
+            telegram.send_message(
+                f"🛑 <b>Scanner in pausa: drawdown cap settimanale</b>\n"
+                f"P&amp;L ultimi 7gg: <b>{realized:+.2f} €</b> "
+                f"(cap {-WEEKLY_DRAWDOWN_CAP_EUR:+.0f} €).\n"
+                f"Riparte automaticamente quando la rolling 7gg torna sopra "
+                f"soglia."
+            )
+        except Exception:
+            log.exception("[risk_cap] Notifica Telegram fallita")
+        try:
+            record_risk_cap_notification(
+                db, weekly_pnl=realized, cap_eur=WEEKLY_DRAWDOWN_CAP_EUR
+            )
+        except Exception:
+            log.exception(
+                "[risk_cap] Persist monitoring_event fallito "
+                "(notifica gia' inviata)"
+            )
+    else:
+        log.info(
+            "[risk_cap] notifica gia' inviata oggi, skip Telegram"
+        )
+
+    _log_run(
+        db,
+        "risk_cap",
+        notes={
+            "weekly_pnl_eur": round(realized, 2),
+            "cap_eur": WEEKLY_DRAWDOWN_CAP_EUR,
+            "window_hours": 168,
+            "renotified": not already_notified,
+        },
+    )
+    return True
 
 
 def _filter_weekend_allowlist(
@@ -835,6 +922,14 @@ def run_morning_scan(config: Config) -> None:
             )
     except Exception as exc:
         log.warning("Snapshot account fallito: %s", exc)
+
+    # Drawdown cap settimanale: se la rolling 7gg chiusa e' <= soglia,
+    # fermiamo l'intera pipeline qui (no discovery/news/LLM, return empty)
+    # per evitare di spendere API a vuoto durante una serie negativa.
+    # Il guard e' early rispetto al rank_setups come da spec, scelto qui
+    # per tagliare anche le chiamate a Capital/news a monte.
+    if _check_drawdown_cap(db, telegram):
+        return
 
     # Discovery dinamica: top mover letti direttamente da
     # /marketnavigation (crypto group + shares popolari). Copertura

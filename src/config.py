@@ -8,6 +8,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+# Cap settimanale di drawdown realizzato (valore assoluto in EUR).
+# Se la somma del pnl dei trade chiusi negli ultimi 7 giorni rolling
+# scende a -WEEKLY_DRAWDOWN_CAP_EUR o sotto, lo scanner si auto-stoppa.
+# Costante modulo (no env var) come da vincolo Sprint 1.
+# Capitale rischio totale 100 EUR; cap 20 EUR e' il 20% di drawdown
+# settimanale come soglia di pausa.
+WEEKLY_DRAWDOWN_CAP_EUR: float = 20.0
+
+
 @dataclass(frozen=True)
 class Config:
     capital_api_key: str

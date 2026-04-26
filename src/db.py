@@ -145,3 +145,88 @@ class Database:
             .execute()
         )
         return {row["asset"] for row in (response.data or []) if row.get("asset")}
+
+
+# ---------------------------------------------------------------------------
+# Risk cap helpers (drawdown settimanale)
+# ---------------------------------------------------------------------------
+# Funzioni modulo (non metodi della classe Database) per separare la logica
+# di risk dal CRUD generico. Firma `(db, ...)` perche' la chiamata e'
+# concettualmente "leggi dati di risk dal DB", non un'operazione interna.
+
+
+def weekly_realized_pnl(db: Database, hours: int = 168) -> float:
+    """Somma del campo ``pnl`` dei trade chiusi nelle ultime ``hours`` ore
+    (default 7 giorni = 168 ore, finestra rolling).
+
+    Esclude esplicitamente i trade ancora aperti tramite filtro
+    ``status='closed'``: il pnl flottante delle posizioni aperte NON
+    contribuisce al cap di drawdown realizzato. Filtra inoltre per
+    ``closed_at >= now() - hours`` (PostgREST scarta automaticamente
+    i record con closed_at NULL).
+
+    Trade con ``pnl IS NULL`` contano 0 (record legacy con solo pnl_pct):
+    il drawdown cap monitora perdite realmente registrate, non ricostruite.
+
+    Ritorna float: negativo per perdita, positivo per profitto, 0.0 se
+    nessun trade chiuso nella finestra.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    cutoff = (
+        datetime.now(timezone.utc) - timedelta(hours=hours)
+    ).isoformat()
+    response = (
+        db._client.table("trades")
+        .select("pnl")
+        .eq("status", "closed")
+        .gte("closed_at", cutoff)
+        .execute()
+    )
+    total = 0.0
+    for row in response.data or []:
+        pnl = row.get("pnl")
+        if pnl is not None:
+            total += float(pnl)
+    return total
+
+
+def risk_cap_notified_today(db: Database) -> bool:
+    """True se una notifica risk_cap e' gia' stata registrata in
+    monitoring_events oggi (UTC, dalle 00:00 di oggi).
+
+    Usato come anti-spam Telegram: la notifica scatta una sola volta
+    per giorno solare anche se il cron di scanner gira N volte. I run
+    successivi loggano comunque l'auto-stop ma non rinotificano.
+    """
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
+    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    response = (
+        db._client.table("monitoring_events")
+        .select("id")
+        .eq("event_type", "risk_cap_notified")
+        .gte("created_at", start_of_day.isoformat())
+        .limit(1)
+        .execute()
+    )
+    return bool(response.data)
+
+
+def record_risk_cap_notification(
+    db: Database, weekly_pnl: float, cap_eur: float
+) -> None:
+    """Registra in monitoring_events l'invio della notifica risk_cap.
+    trade_id resta NULL (la colonna e' nullable). details conserva i
+    valori per audit/diagnostica."""
+    db.insert_monitoring_event(
+        {
+            "event_type": "risk_cap_notified",
+            "reason": "weekly_drawdown_cap",
+            "details": {
+                "weekly_pnl_eur": round(weekly_pnl, 2),
+                "cap_eur": cap_eur,
+            },
+        }
+    )
