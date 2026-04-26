@@ -21,6 +21,32 @@ supabase/           # config CLI + migration SQL versionate
 .github/workflows/  # cron GitHub Actions
 ```
 
+## Sprint 1 (2026-04-25): configurazione cristallizzata
+
+Fix applicati per portare il sistema in stato osservabile e auto-difensivo
+durante la fase Coach:
+
+- **Fix 1.1** prompt LLM allineato al payload reale (no piu' riferimenti a
+  EMA20/50/200, banda upper/lower Bollinger, livelli numerici S/R, volume).
+- **Fix 1.2** cap settimanale drawdown realizzato a -20 EUR (rolling 7gg
+  sui trade chiusi). Scanner si auto-stoppa, notifica Telegram una sola
+  volta per giorno solare UTC, run tracciata in `scanner_runs.outcome='risk_cap'`.
+  Costante: `WEEKLY_DRAWDOWN_CAP_EUR=20.0` in `src/config.py` (no env var).
+- **Fix 1.3** universo ridotto a 5 asset core (Gold, Brent Oil, US500,
+  Nasdaq 100, Bitcoin). Discovery dinamica disattivata via
+  `ENABLE_DISCOVERY=False` in `src/scanner.py`. Allowlist weekend ridotta
+  a {Bitcoin}.
+- **Fix 1.4** colonna `signals.features_at_decision JSONB` per persistere
+  il contesto tecnico di ogni decisione LLM (RSI, ATR, slope, BB width,
+  pct_from_high, daily_pct, news). Abilita analisi retrospettive e backtest.
+
+Parametri di rischio (parametri immutabili dello Sprint 1):
+
+- Capitale rischio totale: 100 EUR (kill switch finale, fuori scope Sprint 1).
+- Cap settimanale drawdown: 20 EUR (Fix 1.2).
+- Universo: 5 asset core (Fix 1.3).
+- Sample target prima di ricalibrare soglie: 30-50 trade chiusi.
+
 ## Setup locale (dev)
 ```bash
 python -m venv .venv
