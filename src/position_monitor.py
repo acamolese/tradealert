@@ -243,7 +243,7 @@ def _apply_trailing_stop(
     tp_log = (
         f"TP {profit_level_to_pass:g} preserved"
         if profit_level_to_pass is not None
-        else "TP assente (no preserve)"
+        else "broker TP=None (no preserve)"
     )
     log.info(
         "Trailing SL %s: %s -> %s (profit %.2fR, offset %+0.2fR) | %s",
