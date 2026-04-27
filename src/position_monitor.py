@@ -221,19 +221,38 @@ def _apply_trailing_stop(
             return
 
     new_sl = round(new_sl, 5)
+    # Capital PUT /positions/{dealId} sostituisce i level non passati con
+    # null (rimuove il TP). Per preservare il take profit dobbiamo SEMPRE
+    # ripassarlo nel body. Sorgente: lo state live del broker
+    # (``pos.profitLevel``) e' la verita' attuale; il DB ``trade.current_tp``
+    # serve solo come backup se il broker l'ha gia' perso (in tal caso non
+    # lo ripristiniamo, per non modificare retroattivamente posizioni
+    # legacy aperte prima di questo fix).
+    broker_tp = pos.get("profitLevel")
+    profit_level_to_pass = float(broker_tp) if broker_tp else None
     try:
-        capital.update_position(deal_id, stop_level=new_sl)
+        capital.update_position(
+            deal_id,
+            stop_level=new_sl,
+            profit_level=profit_level_to_pass,
+        )
     except Exception as exc:
         log.warning("Trailing SL fallito per %s: %s", asset_name, exc)
         return
 
+    tp_log = (
+        f"TP {profit_level_to_pass:g} preserved"
+        if profit_level_to_pass is not None
+        else "TP assente (no preserve)"
+    )
     log.info(
-        "Trailing SL %s: %s -> %s (profit %.2fR, offset %+0.2fR)",
+        "Trailing SL %s: %s -> %s (profit %.2fR, offset %+0.2fR) | %s",
         asset_name,
         current_sl,
         new_sl,
         profit_r,
         offset_r,
+        tp_log,
     )
     reason_text = (
         f"Profit {profit_r:.2f}R, SL {offset_r:+.2f}R dall'entry"
