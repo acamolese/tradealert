@@ -8,6 +8,7 @@ trading vere (apertura/chiusura posizioni) saranno aggiunte in fase 2.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 import requests
@@ -15,6 +16,8 @@ import requests
 from .config import Config
 
 log = logging.getLogger(__name__)
+
+_PREFERENCES_TTL_SEC = 3600.0
 
 
 class CapitalAPIError(Exception):
@@ -43,6 +46,8 @@ class CapitalClient:
         self._session = requests.Session()
         self._cst: str | None = None
         self._security_token: str | None = None
+        self._preferences_cache: dict[str, Any] | None = None
+        self._preferences_cached_at: float = 0.0
 
     def _url(self, path: str) -> str:
         return f"{self._cfg.capital_base_url}{path}"
@@ -115,6 +120,52 @@ class CapitalClient:
         )
         _raise_for_status(response)
         return response.json()
+
+    def get_account_preferences(
+        self, force_refresh: bool = False
+    ) -> dict[str, Any]:
+        """Preferences account (hedgingMode, leverages per asset class).
+        Cachata in-memory con TTL di 1 ora: il setting cambia di rado e
+        Capital ammette ~1 req/sec, quindi evitiamo chiamate ripetute
+        per ogni asset processato dallo scanner."""
+        now = time.time()
+        if (
+            not force_refresh
+            and self._preferences_cache is not None
+            and (now - self._preferences_cached_at) < _PREFERENCES_TTL_SEC
+        ):
+            return self._preferences_cache
+        response = self._session.get(
+            self._url("/accounts/preferences"),
+            headers=self._auth_headers(),
+            timeout=15,
+        )
+        _raise_for_status(response)
+        data = response.json()
+        self._preferences_cache = data
+        self._preferences_cached_at = now
+        return data
+
+    def get_leverages_map(self) -> dict[str, int]:
+        """Mappa instrument_type -> leverage corrente impostata sull'account.
+        Es: {"COMMODITIES": 20, "INDICES": 20, "CURRENCIES": 30, ...}.
+        Ritorna dict vuoto se l'endpoint fallisce: il chiamante decidera'
+        se cadere su fallback (instrument.marginFactor)."""
+        try:
+            prefs = self.get_account_preferences()
+        except Exception:
+            log.exception("get_account_preferences fallito, leverages vuoto")
+            return {}
+        leverages = prefs.get("leverages") or {}
+        out: dict[str, int] = {}
+        for asset_type, info in leverages.items():
+            try:
+                cur = int((info or {}).get("current") or 0)
+            except (TypeError, ValueError):
+                continue
+            if cur > 0:
+                out[asset_type] = cur
+        return out
 
     def search_market(self, search_term: str) -> list[dict[str, Any]]:
         """Cerca strumenti per nome o ticker. Utile per trovare gli epic."""

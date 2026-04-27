@@ -205,12 +205,41 @@ def _log_run(
         log.exception("insert_scanner_run fallito (outcome=%s)", outcome)
 
 
+_TRADEALERT_CLASS_TO_CAPITAL_TYPE: dict[str, str] = {
+    "metal": "COMMODITIES",
+    "energy": "COMMODITIES",
+    "index": "INDICES",
+    "fx": "CURRENCIES",
+    "crypto": "CRYPTOCURRENCIES",
+    "share": "SHARES",
+    "bond": "BONDS",
+}
+
+
+def _leverage_for_asset_class(
+    asset_class: str, leverages_map: dict[str, int]
+) -> float | None:
+    """Risolve la leva per la asset_class TradeAlert dell'universo verso
+    il tipo instrument Capital, e ritorna il valore corrente. None se la
+    mappa e' vuota o la classe non e' tracciata."""
+    if not leverages_map:
+        return None
+    capital_type = _TRADEALERT_CLASS_TO_CAPITAL_TYPE.get(asset_class)
+    if not capital_type:
+        return None
+    val = leverages_map.get(capital_type)
+    return float(val) if val else None
+
+
 def _collect_features(
     capital: CapitalClient, assets: list[Asset]
 ) -> dict[str, dict[str, Any]]:
     """Per ogni asset, fetcha candele 4H e snapshot. Salta i fallimenti.
-    Throttle tra asset per restare sotto il rate limit Capital."""
+    Throttle tra asset per restare sotto il rate limit Capital.
+    La mappa leverage dell'account viene fetchata una volta e cachata
+    nel client (TTL 1h)."""
     features: dict[str, dict[str, Any]] = {}
+    leverages_map = capital.get_leverages_map()
     for asset in assets:
         try:
             candles = capital.get_prices(
@@ -221,8 +250,14 @@ def _collect_features(
                 log.warning("Nessuna candela per %s (%s)", asset.name, asset.epic)
                 time.sleep(_FEATURE_REQUEST_DELAY_SEC)
                 continue
+            leverage = _leverage_for_asset_class(
+                asset.asset_class, leverages_map
+            )
             features[asset.name] = compute_features(
-                asset.name, candles, snapshot=snapshot
+                asset.name,
+                candles,
+                snapshot=snapshot,
+                leverage_override=leverage,
             )
             features[asset.name]["asset_class"] = asset.asset_class
             features[asset.name]["epic"] = asset.epic
@@ -691,6 +726,7 @@ def _preview_sizing(
     proposal: SetupProposal,
     asset_features: dict[str, Any],
     margin_budget: float,
+    max_loss_per_trade_eur: float | None = None,
 ) -> SizingResult:
     return calculate_size(
         margin_budget=margin_budget,
@@ -701,6 +737,7 @@ def _preview_sizing(
         or asset_features.get("min_size")
         or 0.01,
         stop_pct=proposal.suggested_stop_pct or 1.5,
+        max_loss_per_trade_eur=max_loss_per_trade_eur,
     )
 
 
@@ -871,7 +908,12 @@ def _handle_confirm(
     """
     signal_id = signal_row["id"]
     current_budget = float(config.exposure_budget_eur)
-    sizing = _preview_sizing(proposal, asset_features, current_budget)
+    sizing = _preview_sizing(
+        proposal,
+        asset_features,
+        current_budget,
+        max_loss_per_trade_eur=config.max_loss_per_trade_eur,
+    )
 
     telegram.send_message_with_buttons(
         _format_confirm_message(

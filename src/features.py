@@ -85,8 +85,17 @@ def compute_features(
     asset_name: str,
     candles_4h: list[dict[str, Any]],
     snapshot: dict[str, Any] | None = None,
+    leverage_override: float | None = None,
 ) -> dict[str, Any]:
-    """Pacchettizza le feature da passare al LLM per scoring."""
+    """Pacchettizza le feature da passare al LLM per scoring.
+
+    ``leverage_override`` (opzionale): leva effettiva applicata sull'account
+    per la asset class di questo strumento (es. 20 per indices/commodities,
+    30 per FX, 2 per crypto). Se passata, ``margin_factor`` viene calcolato
+    come ``1 / leverage`` invece di leggere ``instrument.marginFactor`` dal
+    market snapshot, che su Capital e' un valore statico di prodotto e non
+    riflette la leva reale dell'account.
+    """
     arr = _to_arrays(candles_4h)
     close = arr["close"]
     last = close[-1] if len(close) else None
@@ -151,8 +160,12 @@ def compute_features(
         features["size_step"] = float(
             step_field.get("value", features["min_size"]) or features["min_size"]
         )
-        features["margin_factor"] = (
-            float(instrument.get("marginFactor", 5) or 5) / 100.0
-        )
+        if leverage_override is not None and leverage_override > 0:
+            features["margin_factor"] = 1.0 / float(leverage_override)
+            features["leverage"] = float(leverage_override)
+        else:
+            features["margin_factor"] = (
+                float(instrument.get("marginFactor", 5) or 5) / 100.0
+            )
 
     return features

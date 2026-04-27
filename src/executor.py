@@ -36,8 +36,18 @@ class ExecutionResult:
     profit_level: float | None = None
 
 
-def _market_meta(market: dict[str, Any]) -> dict[str, float]:
-    """Estrae min size, step, margin factor e regole di stop/profit distance."""
+def _market_meta(
+    market: dict[str, Any],
+    leverages_map: dict[str, int] | None = None,
+) -> dict[str, float]:
+    """Estrae min size, step, margin factor e regole di stop/profit distance.
+
+    Il margin factor viene calcolato dalla leva effettiva dell'account
+    (``/accounts/preferences``), passata come ``leverages_map``. In assenza
+    di leverages_map cade su ``instrument.marginFactor`` come fallback,
+    che pero' su Capital e' un valore statico di prodotto e non riflette
+    la leva reale.
+    """
     rules = market.get("dealingRules", {}) or {}
     min_size_field = rules.get("minDealSize", {}) or {}
     min_size = float(min_size_field.get("value", 0.01) or 0.01)
@@ -46,9 +56,9 @@ def _market_meta(market: dict[str, Any]) -> dict[str, float]:
     step_field = rules.get("minSizeIncrement") or {}
     size_step = float(step_field.get("value", min_size) or min_size)
 
-    instrument = market.get("instrument", {}) or {}
-    margin_factor_pct = float(instrument.get("marginFactor", 5) or 5)
-    margin_factor = margin_factor_pct / 100.0
+    from .risk import effective_margin_factor
+
+    margin_factor = effective_margin_factor(market, leverages_map)
 
     bid = snapshot.get("bid")
     offer = snapshot.get("offer")
@@ -135,7 +145,8 @@ def execute_signal(
 
     # 2. Snapshot mercato per regole di sizing e prezzo aggiornato
     market = capital.get_market(epic)
-    meta = _market_meta(market)
+    leverages_map = capital.get_leverages_map()
+    meta = _market_meta(market, leverages_map=leverages_map)
     entry_price = meta["mid_price"] or asset_features.get("last_price")
     if not entry_price:
         return ExecutionResult(False, reason="Prezzo di mercato non disponibile")
@@ -168,6 +179,7 @@ def execute_signal(
         size_step=meta["size_step"],
         stop_pct=stop_pct,
         available_margin=available_margin,
+        max_loss_per_trade_eur=config.max_loss_per_trade_eur,
     )
     if sizing.size is None:
         return ExecutionResult(False, reason=f"Sizing rifiutato: {sizing.reason}")

@@ -46,6 +46,7 @@ class Config:
     min_rr_at_entry: float  # R:R minimo (vs livelli originali) per aprire al click
     budget_options: list[float]  # preset EUR per bottoni budget Telegram
     trailing_step_r: float  # step in unita' di R per il trailing stop (1.0 conservativo, 0.5 aggressivo)
+    max_loss_per_trade_eur: float  # cap perdita massima per singolo trade (EUR)
 
     @property
     def capital_base_url(self) -> str:
@@ -123,4 +124,7 @@ def load_config() -> Config:
             os.environ.get("BUDGET_OPTIONS", "10,15,20,25,30")
         ),
         trailing_step_r=float(os.environ.get("TRAILING_STEP_R", "0.5")),
+        max_loss_per_trade_eur=float(
+            os.environ.get("MAX_LOSS_PER_TRADE_EUR", "5")
+        ),
     )
