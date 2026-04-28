@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from typing import Any
 
 from anthropic import Anthropic
@@ -68,6 +69,46 @@ def _resolve_epic(asset_name: str) -> str | None:
         if asset.name == asset_name:
             return asset.epic
     return None
+
+
+def _resolve_tick_size(market: dict[str, Any]) -> float:
+    """Ricava il tick size effettivo dello strumento.
+
+    Preferenza: ``dealingRules.minStepDistance`` se in unita' POINTS
+    (delta minimo accettato dal broker per stop/limit). Fallback:
+    ``snapshot.decimalPlacesFactor`` come ``1 / 10**n``. Default 0.01.
+    """
+    rules = market.get("dealingRules") or {}
+    msd = rules.get("minStepDistance") or {}
+    if (msd.get("unit") == "POINTS") and msd.get("value"):
+        try:
+            v = float(msd["value"])
+            if v > 0:
+                return v
+        except (TypeError, ValueError):
+            pass
+    snap = market.get("snapshot") or {}
+    dpf = snap.get("decimalPlacesFactor")
+    try:
+        if dpf is not None and int(dpf) >= 0:
+            return 10.0 ** (-int(dpf))
+    except (TypeError, ValueError):
+        pass
+    return 0.01
+
+
+def _quantize_to_tick(value: float, tick: float) -> float:
+    """Arrotonda ``value`` al multiplo piu' vicino di ``tick``.
+
+    Il broker accetta solo valori multipli del tick, quindi qualunque
+    valore intermedio viene riarrotondato lato server. Quantizzando in
+    locale evitiamo che il confronto float new_sl vs current_sl
+    (letto post-arrotondamento broker) generi loop sub-tick.
+    """
+    if tick <= 0:
+        return value
+    n_decimals = max(0, -int(round(math.log10(tick)))) if tick < 1 else 0
+    return round(round(value / tick) * tick, n_decimals + 2)
 
 
 def _apply_trailing_stop(
@@ -174,24 +215,31 @@ def _apply_trailing_stop(
 
     r_distance = entry * stop_pct / 100
 
-    bid = market.get("bid")
-    offer = market.get("offer")
+    # Fetch market completo (dealingRules + snapshot freschi) per ricavare
+    # tick size e bid/offer aggiornati. Capital arrotonda lo stopLevel al
+    # tick (es. Brent: 0.001 -> 3 decimali). Senza quantizzare al tick il
+    # confronto float new_sl vs current_sl genera trigger sub-tick a ogni
+    # ciclo (loop osservato su trade Brent #19 il 2026-04-28: 25+ trigger
+    # in 4h con delta 0.00025 = un quarto di tick).
+    market_full: dict[str, Any] = {}
+    if epic:
+        try:
+            market_full = capital.get_market(epic) or {}
+        except Exception:
+            market_full = {}
+    snap_full = market_full.get("snapshot") or {}
+
+    bid = market.get("bid") or snap_full.get("bid")
+    offer = market.get("offer") or snap_full.get("offer")
     if bid is not None and offer is not None:
         current_price = (float(bid) + float(offer)) / 2
     else:
-        try:
-            m = capital.get_market(epic) if epic else {}
-            snap = m.get("snapshot", {}) or {}
-            b = snap.get("bid")
-            o = snap.get("offer")
-            current_price = (
-                (float(b) + float(o)) / 2 if b and o else None
-            )
-        except Exception:
-            current_price = None
+        current_price = None
 
     if current_price is None:
         return
+
+    tick_size = _resolve_tick_size(market_full)
 
     if direction == "BUY":
         profit = current_price - entry
@@ -212,15 +260,38 @@ def _apply_trailing_stop(
         offset_r = n_steps * step_r
 
     if direction == "BUY":
-        new_sl = entry + offset_r * r_distance
-        if new_sl <= current_sl + 1e-9:
+        new_sl_raw = entry + offset_r * r_distance
+    else:
+        new_sl_raw = entry - offset_r * r_distance
+
+    # Quantizzazione al tick e soglia minima di mezzo tick: skip update se
+    # la differenza e' sotto un tick intero. Confronto post-quantizzazione
+    # cosi' siamo in linea con cio' che il broker accetta come stopLevel.
+    new_sl = _quantize_to_tick(new_sl_raw, tick_size)
+    half_tick = tick_size / 2 if tick_size > 0 else 1e-9
+    if direction == "BUY":
+        if new_sl <= current_sl + half_tick:
             return
     else:
-        new_sl = entry - offset_r * r_distance
-        if new_sl >= current_sl - 1e-9:
+        if new_sl >= current_sl - half_tick:
             return
 
-    new_sl = round(new_sl, 5)
+    # Dedup notifica: se l'ultimo trailing_sl scritto su monitoring_events
+    # ha lo stesso new_sl entro tick, evita di rinotificare. Layer di
+    # difesa aggiuntivo oltre alla quantizzazione (copre eventuali drift
+    # di lettura SL tra Capital e DB).
+    last_event = db.get_last_monitoring_event(
+        trade["id"], "trailing_sl"
+    ) if trade else None
+    last_new_sl = (
+        (last_event.get("details") or {}).get("new_sl")
+        if last_event
+        else None
+    )
+    suppress_telegram = (
+        last_new_sl is not None
+        and abs(float(last_new_sl) - new_sl) < tick_size
+    )
     # Capital PUT /positions/{dealId} sostituisce i level non passati con
     # null (rimuove il TP). Per preservare il take profit dobbiamo SEMPRE
     # ripassarlo nel body. Sorgente: lo state live del broker
@@ -279,11 +350,18 @@ def _apply_trailing_stop(
         label = "breakeven (rischio zero)"
     else:
         label = f"+{offset_r}R in profitto"
-    telegram.send_message(
-        f"🛡 <b>Trailing SL</b> su {_esc(asset_name)}\n"
-        f"Profit: <code>{profit_r:.2f}R</code> → SL {label}\n"
-        f"SL: <code>{current_sl}</code> → <code>{new_sl}</code>"
-    )
+    if suppress_telegram:
+        log.info(
+            "Trailing notifica soppressa per %s: stesso SL entro tick "
+            "rispetto a ultimo trailing_sl loggato",
+            asset_name,
+        )
+    else:
+        telegram.send_message(
+            f"🛡 <b>Trailing SL</b> su {_esc(asset_name)}\n"
+            f"Profit: <code>{profit_r:.2f}R</code> → SL {label}\n"
+            f"SL: <code>{current_sl}</code> → <code>{new_sl}</code>"
+        )
 
 
 def _evaluate_position(

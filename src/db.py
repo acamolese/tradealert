@@ -98,6 +98,21 @@ class Database:
     def insert_monitoring_event(self, event: dict[str, Any]) -> None:
         self._client.table("monitoring_events").insert(event).execute()
 
+    def get_last_monitoring_event(
+        self, trade_id: int, event_type: str
+    ) -> dict[str, Any] | None:
+        """Ultimo monitoring_event per (trade_id, event_type) o None."""
+        response = (
+            self._client.table("monitoring_events")
+            .select("*")
+            .eq("trade_id", trade_id)
+            .eq("event_type", event_type)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        return response.data[0] if response.data else None
+
     def insert_scanner_run(self, row: dict[str, Any]) -> dict[str, Any]:
         """Traccia l'esito di una run dello scanner per /status."""
         response = self._client.table("scanner_runs").insert(row).execute()
