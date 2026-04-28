@@ -467,6 +467,73 @@ def _format_close_proposal(decision: dict[str, Any]) -> str:
     )
 
 
+def _resolve_close_price_from_activity(
+    capital: CapitalClient,
+    deal_id: str,
+    opposite_direction: str,
+    retries: int = 3,
+    sleep_sec: float = 1.0,
+) -> float | None:
+    """Cerca nell'activity history il prezzo di esecuzione del counter-trade
+    di chiusura. ``confirm_deal`` su Capital, per un close manuale di
+    posizione, ritorna in ``level`` l'entry della posizione originale
+    (non il prezzo del counter-trade). L'evento ``POSITION`` con direzione
+    opposta nell'activity ha invece ``details.level`` corretto.
+
+    Capital ha lag di 1-2s tra DELETE /positions e visibilita' nell'activity:
+    breve retry per assorbirlo.
+    """
+    import time
+
+    for attempt in range(retries):
+        try:
+            activities = capital.get_activity_history(
+                last_period_sec=600, detailed=True
+            )
+        except Exception:
+            activities = []
+        candidates = [
+            a
+            for a in activities
+            if a.get("dealId") == deal_id
+            and a.get("type") == "POSITION"
+            and (a.get("details") or {}).get("direction") == opposite_direction
+        ]
+        if candidates:
+            candidates.sort(key=lambda a: a.get("dateUTC", ""), reverse=True)
+            level = (candidates[0].get("details") or {}).get("level")
+            if level:
+                try:
+                    return float(level)
+                except (TypeError, ValueError):
+                    return None
+        if attempt < retries - 1:
+            time.sleep(sleep_sec)
+    return None
+
+
+def _resolve_close_price_from_market(
+    capital: CapitalClient, epic: str | None, direction_word: str
+) -> float | None:
+    """Subordinato: se l'activity non risponde, usa il prezzo a cui il
+    broker chiuderebbe ora (bid se chiudiamo un long, offer se chiudiamo
+    uno short) come migliore approssimazione del fill effettivo."""
+    if not epic:
+        return None
+    try:
+        snap = (capital.get_market(epic) or {}).get("snapshot") or {}
+    except Exception:
+        return None
+    if direction_word == "long":
+        price = snap.get("bid")
+    else:
+        price = snap.get("offer")
+    try:
+        return float(price) if price is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
 def close_position_by_deal_id(
     capital: CapitalClient,
     db: Database,
@@ -479,21 +546,61 @@ def close_position_by_deal_id(
     sia dal monitor (quando l'LLM propone CLOSE) sia dal daemon (click
     ``mclose:`` dell'utente)."""
     try:
+        # Cattura entry e direzione PRIMA del close, per i fallback di
+        # close_level e pnl quando confirm_deal non li popola correttamente.
+        trade = db.get_trade_by_deal_id(deal_id)
+        direction_word = (
+            (trade.get("direction") or "").lower() if trade else ""
+        )
+        opposite_dir_api = "SELL" if direction_word == "long" else "BUY"
+        entry = float(trade.get("entry_price") or 0) if trade else 0.0
+        size = float(trade.get("size") or 0) if trade else 0.0
+        signal = (
+            db.get_signal(trade["signal_id"])
+            if trade and trade.get("signal_id")
+            else None
+        )
+        epic = (signal or {}).get("epic")
+
         close_resp = capital.close_position(deal_id)
         deal_ref = close_resp.get("dealReference")
         confirm = capital.confirm_deal(deal_ref) if deal_ref else {}
-        close_level = float(confirm.get("level") or 0)
-        pnl = confirm.get("profit") or confirm.get("profitAndLoss")
-        pnl = float(pnl) if pnl is not None else None
+        confirm_level = float(confirm.get("level") or 0)
+        pnl_raw = confirm.get("profit") or confirm.get("profitAndLoss")
+        pnl = float(pnl_raw) if pnl_raw is not None else None
 
-        trade = db.get_trade_by_deal_id(deal_id)
+        # confirm.level e' inaffidabile per close manuali (restituisce
+        # l'entry originale). Sorgente primaria: activity history. Sorgente
+        # subordinata: bid/offer current. Ultima risorsa: confirm_level.
+        activity_level = _resolve_close_price_from_activity(
+            capital, deal_id, opposite_dir_api
+        )
+        market_level = (
+            _resolve_close_price_from_market(capital, epic, direction_word)
+            if activity_level is None
+            else None
+        )
+        close_level = activity_level or market_level or confirm_level
+        close_source = (
+            "activity"
+            if activity_level
+            else ("market" if market_level else "confirm")
+        )
+
+        # Se Capital non ha popolato pnl, ricavalo da (close-entry)*size
+        # con segno per direzione. Currency-blind come il resto del sistema.
+        if pnl is None and close_level and entry and size:
+            delta = close_level - entry
+            if direction_word == "short":
+                delta = -delta
+            pnl = round(delta * size, 4)
+
         asset_name = trade.get("asset") if trade else deal_id
         if trade:
-            entry = float(trade.get("entry_price") or 0)
             pnl_pct = (
                 ((close_level - entry) / entry * 100) if entry else None
             )
-            if trade.get("direction") == "short" and pnl_pct is not None:
+            if direction_word == "short" and pnl_pct is not None:
                 pnl_pct = -pnl_pct
             db.close_trade(
                 deal_id,
@@ -507,9 +614,23 @@ def close_position_by_deal_id(
                     "trade_id": trade["id"],
                     "event_type": "manual_close",
                     "reason": reason,
-                    "details": {"close_level": close_level, "pnl": pnl},
+                    "details": {
+                        "close_level": close_level,
+                        "pnl": pnl,
+                        "close_source": close_source,
+                        "confirm_level": confirm_level,
+                    },
                 }
             )
+
+        log.info(
+            "Close %s: source=%s close_level=%s confirm_level=%s pnl=%s",
+            asset_name,
+            close_source,
+            close_level,
+            confirm_level,
+            pnl,
+        )
 
         text = (
             f"✅ <b>Posizione chiusa</b>\n"
