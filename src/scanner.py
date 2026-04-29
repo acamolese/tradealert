@@ -1133,7 +1133,18 @@ def _handle_confirm(
     # Tutti i filtri passati: chiama executor (che gestisce
     # MAX_OPEN_POSITIONS, sizing con max_loss_per_trade_eur,
     # min stop distance, scrittura trades + monitoring_events).
-    result = execute_signal(config, capital, db, signal_row, asset_features)
+    try:
+        result = execute_signal(config, capital, db, signal_row, asset_features)
+    except Exception as exc:  # rete, epic 404, qualsiasi
+        log.exception("Auto-execute crash su signal %s", signal_id)
+        db.update_signal_status(signal_id, "cancelled_other")
+        telegram.send_message(
+            f"⚠️ <b>Apertura annullata</b> (signal {signal_id})\n"
+            f"<b>{_esc(signal_row['asset'])}</b>\n"
+            f"Motivo: errore tecnico durante l'apertura "
+            f"(<code>{_esc(type(exc).__name__)}</code>)"
+        )
+        return
 
     if result.executed:
         # executor.execute_signal scrive status='executed': sovrascriviamo
