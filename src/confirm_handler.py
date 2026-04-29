@@ -447,7 +447,9 @@ def handle_callback(
 
     if action == "skip":
         if status == "pending":
-            db.update_signal_status(signal_id, "skipped")
+            # 'manual_skipped' distingue il click utente da altri valori
+            # storici (skipped/cancelled_*) per il logging Sprint 4.
+            db.update_signal_status(signal_id, "manual_skipped")
         if message_id:
             telegram.edit_message_text(
                 message_id, f"❌ <b>Signal {signal_id} saltato</b>"

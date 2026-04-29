@@ -38,6 +38,14 @@ log = logging.getLogger(__name__)
 
 _FEATURE_REQUEST_DELAY_SEC = 0.15
 
+# Finestra di skip per la modalita' auto-confirm. Hardcoded: il trigger
+# qui non e' tarato sull'utente (che spesso e' away dal Telegram per
+# ore) ma sul rischio di degradazione del setup nel tempo (R:R, news,
+# spread). 120s e' il compromesso fra "spazio per cambiare idea" e
+# "non perdere edge come e' successo a trade #20 con 11min di delay".
+_AUTO_CONFIRM_WINDOW_SEC = 120
+_AUTO_CONFIRM_POLL_SEC = 5
+
 
 # Weekend: solo crypto major. Esclude alt-coin micro-cap (BOBA, BLUR, GTC,
 # BOME, GRIFFAIN, MERL, GUN, CPOOL, API3, AXS, ecc.) pescate dal Capital
@@ -428,6 +436,76 @@ def _format_reasoning_block(
             )
         )
     return "\n\n".join(parts)
+
+
+def _format_auto_confirm_message(
+    signal_row: dict[str, Any],
+    proposal: SetupProposal,
+    asset_features: dict[str, Any],
+    sizing: "SizingResult",
+    window_sec: int,
+    macro_events_near: list[dict[str, Any]] | None = None,
+) -> str:
+    """Messaggio per la modalita' 'auto-confirm con finestra skip'.
+    L'apertura parte automaticamente al timeout: il footer rende
+    esplicito timer e bottone Skip."""
+    last = asset_features.get("last_price") or signal_row.get("entry_price") or 0
+    sl_pct = proposal.suggested_stop_pct or 0
+    tp_pct = proposal.suggested_target_pct or 0
+    rr = (tp_pct / sl_pct) if sl_pct else 0.0
+    if proposal.direction == "long":
+        sl_level = last * (1 - sl_pct / 100) if last else 0
+        tp_level = last * (1 + tp_pct / 100) if last else 0
+    else:
+        sl_level = last * (1 + sl_pct / 100) if last else 0
+        tp_level = last * (1 - tp_pct / 100) if last else 0
+
+    if sizing.size is not None:
+        risk_eur_str = f"{sizing.risk_estimate:.2f} EUR"
+        profit_eur = float(sizing.size) * float(last) * (tp_pct / 100) if last else 0
+        profit_eur_str = f"{profit_eur:.2f} EUR"
+        size_str = f"{sizing.size:g}"
+        margin_str = f"{sizing.margin_estimate:.2f} EUR"
+    else:
+        risk_eur_str = "n/d"
+        profit_eur_str = "n/d"
+        size_str = "n/d"
+        margin_str = "n/d"
+
+    sizing_block = (
+        f"<b>Trade preview:</b>\n"
+        f"Entry: <code>{last:g}</code>  SL: <code>{sl_level:g}</code> "
+        f"(-{sl_pct}%)  TP: <code>{tp_level:g}</code> (+{tp_pct}%)\n"
+        f"R:R: <code>{rr:.2f}</code>\n"
+        f"Size: <code>{size_str}</code>  Margine: <code>{margin_str}</code>\n"
+        f"Risk se SL: <code>{risk_eur_str}</code>  "
+        f"Profit se TP: <code>{profit_eur_str}</code>"
+    )
+    if sizing.size is None:
+        sizing_block += (
+            f"\n⚠️ <i>Sizing rifiutato: {_esc(sizing.reason)}</i>"
+        )
+
+    reasoning = _format_reasoning_block(proposal, asset_features)
+    macro_block = _format_macro_events_block(macro_events_near)
+    macro_section = f"\n\n{macro_block}" if macro_block else ""
+    minutes = window_sec // 60
+    return (
+        f"🟡 <b>Setup individuato</b> (signal {signal_row['id']})\n\n"
+        f"<b>{_esc(proposal.asset)}</b>  (score {proposal.score}/10)\n"
+        f"{_direction_label(proposal.direction)}\n\n"
+        f"{reasoning}\n\n"
+        f"{sizing_block}"
+        f"{macro_section}\n\n"
+        f"<i>⏱ Apertura automatica tra {minutes} minuti se non skippi.</i>"
+    )
+
+
+def _skip_only_buttons(signal_id: int) -> list[list[dict[str, str]]]:
+    """Bottone unico Skip per la modalita' auto-confirm."""
+    return [
+        [{"text": "❌ Skip", "callback_data": f"skip:{signal_id}"}]
+    ]
 
 
 def _format_confirm_message(
@@ -891,6 +969,40 @@ def _rotation_buttons(
     ]
 
 
+def _classify_executor_failure(reason: str) -> str:
+    """Mappa il reason testuale di ExecutionResult.success=False sul
+    valore di ``signals.status`` ``cancelled_*`` corretto. Cosi' le
+    analytics future possono distinguere tra: R:R degradato, cap
+    settimanale raggiunto, slot posizioni saturo, altro."""
+    r = (reason or "").lower()
+    if "max" in r and ("posizion" in r or "open" in r):
+        return "cancelled_max_positions"
+    if "drawdown" in r or "weekly" in r or "risk_cap" in r:
+        return "cancelled_risk_cap"
+    if "r:r" in r or "rr " in r or "reward" in r:
+        return "cancelled_rr_degraded"
+    return "cancelled_other"
+
+
+def _format_auto_executed_message(
+    signal_row: dict[str, Any],
+    proposal: SetupProposal,
+    result: ExecutionResult,
+) -> str:
+    size_str = f"{result.size:g}" if result.size else "n/d"
+    entry_str = (
+        f"{result.entry_price:g}" if result.entry_price else "n/d"
+    )
+    sl_str = f"{result.stop_level:g}" if result.stop_level else "n/d"
+    tp_str = f"{result.profit_level:g}" if result.profit_level else "n/d"
+    return (
+        f"✅ <b>Posizione aperta automaticamente</b> (signal {signal_row['id']})\n"
+        f"<b>{_esc(proposal.asset)}</b>  {_direction_label(proposal.direction, short=True)}\n"
+        f"Entry: <code>{entry_str}</code>  Size: <code>{size_str}</code>\n"
+        f"SL: <code>{sl_str}</code>  TP: <code>{tp_str}</code>"
+    )
+
+
 def _handle_confirm(
     config: Config,
     capital: CapitalClient,
@@ -901,11 +1013,25 @@ def _handle_confirm(
     asset_features: dict[str, Any],
     macro_events_near: list[dict[str, Any]] | None = None,
 ) -> None:
-    """Invia il messaggio di conferma con bottoni e ritorna. I callback
-    dei bottoni (Esegui/Salta/Budget) sono gestiti in modo asincrono dal
-    listener daemon (``src.confirm_handler``), cosi' nessun polling
-    Telegram concorrente.
+    """Auto-confirm con finestra skip: invia notifica con un solo
+    bottone Skip, attende ``_AUTO_CONFIRM_WINDOW_SEC`` polling il DB,
+    e se il signal e' ancora pending al timeout chiama l'apertura
+    automatica con tutti i filtri di rischio (R:R, cap settimanale,
+    max posizioni, market_status).
+
+    Il listener Telegram gestisce il bottone Skip in modo asincrono
+    aggiornando ``signals.status`` a ``manual_skipped``: il polling
+    qui rileva il cambio e termina senza aprire.
+
+    Edge case nuovo setup mentre uno e' in finestra: con
+    ``MAX_OPEN_POSITIONS=1`` e cron orario lo scan successivo arriva
+    almeno 60 minuti dopo, ben oltre la finestra di 120s. Se in futuro
+    si abbassa la cadenza, il secondo signal verrebbe semplicemente
+    accodato (lo scanner gira sequenzialmente sui suoi job).
     """
+    from .confirm_handler import _check_entry_still_valid, _fetch_current_mid
+    from .executor import execute_signal
+
     signal_id = signal_row["id"]
     current_budget = float(config.exposure_budget_eur)
     sizing = _preview_sizing(
@@ -916,22 +1042,114 @@ def _handle_confirm(
     )
 
     telegram.send_message_with_buttons(
-        _format_confirm_message(
+        _format_auto_confirm_message(
             signal_row,
             proposal,
             asset_features,
-            current_budget,
             sizing,
-            config.confirm_timeout_sec,
+            _AUTO_CONFIRM_WINDOW_SEC,
             macro_events_near=macro_events_near,
         ),
-        _confirm_buttons(
-            signal_id,
-            current_budget,
-            config.budget_options,
-            _min_entry_eur(asset_features),
-        ),
+        _skip_only_buttons(signal_id),
     )
+    log.info(
+        "Signal %s in finestra auto-confirm (%ds), polling ogni %ds",
+        signal_id,
+        _AUTO_CONFIRM_WINDOW_SEC,
+        _AUTO_CONFIRM_POLL_SEC,
+    )
+
+    # Polling DB per skip user-iniziato
+    deadline = time.monotonic() + _AUTO_CONFIRM_WINDOW_SEC
+    while time.monotonic() < deadline:
+        time.sleep(_AUTO_CONFIRM_POLL_SEC)
+        sig_now = db.get_signal(signal_id)
+        if sig_now and sig_now.get("status") != "pending":
+            log.info(
+                "Signal %s uscito da pending durante finestra (status=%s),"
+                " no auto-execute",
+                signal_id,
+                sig_now.get("status"),
+            )
+            return
+
+    # Timeout finestra: applica filtri pre-volo, poi apri.
+    log.info("Signal %s: timeout finestra, apertura automatica", signal_id)
+
+    # Filtro: re-fetch difensivo (race tra fine sleep e click skip)
+    sig_now = db.get_signal(signal_id)
+    if not sig_now or sig_now.get("status") != "pending":
+        log.info(
+            "Signal %s no piu' pending (race), abort auto-execute", signal_id
+        )
+        return
+
+    # Filtro 1: cap settimanale drawdown ricontrollato
+    weekly_pnl = weekly_realized_pnl(db, hours=168)
+    if weekly_pnl <= -WEEKLY_DRAWDOWN_CAP_EUR:
+        db.update_signal_status(signal_id, "cancelled_risk_cap")
+        telegram.send_message(
+            f"⚠️ <b>Apertura annullata</b> (signal {signal_id})\n"
+            f"<b>{_esc(signal_row['asset'])}</b>\n"
+            f"Motivo: cap settimanale drawdown raggiunto "
+            f"(P&amp;L 7gg: €{weekly_pnl:.2f})"
+        )
+        return
+
+    # Filtro 2: R:R recheck rispetto al prezzo corrente
+    epic = asset_features.get("epic") or signal_row.get("epic")
+    current_mid = _fetch_current_mid(capital, epic) if epic else None
+    if current_mid:
+        ok, reason = _check_entry_still_valid(
+            signal_row, current_mid, config.min_rr_at_entry
+        )
+        if not ok:
+            db.update_signal_status(signal_id, "cancelled_rr_degraded")
+            telegram.send_message(
+                f"⚠️ <b>Apertura annullata</b> (signal {signal_id})\n"
+                f"<b>{_esc(signal_row['asset'])}</b>\n"
+                f"Motivo: <i>{_esc(reason)}</i>"
+            )
+            return
+
+    # Filtro 3: market_status ancora TRADEABLE
+    if epic:
+        try:
+            market_now = capital.get_market(epic)
+            mstatus = (market_now.get("snapshot") or {}).get(
+                "marketStatus", "UNKNOWN"
+            )
+            if mstatus not in ("TRADEABLE", "UNKNOWN"):
+                db.update_signal_status(signal_id, "cancelled_other")
+                telegram.send_message(
+                    f"⚠️ <b>Apertura annullata</b> (signal {signal_id})\n"
+                    f"<b>{_esc(signal_row['asset'])}</b>\n"
+                    f"Motivo: market_status={mstatus}"
+                )
+                return
+        except Exception:
+            log.exception("Market status check fallito su %s", epic)
+
+    # Tutti i filtri passati: chiama executor (che gestisce
+    # MAX_OPEN_POSITIONS, sizing con max_loss_per_trade_eur,
+    # min stop distance, scrittura trades + monitoring_events).
+    result = execute_signal(config, capital, db, signal_row, asset_features)
+
+    if result.executed:
+        # executor.execute_signal scrive status='executed': sovrascriviamo
+        # con 'auto_confirmed' per tracciare la modalita' di esecuzione.
+        db.update_signal_status(signal_id, "auto_confirmed")
+        telegram.send_message(
+            _format_auto_executed_message(signal_row, proposal, result)
+        )
+    else:
+        outcome = _classify_executor_failure(result.reason or "")
+        db.update_signal_status(signal_id, outcome)
+        telegram.send_message(
+            f"⚠️ <b>Apertura annullata</b> (signal {signal_id})\n"
+            f"<b>{_esc(signal_row['asset'])}</b>\n"
+            f"Motivo: <i>{_esc(result.reason)}</i>"
+        )
 
 
 def run_morning_scan(config: Config) -> None:
