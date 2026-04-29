@@ -41,9 +41,9 @@ _FEATURE_REQUEST_DELAY_SEC = 0.15
 # Finestra di skip per la modalita' auto-confirm. Hardcoded: il trigger
 # qui non e' tarato sull'utente (che spesso e' away dal Telegram per
 # ore) ma sul rischio di degradazione del setup nel tempo (R:R, news,
-# spread). 120s e' il compromesso fra "spazio per cambiare idea" e
+# spread). 60s e' il compromesso fra "spazio per cambiare idea" e
 # "non perdere edge come e' successo a trade #20 con 11min di delay".
-_AUTO_CONFIRM_WINDOW_SEC = 120
+_AUTO_CONFIRM_WINDOW_SEC = 60
 _AUTO_CONFIRM_POLL_SEC = 5
 
 
@@ -489,7 +489,11 @@ def _format_auto_confirm_message(
     reasoning = _format_reasoning_block(proposal, asset_features)
     macro_block = _format_macro_events_block(macro_events_near)
     macro_section = f"\n\n{macro_block}" if macro_block else ""
-    minutes = window_sec // 60
+    if window_sec >= 60 and window_sec % 60 == 0:
+        minutes = window_sec // 60
+        when = f"{minutes} minuto" if minutes == 1 else f"{minutes} minuti"
+    else:
+        when = f"{window_sec} secondi"
     return (
         f"🟡 <b>Setup individuato</b> (signal {signal_row['id']})\n\n"
         f"<b>{_esc(proposal.asset)}</b>  (score {proposal.score}/10)\n"
@@ -497,7 +501,7 @@ def _format_auto_confirm_message(
         f"{reasoning}\n\n"
         f"{sizing_block}"
         f"{macro_section}\n\n"
-        f"<i>⏱ Apertura automatica tra {minutes} minuti se non skippi.</i>"
+        f"<i>⏱ Apertura automatica tra {when} se non skippi.</i>"
     )
 
 
