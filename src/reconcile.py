@@ -26,9 +26,12 @@ from .telegram_client import TelegramClient
 log = logging.getLogger(__name__)
 
 
-# Keyword nella description/reason dell'activity che indicano una chiusura.
-# Tier Capital live: spesso il flag esplicito manca; ci appoggiamo allora
-# a ``source`` (SL/TP/USER) e a ``type=POSITION`` con direction opposta.
+# Keyword nella description/reason dell'activity, fallback per tier
+# che le popolano. La strategia primaria e' strutturale (vedi
+# _find_close_activity): ``type=POSITION`` + ``status=ACCEPTED`` +
+# direction opposta. Cosi' funziona per qualunque ragione di chiusura
+# (SL hit, TP hit, manuale frontend broker, broker-forced) senza
+# elenchi di ``source`` da mantenere.
 _CLOSE_DESCRIPTIONS = {
     "POSITION_CLOSED",
     "CLOSED",
@@ -36,9 +39,6 @@ _CLOSE_DESCRIPTIONS = {
     "PROFIT_ORDER_FILLED",
     "PARTIALLY_CLOSED",
 }
-
-# Sorgenti che generano counter-trade di chiusura sul tier live.
-_CLOSE_SOURCES = {"SL", "TP", "USER"}
 
 
 def _opposite_dir(direction_word: str) -> str:
@@ -52,11 +52,17 @@ def _find_close_activity(
 ) -> dict[str, Any] | None:
     """Dalla history cerca l'activity di chiusura per un deal_id.
 
-    Match in ordine:
-    1. ``description`` o ``details.reason`` con keyword nota.
-    2. ``type=POSITION`` con ``details.direction`` opposta a quella del
-       trade originale e ``source in {SL, TP, USER}`` (counter-trade
-       generato da SL hit, TP hit o close manuale frontend broker).
+    Strategia primaria, agnostica al ``source``: pattern strutturale
+    ``type=POSITION`` + ``status=ACCEPTED`` + ``details.direction``
+    opposta a quella del trade originale. Funziona per SL hit, TP hit,
+    close manuale dal frontend broker, broker-forced (margin call,
+    delisting), ecc., perche' tutti generano un counter-trade POSITION
+    di direzione opposta. ``source`` resta un'informazione utile per
+    derivare il tag (vedi ``_extract_close_info``).
+
+    Strategia di fallback: ``description`` o ``details.reason`` con
+    keyword nota. Mantenuta per tier che popolano questi campi.
+
     Sceglie il match piu' recente per dateUTC.
     """
     candidates: list[dict[str, Any]] = []
@@ -65,21 +71,24 @@ def _find_close_activity(
     for act in activities:
         if act.get("dealId") != deal_id:
             continue
+        details = act.get("details") or {}
+        # Strategia primaria: counter-trade strutturale.
+        if (
+            act.get("type") == "POSITION"
+            and act.get("status") == "ACCEPTED"
+            and details.get("direction") == opp_dir
+        ):
+            candidates.append(act)
+            continue
+        # Fallback keyword.
         desc = (act.get("description") or "").upper()
         if any(k in desc for k in _CLOSE_DESCRIPTIONS):
             candidates.append(act)
             continue
-        details = act.get("details") or {}
-        reason = (details.get("reason") or details.get("actionType") or "").upper()
+        reason = (
+            details.get("reason") or details.get("actionType") or ""
+        ).upper()
         if any(k in reason for k in _CLOSE_DESCRIPTIONS):
-            candidates.append(act)
-            continue
-        # Match strutturale: counter-trade POSITION direction opposta
-        if (
-            act.get("type") == "POSITION"
-            and act.get("source") in _CLOSE_SOURCES
-            and details.get("direction") == opp_dir
-        ):
             candidates.append(act)
 
     if not candidates:
@@ -149,12 +158,27 @@ def _format_close_notification(
     pnl_pct: float | None,
     tag: str,
 ) -> str:
-    """Messaggio Telegram per chiusura broker-side rilevata dal reconcile.
-    Senza questa notifica le chiusure notturne (fuori finestra monitor
-    LLM 7-22) passavano in silenzio."""
+    """Messaggio Telegram per chiusura rilevata dal reconcile. Diverso
+    sui due rami: match (icona contestuale, dettagli pieni) vs no_match
+    (warning, invito a verifica manuale). Senza questa notifica le
+    chiusure notturne fuori dalla finestra monitor LLM (7-22) passavano
+    in silenzio."""
     asset = trade.get("asset") or "?"
     entry = trade.get("entry_price")
     size = trade.get("size")
+    entry_str = f"<code>{entry:g}</code>" if entry else "<code>n/d</code>"
+    size_str = f"<code>{size:g}</code>" if size else "<code>n/d</code>"
+
+    if tag == "reconcile:no_match":
+        return (
+            f"⚠️ <b>{asset} chiuso</b> "
+            f"(motivo non identificato dal sistema)\n"
+            f"Entry: {entry_str}  Size: {size_str}\n"
+            f"<i>Capital ha chiuso la posizione ma il reconcile non ha"
+            f" trovato l'evento corrispondente. Verifica manuale "
+            f"consigliata su app Capital.</i>"
+        )
+
     icon = "🛑" if "stop_hit" in tag else (
         "🎯" if "tp_hit" in tag else "🔚"
     )
@@ -163,23 +187,16 @@ def _format_close_notification(
         "reconcile:tp_hit": "Take profit colpito",
         "reconcile:closed_on_broker": "Chiusura lato broker",
         "reconcile:activity_match": "Chiusura rilevata",
-        "reconcile:no_match": "Posizione chiusa (dettagli non recuperati)",
     }.get(tag, "Posizione chiusa")
     pnl_str = (
         f"<code>{pnl:+.2f}</code>" if pnl is not None else "<code>n/d</code>"
     )
-    pnl_pct_str = (
-        f" ({pnl_pct:+.2f}%)"
-        if pnl_pct is not None
-        else ""
-    )
+    pnl_pct_str = f" ({pnl_pct:+.2f}%)" if pnl_pct is not None else ""
     close_str = (
         f"<code>{close_price:g}</code>"
         if close_price is not None
         else "<code>n/d</code>"
     )
-    entry_str = f"<code>{entry:g}</code>" if entry else "<code>n/d</code>"
-    size_str = f"<code>{size:g}</code>" if size else "<code>n/d</code>"
     return (
         f"{icon} <b>{label}</b>\n"
         f"Asset: <b>{asset}</b>  Size: {size_str}\n"
