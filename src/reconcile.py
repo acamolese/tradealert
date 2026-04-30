@@ -21,11 +21,14 @@ from typing import Any
 from .capital_client import CapitalAPIError, CapitalClient
 from .config import Config
 from .db import Database
+from .telegram_client import TelegramClient
 
 log = logging.getLogger(__name__)
 
 
-# Keyword nella descrizione dell'activity che indicano una chiusura.
+# Keyword nella description/reason dell'activity che indicano una chiusura.
+# Tier Capital live: spesso il flag esplicito manca; ci appoggiamo allora
+# a ``source`` (SL/TP/USER) e a ``type=POSITION`` con direction opposta.
 _CLOSE_DESCRIPTIONS = {
     "POSITION_CLOSED",
     "CLOSED",
@@ -34,24 +37,55 @@ _CLOSE_DESCRIPTIONS = {
     "PARTIALLY_CLOSED",
 }
 
+# Sorgenti che generano counter-trade di chiusura sul tier live.
+_CLOSE_SOURCES = {"SL", "TP", "USER"}
+
+
+def _opposite_dir(direction_word: str) -> str:
+    return "SELL" if (direction_word or "").lower() == "long" else "BUY"
+
 
 def _find_close_activity(
-    activities: list[dict[str, Any]], deal_id: str
+    activities: list[dict[str, Any]],
+    deal_id: str,
+    db_trade: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Dalla history cerca l'activity di chiusura per un deal_id.
-    Restituisce il dict dell'activity, oppure None."""
+
+    Match in ordine:
+    1. ``description`` o ``details.reason`` con keyword nota.
+    2. ``type=POSITION`` con ``details.direction`` opposta a quella del
+       trade originale e ``source in {SL, TP, USER}`` (counter-trade
+       generato da SL hit, TP hit o close manuale frontend broker).
+    Sceglie il match piu' recente per dateUTC.
+    """
+    candidates: list[dict[str, Any]] = []
+    opp_dir = _opposite_dir((db_trade or {}).get("direction", ""))
+
     for act in activities:
         if act.get("dealId") != deal_id:
             continue
         desc = (act.get("description") or "").upper()
         if any(k in desc for k in _CLOSE_DESCRIPTIONS):
-            return act
-        # fallback: details.reason
+            candidates.append(act)
+            continue
         details = act.get("details") or {}
         reason = (details.get("reason") or details.get("actionType") or "").upper()
         if any(k in reason for k in _CLOSE_DESCRIPTIONS):
-            return act
-    return None
+            candidates.append(act)
+            continue
+        # Match strutturale: counter-trade POSITION direction opposta
+        if (
+            act.get("type") == "POSITION"
+            and act.get("source") in _CLOSE_SOURCES
+            and details.get("direction") == opp_dir
+        ):
+            candidates.append(act)
+
+    if not candidates:
+        return None
+    candidates.sort(key=lambda a: a.get("dateUTC", ""), reverse=True)
+    return candidates[0]
 
 
 def _extract_close_info(
@@ -59,10 +93,12 @@ def _extract_close_info(
 ) -> tuple[float | None, float | None, float | None, str]:
     """Ritorna (close_price, pnl, pnl_pct, exit_reason_tag).
 
-    ``activity`` puo' avere struttura leggermente diversa a seconda del
-    tier Capital; proviamo entrambe: ``level`` top-level o dentro
-    ``details``. Se pnl non disponibile lo ricaviamo da
-    (close-entry)*size * segno_direzione.
+    Sorgenti per close_price (in ordine): activity.level top-level
+    (vecchio tier), details.level (nuovo tier counter-trade),
+    details.closeLevel. Se pnl non e' fornito da Capital, lo deriva da
+    (close-entry)*size con segno per direzione.
+    Tag e' derivato da ``source`` se presente (SL/TP/USER), altrimenti
+    dalla description.
     """
     details = activity.get("details") or {}
     close_price = (
@@ -75,7 +111,6 @@ def _extract_close_info(
     entry = db_trade.get("entry_price")
     size = db_trade.get("size")
 
-    # Fallback: calcola pnl e pnl_pct se abbiamo i dati
     if pnl is None and close_price and entry and size:
         delta = (float(close_price) - float(entry))
         if direction == "short":
@@ -86,11 +121,14 @@ def _extract_close_info(
         delta = (float(close_price) - float(entry)) / float(entry) * 100
         pnl_pct = -delta if direction == "short" else delta
 
+    source = (activity.get("source") or "").upper()
     desc = (activity.get("description") or "").upper()
-    if "STOP" in desc:
+    if source == "SL" or "STOP" in desc:
         tag = "reconcile:stop_hit"
-    elif "PROFIT" in desc:
+    elif source == "TP" or "PROFIT" in desc:
         tag = "reconcile:tp_hit"
+    elif source == "USER":
+        tag = "reconcile:closed_on_broker"
     elif "CLOSED" in desc:
         tag = "reconcile:closed_on_broker"
     else:
@@ -104,11 +142,58 @@ def _extract_close_info(
     )
 
 
+def _format_close_notification(
+    trade: dict[str, Any],
+    close_price: float | None,
+    pnl: float | None,
+    pnl_pct: float | None,
+    tag: str,
+) -> str:
+    """Messaggio Telegram per chiusura broker-side rilevata dal reconcile.
+    Senza questa notifica le chiusure notturne (fuori finestra monitor
+    LLM 7-22) passavano in silenzio."""
+    asset = trade.get("asset") or "?"
+    entry = trade.get("entry_price")
+    size = trade.get("size")
+    icon = "🛑" if "stop_hit" in tag else (
+        "🎯" if "tp_hit" in tag else "🔚"
+    )
+    label = {
+        "reconcile:stop_hit": "Stop loss colpito",
+        "reconcile:tp_hit": "Take profit colpito",
+        "reconcile:closed_on_broker": "Chiusura lato broker",
+        "reconcile:activity_match": "Chiusura rilevata",
+        "reconcile:no_match": "Posizione chiusa (dettagli non recuperati)",
+    }.get(tag, "Posizione chiusa")
+    pnl_str = (
+        f"<code>{pnl:+.2f}</code>" if pnl is not None else "<code>n/d</code>"
+    )
+    pnl_pct_str = (
+        f" ({pnl_pct:+.2f}%)"
+        if pnl_pct is not None
+        else ""
+    )
+    close_str = (
+        f"<code>{close_price:g}</code>"
+        if close_price is not None
+        else "<code>n/d</code>"
+    )
+    entry_str = f"<code>{entry:g}</code>" if entry else "<code>n/d</code>"
+    size_str = f"<code>{size:g}</code>" if size else "<code>n/d</code>"
+    return (
+        f"{icon} <b>{label}</b>\n"
+        f"Asset: <b>{asset}</b>  Size: {size_str}\n"
+        f"Entry: {entry_str}  Close: {close_str}\n"
+        f"P&amp;L: {pnl_str}{pnl_pct_str}"
+    )
+
+
 def reconcile_open_trades(
     config: Config,
     capital: CapitalClient | None = None,
     db: Database | None = None,
     live_positions: list[dict[str, Any]] | None = None,
+    telegram: TelegramClient | None = None,
 ) -> dict[str, int]:
     """Allinea DB con broker. Ritorna contatori {checked, stale, closed,
     closed_with_pnl}. Loggare l'outcome e' compito del job entry point.
@@ -116,12 +201,16 @@ def reconcile_open_trades(
     Parametri opzionali per riuso da chiamanti che hanno gia' una sessione
     Capital aperta (es. position_monitor): se ``capital`` e' passato, non
     si fa un nuovo login; se ``live_positions`` e' passata, non si rifa
-    la chiamata HTTP /positions."""
+    la chiamata HTTP /positions. Se ``telegram`` e' passato, ad ogni
+    chiusura riconciliata invia un messaggio (utile per intercettare le
+    chiusure broker-side fuori finestra monitor LLM)."""
     if capital is None:
         capital = CapitalClient(config)
         capital.login()
     if db is None:
         db = Database(config)
+    if telegram is None:
+        telegram = TelegramClient(config)
 
     if live_positions is None:
         live_positions = capital.get_open_positions()
@@ -165,7 +254,7 @@ def reconcile_open_trades(
 
     for trade in stale:
         deal_id = trade["capital_deal_id"]
-        activity = _find_close_activity(activities, deal_id)
+        activity = _find_close_activity(activities, deal_id, db_trade=trade)
         if activity:
             close_price, pnl, pnl_pct, tag = _extract_close_info(
                 activity, trade
@@ -191,6 +280,17 @@ def reconcile_open_trades(
                 pnl,
                 tag,
             )
+            try:
+                telegram.send_message(
+                    _format_close_notification(
+                        trade, close_price, pnl, pnl_pct, tag
+                    )
+                )
+            except Exception:
+                log.exception(
+                    "Notifica Telegram chiusura reconcile fallita per %s",
+                    deal_id,
+                )
         except Exception:
             log.exception(
                 "close_trade fallito per %s (%s)", trade["asset"], deal_id

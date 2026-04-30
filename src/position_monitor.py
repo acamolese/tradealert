@@ -704,7 +704,11 @@ def monitor_positions(config: Config) -> None:
         from .reconcile import reconcile_open_trades
 
         rec = reconcile_open_trades(
-            config, capital=capital, db=db, live_positions=open_positions
+            config,
+            capital=capital,
+            db=db,
+            live_positions=open_positions,
+            telegram=telegram,
         )
         if rec.get("closed", 0) > 0:
             log.info(
