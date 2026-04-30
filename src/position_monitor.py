@@ -470,20 +470,26 @@ def _format_close_proposal(decision: dict[str, Any]) -> str:
 def _resolve_close_price_from_activity(
     capital: CapitalClient,
     deal_id: str,
-    opposite_direction: str,
+    db_trade: dict[str, Any],
     retries: int = 3,
     sleep_sec: float = 1.0,
 ) -> float | None:
     """Cerca nell'activity history il prezzo di esecuzione del counter-trade
     di chiusura. ``confirm_deal`` su Capital, per un close manuale di
     posizione, ritorna in ``level`` l'entry della posizione originale
-    (non il prezzo del counter-trade). L'evento ``POSITION`` con direzione
-    opposta nell'activity ha invece ``details.level`` corretto.
+    (non il prezzo del counter-trade).
 
-    Capital ha lag di 1-2s tra DELETE /positions e visibilita' nell'activity:
-    breve retry per assorbirlo.
+    Riutilizza la helper ``_find_close_activity`` di ``reconcile.py``
+    (logica unica per riconoscere counter-trade strutturali) e ne legge
+    il ``close_price`` via ``_extract_close_info``. Cosi' i due path
+    di chiusura DB (close_position_by_deal_id e reconcile) condividono
+    lo stesso parser e qualunque fix futuro vale per entrambi.
+
+    Capital ha lag di 1-2s tra DELETE /positions e visibilita'
+    nell'activity: retry breve per assorbirlo.
     """
     import time
+    from .reconcile import _find_close_activity, _extract_close_info
 
     for attempt in range(retries):
         try:
@@ -492,21 +498,13 @@ def _resolve_close_price_from_activity(
             )
         except Exception:
             activities = []
-        candidates = [
-            a
-            for a in activities
-            if a.get("dealId") == deal_id
-            and a.get("type") == "POSITION"
-            and (a.get("details") or {}).get("direction") == opposite_direction
-        ]
-        if candidates:
-            candidates.sort(key=lambda a: a.get("dateUTC", ""), reverse=True)
-            level = (candidates[0].get("details") or {}).get("level")
-            if level:
-                try:
-                    return float(level)
-                except (TypeError, ValueError):
-                    return None
+        found = _find_close_activity(activities, deal_id, db_trade=db_trade)
+        if found:
+            close_price, _pnl, _pct, _tag = _extract_close_info(
+                found, db_trade
+            )
+            if close_price:
+                return close_price
         if attempt < retries - 1:
             time.sleep(sleep_sec)
     return None
@@ -552,7 +550,6 @@ def close_position_by_deal_id(
         direction_word = (
             (trade.get("direction") or "").lower() if trade else ""
         )
-        opposite_dir_api = "SELL" if direction_word == "long" else "BUY"
         entry = float(trade.get("entry_price") or 0) if trade else 0.0
         size = float(trade.get("size") or 0) if trade else 0.0
         signal = (
@@ -570,10 +567,11 @@ def close_position_by_deal_id(
         pnl = float(pnl_raw) if pnl_raw is not None else None
 
         # confirm.level e' inaffidabile per close manuali (restituisce
-        # l'entry originale). Sorgente primaria: activity history. Sorgente
-        # subordinata: bid/offer current. Ultima risorsa: confirm_level.
+        # l'entry originale). Sorgente primaria: activity history (stessa
+        # helper usata da reconcile). Sorgente subordinata: bid/offer
+        # current. Ultima risorsa: confirm_level.
         activity_level = _resolve_close_price_from_activity(
-            capital, deal_id, opposite_dir_api
+            capital, deal_id, trade or {}
         )
         market_level = (
             _resolve_close_price_from_market(capital, epic, direction_word)
