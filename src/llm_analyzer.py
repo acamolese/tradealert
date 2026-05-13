@@ -14,6 +14,7 @@ from typing import Any
 from anthropic import Anthropic
 
 from .config import Config
+from .llm_usage import log_usage
 
 
 def _compress_features(
@@ -222,6 +223,7 @@ class LLMAnalyzer:
     def __init__(self, config: Config) -> None:
         self._client = Anthropic(api_key=config.anthropic_api_key)
         self._model = config.anthropic_model
+        self._config = config
 
     def rank_setups(
         self,
@@ -246,6 +248,7 @@ class LLMAnalyzer:
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_message}],
         )
+        log_usage(self._config, "scanner", response)
 
         raw_text = response.content[0].text.strip()
         # Difensivo: alcuni modelli aggiungono code fences nonostante il system prompt

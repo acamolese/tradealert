@@ -138,6 +138,41 @@ def _format_positions_block(positions: list[dict[str, Any]]) -> str:
     return header + "\n" + "\n".join(lines)
 
 
+_MONTH_LABEL_IT = {
+    1: "gen",
+    2: "feb",
+    3: "mar",
+    4: "apr",
+    5: "mag",
+    6: "giu",
+    7: "lug",
+    8: "ago",
+    9: "set",
+    10: "ott",
+    11: "nov",
+    12: "dic",
+}
+
+
+def _format_llm_cost_block(rows: list[dict[str, Any]]) -> str:
+    if not rows:
+        return "💰 <i>Nessun consumo Anthropic registrato</i>"
+    lines = ["💰 <b>Spesa Anthropic (stima)</b>"]
+    for r in rows:
+        month = r.get("month") or ""
+        cost = float(r.get("cost_usd") or 0)
+        calls = int(r.get("calls") or 0)
+        try:
+            year, m = month.split("-")
+            label = f"{_MONTH_LABEL_IT.get(int(m), m)} {year}"
+        except ValueError:
+            label = month
+        lines.append(
+            f"• <b>{label}</b>: <code>${cost:.2f}</code> ({calls} call)"
+        )
+    return "\n".join(lines)
+
+
 def _format_signals_block(signals: list[dict[str, Any]]) -> str:
     if not signals:
         return "🔕 <i>Nessun signal nelle ultime 24h</i>"
@@ -180,6 +215,11 @@ def build_status_message(config: Config) -> str:
     except Exception:
         log.exception("recent_signals fallito")
         signals_24h = []
+    try:
+        llm_costs = db.llm_cost_by_month(3)
+    except Exception:
+        log.exception("llm_cost_by_month fallito")
+        llm_costs = []
 
     positions: list[dict[str, Any]] = []
     positions_error: str | None = None
@@ -208,6 +248,8 @@ def build_status_message(config: Config) -> str:
         parts.append(_format_positions_block(positions))
     parts.append("")
     parts.append(_format_signals_block(signals_24h))
+    parts.append("")
+    parts.append(_format_llm_cost_block(llm_costs))
     return "\n".join(parts)
 
 

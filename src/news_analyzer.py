@@ -27,6 +27,7 @@ from typing import Any
 from anthropic import Anthropic
 
 from .config import Config
+from .llm_usage import log_usage
 
 log = logging.getLogger(__name__)
 
@@ -170,6 +171,7 @@ def analyze_news(
             system=_system_prompt(universe_names),
             messages=[{"role": "user", "content": user_block}],
         )
+        log_usage(config, "news", response)
         raw_text = response.content[0].text.strip()
     except Exception as exc:
         log.warning("analyze_news: chiamata LLM fallita (%s)", exc)

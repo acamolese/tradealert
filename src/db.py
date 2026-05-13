@@ -144,6 +144,52 @@ class Database:
         )
         return response.data or []
 
+    def insert_llm_usage(self, row: dict[str, Any]) -> None:
+        """Traccia tokens e costo di una chiamata Anthropic."""
+        self._client.table("llm_usage").insert(row).execute()
+
+    def llm_cost_by_month(self, months: int = 3) -> list[dict[str, Any]]:
+        """Spesa Anthropic stimata raggruppata per mese (UTC), dal piu'
+        recente. Restituisce al massimo ``months`` righe con chiavi
+        ``month`` ("YYYY-MM"), ``cost_usd`` (float), ``calls`` (int).
+
+        Non aggreghiamo lato DB con una view per restare nello stack
+        Python-only: il volume di righe (poche centinaia al mese) e'
+        trascurabile.
+        """
+        from collections import defaultdict
+        from datetime import datetime, timedelta, timezone
+
+        # Finestra ampia: ultimi N+1 mesi solari per coprire il bordo.
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(days=31 * (months + 1))
+        ).isoformat()
+        response = (
+            self._client.table("llm_usage")
+            .select("ran_at,cost_usd")
+            .gte("ran_at", cutoff)
+            .execute()
+        )
+        buckets: dict[str, dict[str, float]] = defaultdict(
+            lambda: {"cost_usd": 0.0, "calls": 0}
+        )
+        for row in response.data or []:
+            ran_at = row.get("ran_at") or ""
+            month = ran_at[:7]  # "YYYY-MM"
+            if not month:
+                continue
+            buckets[month]["cost_usd"] += float(row.get("cost_usd") or 0)
+            buckets[month]["calls"] += 1
+        sorted_months = sorted(buckets.keys(), reverse=True)[:months]
+        return [
+            {
+                "month": m,
+                "cost_usd": round(buckets[m]["cost_usd"], 4),
+                "calls": int(buckets[m]["calls"]),
+            }
+            for m in sorted_months
+        ]
+
     def recent_signal_assets(self, hours: int = 24) -> set[str]:
         """Asset per cui e' stato creato un signal nelle ultime ``hours``
         (qualsiasi status). Usato per evitare di riproporre ripetutamente

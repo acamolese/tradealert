@@ -25,6 +25,7 @@ from .capital_client import CapitalAPIError, CapitalClient
 from .config import Config
 from .db import Database
 from .features import compute_features
+from .llm_usage import log_usage
 from .quiet_hours import is_quiet_now, quiet_reason
 from .telegram_client import TelegramClient
 from .universe import UNIVERSE
@@ -433,6 +434,7 @@ def _evaluate_position(
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": json.dumps(payload, default=str)}],
     )
+    log_usage(config, "monitor", response)
     raw = response.content[0].text.strip()
     if raw.startswith("```"):
         raw = raw.strip("`")

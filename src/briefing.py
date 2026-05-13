@@ -23,6 +23,7 @@ from anthropic import Anthropic
 
 from .capital_client import CapitalAPIError, CapitalClient
 from .config import Config
+from .llm_usage import log_usage
 from .news import fetch_news, format_news_for_llm
 from .news_analyzer import analyze_news
 from .quiet_hours import is_quiet_now, quiet_reason
@@ -156,6 +157,7 @@ def generate_briefing(config: Config, slot: str) -> str:
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_block}],
     )
+    log_usage(config, "briefing", response)
     return response.content[0].text.strip()
 
 

@@ -24,6 +24,7 @@ from typing import Any
 from anthropic import Anthropic
 
 from .config import Config
+from .llm_usage import log_usage
 
 log = logging.getLogger(__name__)
 
@@ -182,6 +183,7 @@ def extract_events(
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_block}],
         )
+        log_usage(config, "events", response)
         raw_text = response.content[0].text.strip()
     except Exception as exc:
         log.warning("extract_events: chiamata LLM fallita (%s)", exc)
