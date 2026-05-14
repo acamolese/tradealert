@@ -257,6 +257,21 @@ def execute_signal(
     # Fallback / verifica: cerca la posizione reale. Serve sia per
     # rimpiazzare deal_id col position id (quello usato per DELETE), sia
     # come fallback quando confirm_deal ha fallito.
+    # Le posizioni gia' presenti fra i trade aperti nel DB vanno escluse
+    # dal match indiretto: sono posizioni preesistenti, non quella appena
+    # aperta. Senza questo filtro, con un'altra posizione gia' aperta sullo
+    # stesso epic+direzione+size il match indiretto aggancia il deal_id
+    # sbagliato e insert_trade fallisce sul vincolo unique.
+    try:
+        known_deal_ids = {
+            t["capital_deal_id"]
+            for t in db.get_open_trades()
+            if t.get("capital_deal_id")
+        }
+    except Exception as exc:
+        log.warning("Lookup trade aperti per dedup fallito: %s", exc)
+        known_deal_ids = set()
+
     matched_position: dict[str, Any] | None = None
     for attempt in range(3):
         if attempt > 0:
@@ -273,6 +288,9 @@ def execute_signal(
             if pos.get("dealReference") == deal_reference:
                 matched_position = pos_wrapper
                 break
+            # Posizione gia' tracciata nel DB: non e' quella appena aperta.
+            if pos.get("dealId") in known_deal_ids:
+                continue
             # Match indiretto: stesso epic, stessa direzione, size molto
             # vicina alla nostra size calcolata. Tolleranza 1% per gestire
             # eventuali arrotondamenti lato broker.
@@ -287,6 +305,7 @@ def execute_signal(
             )
             if same_epic and same_dir and size_ok:
                 matched_position = pos_wrapper
+                break
         if matched_position:
             break
 
