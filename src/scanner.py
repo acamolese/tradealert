@@ -1140,13 +1140,19 @@ def _handle_confirm(
     try:
         result = execute_signal(config, capital, db, signal_row, asset_features)
     except Exception as exc:  # rete, epic 404, qualsiasi
+        # Lo step ignoto: l'eccezione puo' arrivare prima o dopo
+        # create_position. Marchiamo execute_inconsistent (non
+        # cancelled_other) cosi' il position_monitor sa che esiste un
+        # signal candidato per il recovery se la posizione e' stata
+        # comunque aperta su Capital. Vedi docs/bug-6-atomicita-execute-persist.md
         log.exception("Auto-execute crash su signal %s", signal_id)
-        db.update_signal_status(signal_id, "cancelled_other")
+        db.update_signal_status(signal_id, "execute_inconsistent")
         telegram.send_message(
-            f"⚠️ <b>Apertura annullata</b> (signal {signal_id})\n"
+            f"⚠️ <b>Apertura inconsistente</b> (signal {signal_id})\n"
             f"<b>{_esc(signal_row['asset'])}</b>\n"
-            f"Motivo: errore tecnico durante l'apertura "
-            f"(<code>{_esc(type(exc).__name__)}</code>)"
+            f"Errore: <code>{_esc(type(exc).__name__)}</code>. "
+            f"Se la posizione e' aperta su Capital il monitor la ricuce "
+            f"al prossimo ciclo."
         )
         return
 

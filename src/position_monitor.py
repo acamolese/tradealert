@@ -144,10 +144,18 @@ def _apply_trailing_stop(
 
     trade = db.get_trade_by_deal_id(deal_id)
 
-    # Posizione aperta fuori-bot (manuale su Capital): la importiamo nel
-    # DB come orphan trade (signal_id=None), usando lo SL attuale come
-    # riferimento per la R-distance. Dal prossimo ciclo il trailing
-    # procede normalmente.
+    # Posizione aperta fuori-bot: la importiamo nel DB. Due casi:
+    #
+    # 1. RECOVERY (bug #6): esiste un signal recente con status
+    #    'execute_inconsistent' compatibile per epic+direction. Significa
+    #    che il bot l'aveva aperta ma il persist su Supabase e' fallito.
+    #    Ricostruiamo il link signal_id valido cosi' il sample resta
+    #    valido per la validazione hit-rate.
+    #
+    # 2. ORPHAN classico: nessun signal candidato -> apertura manuale
+    #    dell'utente lato Capital, signal_id=None.
+    #
+    # In entrambi i casi usiamo lo SL attuale come riferimento R-distance.
     if not trade:
         if not current_sl:
             log.warning(
@@ -157,37 +165,183 @@ def _apply_trailing_stop(
                 asset_name,
             )
             return
+        size = pos.get("size") or 0
+        direction_norm = "long" if direction == "BUY" else "short"
+        profit_level = pos.get("profitLevel")
+
+        # Tentativo di recovery: cerca un signal execute_inconsistent
+        # compatibile nelle ultime 10 minuti.
+        recovered_signal: dict[str, Any] | None = None
+        ambiguous_match = False
+        if epic:
+            try:
+                candidates = db.find_inconsistent_signal(
+                    epic=epic,
+                    direction=direction_norm,
+                    window_minutes=10,
+                )
+                if len(candidates) == 1:
+                    recovered_signal = candidates[0]
+                elif len(candidates) > 1:
+                    ambiguous_match = True
+                    log.warning(
+                        "Recovery ambiguo per %s (%s): %d signal "
+                        "execute_inconsistent candidati, fallback orphan",
+                        deal_id,
+                        asset_name,
+                        len(candidates),
+                    )
+            except Exception:
+                log.exception(
+                    "find_inconsistent_signal fallito per %s", deal_id
+                )
+
+        trade_row = {
+            "signal_id": (
+                recovered_signal["id"] if recovered_signal else None
+            ),
+            "capital_deal_id": deal_id,
+            "asset": asset_name,
+            "direction": direction_norm,
+            "size": float(size),
+            "entry_price": float(entry),
+            "current_sl": float(current_sl),
+            "current_tp": (
+                float(profit_level) if profit_level else None
+            ),
+            "status": "open",
+            "exit_reason": (
+                "recovered:execute_inconsistent"
+                if recovered_signal
+                else "manual_import:trailing"
+            ),
+        }
+
         try:
-            size = pos.get("size") or 0
-            direction_norm = "long" if direction == "BUY" else "short"
-            profit_level = pos.get("profitLevel")
-            trade = db.insert_trade(
-                {
-                    "signal_id": None,
-                    "capital_deal_id": deal_id,
-                    "asset": asset_name,
-                    "direction": direction_norm,
-                    "size": float(size),
-                    "entry_price": float(entry),
-                    "current_sl": float(current_sl),
-                    "current_tp": (
-                        float(profit_level) if profit_level else None
-                    ),
-                    "status": "open",
-                    "exit_reason": "manual_import:trailing",
-                }
-            )
-            log.warning(
-                "Posizione manuale %s (%s) importata in trades come "
-                "orphan: trailing attivo dal prossimo ciclo",
-                deal_id,
-                asset_name,
-            )
+            trade = db.insert_trade(trade_row)
         except Exception:
             log.exception(
-                "Import orphan fallito per posizione %s", deal_id
+                "Import (recovery=%s) fallito per posizione %s",
+                bool(recovered_signal),
+                deal_id,
             )
             return
+
+        if recovered_signal:
+            # Update signal status + monitoring event + notifica.
+            # Tutti gli errori sotto sono best-effort: il trade row
+            # gia' creato e' la sorgente di verita'.
+            from datetime import datetime, timezone
+
+            sig_created = recovered_signal.get("created_at", "")
+            latency_s: float | None = None
+            try:
+                created_dt = datetime.fromisoformat(
+                    sig_created.replace("Z", "+00:00")
+                )
+                latency_s = (
+                    datetime.now(timezone.utc) - created_dt
+                ).total_seconds()
+            except Exception:
+                pass
+
+            try:
+                db.update_signal_status(
+                    recovered_signal["id"], "executed_recovered"
+                )
+            except Exception:
+                log.exception(
+                    "update_signal_status executed_recovered fallito "
+                    "per signal %s",
+                    recovered_signal["id"],
+                )
+
+            try:
+                db.insert_monitoring_event(
+                    {
+                        "trade_id": trade["id"],
+                        "event_type": "orphan_adopted_recovered",
+                        "reason": (
+                            f"Recovery signal {recovered_signal['id']} "
+                            f"(execute_inconsistent) -> trade "
+                            f"{trade['id']}"
+                        ),
+                        "details": {
+                            "signal_id": recovered_signal["id"],
+                            "signal_created_at": sig_created,
+                            "latency_seconds": latency_s,
+                            "deal_id": deal_id,
+                            "epic": epic,
+                            "direction": direction_norm,
+                        },
+                    }
+                )
+            except Exception:
+                log.exception("Monitoring event recovered fallito")
+
+            log.warning(
+                "RECOVERY: posizione %s (%s) linkata a signal %d "
+                "(execute_inconsistent), latency=%.1fs",
+                deal_id,
+                asset_name,
+                recovered_signal["id"],
+                latency_s or -1,
+            )
+            try:
+                telegram.send_message(
+                    f"♻️ <b>Recovery posizione</b>\n"
+                    f"<b>{_esc(asset_name)}</b> ({direction_norm}) "
+                    f"linkata a signal #{recovered_signal['id']}.\n"
+                    f"Latency apertura -> link: "
+                    f"<code>{latency_s:.0f}s</code>"
+                    if latency_s
+                    else (
+                        f"♻️ <b>Recovery posizione</b>\n"
+                        f"<b>{_esc(asset_name)}</b> ({direction_norm}) "
+                        f"linkata a signal #{recovered_signal['id']}"
+                    )
+                )
+            except Exception:
+                log.exception("Telegram recovery notice fallita")
+        else:
+            # Vero orphan: signal_id=None, niente signal da aggiornare.
+            try:
+                db.insert_monitoring_event(
+                    {
+                        "trade_id": trade["id"],
+                        "event_type": "orphan_adopted",
+                        "reason": (
+                            "Posizione adottata senza signal candidato"
+                            + (" (match ambiguo)" if ambiguous_match else "")
+                        ),
+                        "details": {
+                            "deal_id": deal_id,
+                            "epic": epic,
+                            "direction": direction_norm,
+                            "ambiguous": ambiguous_match,
+                        },
+                    }
+                )
+            except Exception:
+                log.exception("Monitoring event orphan fallito")
+
+            log.warning(
+                "ORPHAN: posizione %s (%s) importata senza signal_id "
+                "(ambiguous=%s)",
+                deal_id,
+                asset_name,
+                ambiguous_match,
+            )
+            try:
+                tag = "ambiguo" if ambiguous_match else "manuale"
+                telegram.send_message(
+                    f"⚠️ <b>Posizione orphan adottata</b> ({tag})\n"
+                    f"<b>{_esc(asset_name)}</b> ({direction_norm}) "
+                    f"senza signal collegato.\n"
+                    f"Trailing attivo dal prossimo ciclo."
+                )
+            except Exception:
+                log.exception("Telegram orphan notice fallita")
 
     # Deriva lo stop_pct: se c'e un signal originale usa il suo, altrimenti
     # lo ricava dallo SL iniziale salvato sul trade (stabile nel tempo).

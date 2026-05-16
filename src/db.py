@@ -61,6 +61,41 @@ class Database:
         response = self._client.table("trades").insert(trade).execute()
         return response.data[0]
 
+    def find_inconsistent_signal(
+        self,
+        epic: str,
+        direction: str,
+        window_minutes: int = 10,
+    ) -> list[dict[str, Any]]:
+        """Cerca signal con status='execute_inconsistent' su epic+direction
+        creati nelle ultime ``window_minutes``.
+
+        Usato dal position_monitor per ricucire orphan trade al signal
+        che li ha generati quando l'auto-executor crasha fra
+        create_position su Capital e insert_trade su Supabase
+        (bug #6 atomicita').
+
+        Ritorna lista vuota se nessun match, lista con 1 elemento se
+        match univoco, lista con >1 elementi se ambiguo (in quel caso
+        il chiamante deve fallback su orphan classico per sicurezza).
+        """
+        from datetime import datetime, timedelta, timezone
+
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(minutes=window_minutes)
+        ).isoformat()
+        response = (
+            self._client.table("signals")
+            .select("*")
+            .eq("status", "execute_inconsistent")
+            .eq("epic", epic)
+            .eq("direction", direction)
+            .gte("created_at", cutoff)
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return response.data or []
+
     def get_trade_by_deal_id(self, deal_id: str) -> dict[str, Any] | None:
         response = (
             self._client.table("trades")

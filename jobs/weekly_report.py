@@ -86,6 +86,43 @@ def _fmt_wlbe(s) -> str:
     return base
 
 
+def _count_orphan_adoptions(db: Database, days: int = 7) -> tuple[int, int]:
+    """Conta monitoring_events di tipo orphan_adopted e
+    orphan_adopted_recovered negli ultimi ``days`` giorni.
+
+    Ritorna (orphan_classici, recovered). Sentinella per il bug #6:
+    se 'orphan_classici' inizia a salire senza che l'utente abbia
+    aperto posizioni manualmente, l'auto-executor sta crashando in
+    modo che il recovery non cattura (signal NON marcato come
+    execute_inconsistent oppure window > 10min).
+    """
+    from datetime import datetime, timedelta, timezone
+
+    cutoff = (
+        datetime.now(timezone.utc) - timedelta(days=days)
+    ).isoformat()
+    try:
+        rows = (
+            db._client.table("monitoring_events")
+            .select("event_type")
+            .in_(
+                "event_type",
+                ["orphan_adopted", "orphan_adopted_recovered"],
+            )
+            .gte("created_at", cutoff)
+            .execute()
+            .data
+        ) or []
+    except Exception:
+        log.exception("Counter orphan: query fallita")
+        return 0, 0
+    orphan = sum(1 for r in rows if r["event_type"] == "orphan_adopted")
+    recovered = sum(
+        1 for r in rows if r["event_type"] == "orphan_adopted_recovered"
+    )
+    return orphan, recovered
+
+
 def build_report(db: Database) -> str:
     summary_7 = compute_weekly_summary(db, days=7)
     summary_30 = compute_weekly_summary(db, days=30)
@@ -93,6 +130,7 @@ def build_report(db: Database) -> str:
     asset_30 = compute_hit_rate_by_asset_class(db, days=30)
     open_trades = db.get_open_trades()
     n_open = len(open_trades)
+    orphan_7, recovered_7 = _count_orphan_adoptions(db, days=7)
 
     header = (
         f"📊 <b>Report settimanale TradeAlert</b>\n\n"
@@ -103,6 +141,7 @@ def build_report(db: Database) -> str:
         f"  P&amp;L netto: <b>{_fmt_eur(summary_7.total_pnl)}</b>\n"
         f"  Win rate: {_fmt_pct(summary_7.win_rate)}\n"
         f"  Max drawdown: {_fmt_eur(summary_7.max_drawdown)}\n"
+        f"  Orphan adottati: {orphan_7} (di cui recovered: {recovered_7})\n"
         f"\n<b>Rolling 30 giorni (contesto):</b>\n"
         f"  Trade chiusi: {summary_30.n_trades} "
         f"({_fmt_wlbe(summary_30)})\n"

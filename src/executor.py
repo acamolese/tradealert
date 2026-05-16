@@ -269,7 +269,29 @@ def execute_signal(
             if t.get("capital_deal_id")
         }
     except Exception as exc:
-        log.warning("Lookup trade aperti per dedup fallito: %s", exc)
+        # Critico: senza known_deal_ids il match indiretto puo' agganciare
+        # il deal_id di una posizione gia' aperta (bug di selezione
+        # mitigato dal commit 2557189) e l'insert_trade fallira' per
+        # duplicate key, riaprendo il path del bug #6. Lo segnaliamo come
+        # error e notifichiamo: la run continua ma il signal va sorvegliato.
+        log.error(
+            "Lookup trade aperti per dedup FALLITO: %s. Senza known_deal_ids "
+            "il match indiretto puo' agganciare deal_id sbagliati.",
+            exc,
+        )
+        try:
+            from .telegram_client import TelegramClient
+
+            TelegramClient(config).send_message(
+                f"🚨 <b>executor warning</b>\n"
+                f"db.get_open_trades fallito durante apertura "
+                f"signal {signal_row.get('id')} "
+                f"({signal_row.get('asset', '?')}): "
+                f"<code>{type(exc).__name__}</code>. "
+                f"Filtro deal_id disattivato: verifica posizioni."
+            )
+        except Exception:
+            log.exception("Notifica Telegram known_deal_ids fallita")
         known_deal_ids = set()
 
     matched_position: dict[str, Any] | None = None
