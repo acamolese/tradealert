@@ -36,6 +36,16 @@ class ExecutionResult:
     profit_level: float | None = None
 
 
+def _link_safe(call, *args, **kwargs) -> None:
+    """Wrap delle scritture su signal_to_trade_link in best-effort.
+    Le scritture del link sono telemetria, non sorgente di verita': una
+    loro failure NON deve mai interrompere execute_signal."""
+    try:
+        call(*args, **kwargs)
+    except Exception:
+        log.exception("signal_to_trade_link write fallito (best-effort)")
+
+
 def _market_meta(
     market: dict[str, Any],
     leverages_map: dict[str, int] | None = None,
@@ -205,7 +215,13 @@ def execute_signal(
         meta.get("stop_unit", "POINTS"),
     )
 
-    # 6. Apertura posizione
+    # 6. Apertura posizione.
+    # Pre-commit del link signal->trade (bug #6 Tier 2): se da qui in poi
+    # l'executor crasha, il monitor sa quale signal_id corrisponde al
+    # deal_id che eventualmente trova orfano su Capital.
+    signal_id = signal_row["id"]
+    _link_safe(db.link_attempt_start, signal_id)
+
     try:
         deal_resp = capital.create_position(
             epic=epic,
@@ -215,6 +231,9 @@ def execute_signal(
             profit_level=round(profit_level, 5) if profit_level else None,
         )
     except Exception as exc:
+        _link_safe(
+            db.link_attempt_failed, signal_id, f"create_position: {exc}"
+        )
         # Se e' un CapitalAPIError ha gia' il body dettagliato.
         return ExecutionResult(
             False, reason=f"create_position fallita: {exc}"
@@ -222,6 +241,11 @@ def execute_signal(
 
     deal_reference = deal_resp.get("dealReference")
     if not deal_reference:
+        _link_safe(
+            db.link_attempt_failed,
+            signal_id,
+            "dealReference mancante in risposta",
+        )
         return ExecutionResult(False, reason="dealReference mancante in risposta")
 
     # 7. Conferma esito (Capital lavora in modo asincrono).
@@ -249,6 +273,11 @@ def execute_signal(
     fill_level = float(confirm.get("level") or entry_price)
 
     if not confirm_failed and status and status != "ACCEPTED":
+        _link_safe(
+            db.link_attempt_failed,
+            signal_id,
+            f"Deal non accettato: status={status}",
+        )
         return ExecutionResult(
             False,
             reason=f"Deal non accettato: status={status}, reason={confirm.get('reason')}",
@@ -332,6 +361,11 @@ def execute_signal(
             break
 
     if confirm_failed and not matched_position:
+        _link_safe(
+            db.link_attempt_failed,
+            signal_id,
+            "confirm_deal fallita e matched_position assente",
+        )
         return ExecutionResult(
             False,
             reason=(
@@ -352,21 +386,39 @@ def execute_signal(
         if pos.get("profitLevel"):
             profit_level = float(pos["profitLevel"])
 
+    # Da qui sappiamo il deal_id reale: pre-commit del link prima di
+    # insert_trade. Se insert_trade fallisce (es. duplicate key, come
+    # nel bug #6 osservato il 14/05), il link in stato 'capital_open'
+    # col capital_deal_id corretto resta nel DB e il monitor lo usera'
+    # come fast path al ciclo successivo.
+    if deal_id:
+        _link_safe(db.link_attempt_capital_open, signal_id, deal_id)
+
     # 8. Persistenza trade + signal status
-    trade_row = db.insert_trade(
-        {
-            "signal_id": signal_row["id"],
-            "capital_deal_id": deal_id,
-            "asset": signal_row["asset"],
-            "direction": signal_row["direction"],
-            "size": sizing.size,
-            "entry_price": fill_level,
-            "current_sl": round(stop_level, 5),
-            "current_tp": round(profit_level, 5) if profit_level else None,
-            "status": "open",
-        }
-    )
-    db.update_signal_status(signal_row["id"], "executed")
+    try:
+        trade_row = db.insert_trade(
+            {
+                "signal_id": signal_id,
+                "capital_deal_id": deal_id,
+                "asset": signal_row["asset"],
+                "direction": signal_row["direction"],
+                "size": sizing.size,
+                "entry_price": fill_level,
+                "current_sl": round(stop_level, 5),
+                "current_tp": round(profit_level, 5) if profit_level else None,
+                "status": "open",
+            }
+        )
+    except Exception as exc:
+        # Lasciamo il link in 'capital_open': il monitor sapra' come
+        # ricucirlo. Marchiamo failed con l'errore concreto per audit.
+        _link_safe(
+            db.link_attempt_failed, signal_id, f"insert_trade: {exc}"
+        )
+        raise
+
+    _link_safe(db.link_attempt_persisted, signal_id)
+    db.update_signal_status(signal_id, "executed")
     db.insert_monitoring_event(
         {
             "trade_id": trade_row["id"],

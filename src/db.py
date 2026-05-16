@@ -61,6 +61,71 @@ class Database:
         response = self._client.table("trades").insert(trade).execute()
         return response.data[0]
 
+    # ---------- signal_to_trade_link (bug #6 Tier 2) ----------
+    #
+    # Le scritture qui sono best-effort: una loro failure non deve mai
+    # impedire la prosecuzione di execute_signal. Sono telemetria
+    # strutturata, non sorgente di verita'. La sorgente di verita' resta
+    # ``trades``. Il loro valore e': se l'executor crasha fra
+    # create_position e insert_trade, il link esiste gia' con il
+    # capital_deal_id reale, e il monitor puo' usarlo per ricostruire
+    # il link senza euristiche.
+
+    def link_attempt_start(self, signal_id: int) -> None:
+        """Upsert link a status='attempting' subito prima di chiamare
+        Capital. Upsert per gestire retry manuali sullo stesso signal."""
+        self._client.table("signal_to_trade_link").upsert(
+            {"signal_id": signal_id, "status": "attempting"},
+            on_conflict="signal_id",
+        ).execute()
+
+    def link_attempt_capital_open(
+        self, signal_id: int, capital_deal_id: str
+    ) -> None:
+        """create_position ok + deal_id determinato. Da qui il monitor
+        sa il signal_id per qualunque deal_id che dovesse risultare
+        orfano lato Capital."""
+        self._client.table("signal_to_trade_link").update(
+            {
+                "status": "capital_open",
+                "capital_deal_id": capital_deal_id,
+            }
+        ).eq("signal_id", signal_id).execute()
+
+    def link_attempt_persisted(self, signal_id: int) -> None:
+        """insert_trade riuscito: il link ha gia' fatto il suo lavoro.
+        Status terminale, niente cleanup necessario."""
+        self._client.table("signal_to_trade_link").update(
+            {"status": "persisted"}
+        ).eq("signal_id", signal_id).execute()
+
+    def link_attempt_failed(self, signal_id: int, error_text: str) -> None:
+        """Eccezione catturata. Marker per indagine retroattiva. Lo stato
+        finale potrebbe diventare 'persisted' se il monitor poi
+        ricuce il link."""
+        self._client.table("signal_to_trade_link").update(
+            {
+                "status": "failed",
+                "error_text": (error_text or "")[:2000],
+            }
+        ).eq("signal_id", signal_id).execute()
+
+    def find_link_by_deal_id(
+        self, capital_deal_id: str
+    ) -> dict[str, Any] | None:
+        """Match deterministico per il fast path del monitor. Ritorna il
+        link se esiste un record con quel capital_deal_id, in qualsiasi
+        status (incluso 'persisted', utile per debug). Il chiamante deve
+        filtrare 'persisted' se vuole solo i pending."""
+        response = (
+            self._client.table("signal_to_trade_link")
+            .select("*")
+            .eq("capital_deal_id", capital_deal_id)
+            .limit(1)
+            .execute()
+        )
+        return response.data[0] if response.data else None
+
     def find_inconsistent_signal(
         self,
         epic: str,

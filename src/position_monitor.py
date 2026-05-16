@@ -169,11 +169,45 @@ def _apply_trailing_stop(
         direction_norm = "long" if direction == "BUY" else "short"
         profit_level = pos.get("profitLevel")
 
-        # Tentativo di recovery: cerca un signal execute_inconsistent
-        # compatibile nelle ultime 10 minuti.
+        # Recovery a due livelli:
+        #
+        # Tier 2 (fast path, deterministico): cerca in signal_to_trade_link
+        # un record con questo capital_deal_id. Se l'executor era arrivato
+        # ad aprire la posizione su Capital prima di crashare,
+        # link_attempt_capital_open ha gia' salvato (signal_id, deal_id)
+        # esatti. Niente euristica, match diretto.
+        #
+        # Tier 1 (fallback euristico): se il fast path non trova nulla
+        # (es. eccezione PRIMA di link_attempt_capital_open, o link
+        # writes falliti), si tenta il match per epic+direction+window
+        # su signal execute_inconsistent.
         recovered_signal: dict[str, Any] | None = None
+        recovery_tier: str | None = None
         ambiguous_match = False
-        if epic:
+
+        try:
+            link = db.find_link_by_deal_id(deal_id)
+        except Exception:
+            log.exception(
+                "find_link_by_deal_id fallito per %s", deal_id
+            )
+            link = None
+
+        if link and link.get("status") in ("capital_open", "attempting"):
+            signal_id_from_link = link.get("signal_id")
+            if signal_id_from_link:
+                try:
+                    sig = db.get_signal(signal_id_from_link)
+                    if sig:
+                        recovered_signal = sig
+                        recovery_tier = "tier2_link"
+                except Exception:
+                    log.exception(
+                        "get_signal %s fallito durante recovery tier 2",
+                        signal_id_from_link,
+                    )
+
+        if not recovered_signal and epic:
             try:
                 candidates = db.find_inconsistent_signal(
                     epic=epic,
@@ -182,6 +216,7 @@ def _apply_trailing_stop(
                 )
                 if len(candidates) == 1:
                     recovered_signal = candidates[0]
+                    recovery_tier = "tier1_inconsistent"
                 elif len(candidates) > 1:
                     ambiguous_match = True
                     log.warning(
@@ -196,6 +231,10 @@ def _apply_trailing_stop(
                     "find_inconsistent_signal fallito per %s", deal_id
                 )
 
+        recovery_reason_map = {
+            "tier2_link": "recovered:link_capital_open",
+            "tier1_inconsistent": "recovered:execute_inconsistent",
+        }
         trade_row = {
             "signal_id": (
                 recovered_signal["id"] if recovered_signal else None
@@ -211,9 +250,9 @@ def _apply_trailing_stop(
             ),
             "status": "open",
             "exit_reason": (
-                "recovered:execute_inconsistent"
-                if recovered_signal
-                else "manual_import:trailing"
+                recovery_reason_map.get(
+                    recovery_tier or "", "manual_import:trailing"
+                )
             ),
         }
 
@@ -256,6 +295,19 @@ def _apply_trailing_stop(
                     recovered_signal["id"],
                 )
 
+            # Chiusura della macchina a stati del link (best-effort).
+            # Il link era in 'capital_open' o 'attempting': lo portiamo a
+            # 'persisted' visto che adesso esiste la riga in trades.
+            try:
+                db.link_attempt_persisted(recovered_signal["id"])
+            except Exception:
+                log.exception(
+                    "link_attempt_persisted fallito per signal %s "
+                    "durante recovery",
+                    recovered_signal["id"],
+                )
+
+            tier_label = recovery_tier or "?"
             try:
                 db.insert_monitoring_event(
                     {
@@ -263,8 +315,7 @@ def _apply_trailing_stop(
                         "event_type": "orphan_adopted_recovered",
                         "reason": (
                             f"Recovery signal {recovered_signal['id']} "
-                            f"(execute_inconsistent) -> trade "
-                            f"{trade['id']}"
+                            f"({tier_label}) -> trade {trade['id']}"
                         ),
                         "details": {
                             "signal_id": recovered_signal["id"],
@@ -273,6 +324,7 @@ def _apply_trailing_stop(
                             "deal_id": deal_id,
                             "epic": epic,
                             "direction": direction_norm,
+                            "recovery_tier": tier_label,
                         },
                     }
                 )
@@ -281,25 +333,23 @@ def _apply_trailing_stop(
 
             log.warning(
                 "RECOVERY: posizione %s (%s) linkata a signal %d "
-                "(execute_inconsistent), latency=%.1fs",
+                "(tier=%s), latency=%.1fs",
                 deal_id,
                 asset_name,
                 recovered_signal["id"],
+                tier_label,
                 latency_s or -1,
             )
             try:
+                lat_txt = (
+                    f" (latency {latency_s:.0f}s)"
+                    if latency_s is not None
+                    else ""
+                )
                 telegram.send_message(
-                    f"♻️ <b>Recovery posizione</b>\n"
+                    f"♻️ <b>Recovery posizione</b> [{tier_label}]\n"
                     f"<b>{_esc(asset_name)}</b> ({direction_norm}) "
-                    f"linkata a signal #{recovered_signal['id']}.\n"
-                    f"Latency apertura -> link: "
-                    f"<code>{latency_s:.0f}s</code>"
-                    if latency_s
-                    else (
-                        f"♻️ <b>Recovery posizione</b>\n"
-                        f"<b>{_esc(asset_name)}</b> ({direction_norm}) "
-                        f"linkata a signal #{recovered_signal['id']}"
-                    )
+                    f"linkata a signal #{recovered_signal['id']}{lat_txt}"
                 )
             except Exception:
                 log.exception("Telegram recovery notice fallita")
