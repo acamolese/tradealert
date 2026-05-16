@@ -63,15 +63,20 @@ def _parse_iso(s: str) -> datetime:
 def _candidates_orphan_trades(db: Database) -> list[dict]:
     """Trade da considerare per il backfill. Filtri:
     - signal_id IS NULL (mai linkato)
-    - exit_reason inizia con 'manual_import:' (importati dal monitor
-      come orphan, NON dall'utente che ha aperto a mano).
     - capital_deal_id NOT NULL (servono per il match Capital).
+
+    NOTA: non filtriamo su exit_reason perche' close_trade() sovrascrive
+    quel campo alla chiusura (es. 'reconcile:stop_hit'), perdendo
+    'manual_import:...' originale. signal_id IS NULL e' il marker
+    affidabile: tutti i trade auto-execute hanno signal_id valido.
+    L'unico falso positivo possibile sono aperture manuali dell'utente
+    su Capital, ma per quelle il match _find_signal_candidates non
+    trovera' alcun candidato e lo skip e' automatico.
     """
     response = (
         db._client.table("trades")
         .select("*")
         .is_("signal_id", "null")
-        .like("exit_reason", "manual_import:%")
         .not_.is_("capital_deal_id", "null")
         .order("opened_at", desc=True)
         .execute()
