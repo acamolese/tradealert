@@ -37,12 +37,27 @@ from src.db import Database
 
 log = logging.getLogger(__name__)
 
-# Finestre temporali per il matching. Stesso ordine di grandezza
-# del fast path Tier 1 (10 min sul monitor), ma piu' stretto qui per
-# ridurre falsi positivi su trade vecchi: il backfill non ha l'urgenza
-# che ha il monitor in tempo reale.
-ACTIVITY_WINDOW_MIN = 5
-SIGNAL_WINDOW_MIN = 5
+# Finestre temporali per il matching.
+#
+# ACTIVITY_WINDOW_MIN: ricerca dell'activity Capital attorno a
+# trade.opened_at. Capital tiene activity history per finestre brevi,
+# qui ampliamo a 30min per gestire monitor che salta un ciclo
+# (cron */30min).
+#
+# SIGNAL_WINDOW_BEFORE_MIN / SIGNAL_WINDOW_AFTER_MIN: finestra per
+# cercare il signal compatibile attorno a trade.opened_at (UTC).
+# Asimmetrica: il signal viene PRIMA della scoperta orphan, mai dopo.
+# 60 min copre il caso peggiore (monitor cron */30 + finestra
+# auto-confirm 60s + qualche secondo di network). Verso il futuro
+# stringiamo a 5min: serve solo per gestire piccoli skew di clock.
+#
+# NB: signals.created_at e trade.opened_at sono entrambi in UTC.
+# Capital activity.date e' in local timezone del server (CEST):
+# non usato per il match temporale, solo per il match deterministico
+# sul dealId.
+ACTIVITY_WINDOW_MIN = 30
+SIGNAL_WINDOW_BEFORE_MIN = 60
+SIGNAL_WINDOW_AFTER_MIN = 5
 
 # Statuti di signal che possiamo legittimamente promuovere a
 # executed_recovered. cancelled_other e' lo status legacy pre-Tier 1.
@@ -114,15 +129,21 @@ def _find_signal_candidates(
     db: Database,
     epic: str,
     direction_long_short: str,
-    broker_open_at: datetime,
+    trade_opened_at: datetime,
 ) -> list[dict]:
     """Signal compatibili da promuovere. Filtro: status in eligible,
     stesso epic, stessa direction (long/short), created_at nella
-    finestra ±SIGNAL_WINDOW_MIN attorno al timestamp di apertura
-    broker (NON al timestamp di opened_at del trade, che potrebbe
-    essere quello di scoperta dal monitor)."""
-    lo = (broker_open_at - timedelta(minutes=SIGNAL_WINDOW_MIN)).isoformat()
-    hi = (broker_open_at + timedelta(minutes=SIGNAL_WINDOW_MIN)).isoformat()
+    finestra [opened_at - SIGNAL_WINDOW_BEFORE_MIN,
+              opened_at + SIGNAL_WINDOW_AFTER_MIN].
+
+    Usiamo trade.opened_at (UTC) come ancora invece di
+    Capital activity.date (timezone server, ambiguo)."""
+    lo = (
+        trade_opened_at - timedelta(minutes=SIGNAL_WINDOW_BEFORE_MIN)
+    ).isoformat()
+    hi = (
+        trade_opened_at + timedelta(minutes=SIGNAL_WINDOW_AFTER_MIN)
+    ).isoformat()
     response = (
         db._client.table("signals")
         .select("*")
@@ -202,7 +223,6 @@ def run(dry_run: bool, limit: int | None) -> int:
         direction_norm = CAPITAL_DIRECTION_TO_LONG_SHORT.get(
             direction_api or ""
         )
-        broker_open_at = _parse_iso(activity["date"])
 
         if not (epic and direction_norm):
             log.warning(
@@ -216,15 +236,16 @@ def run(dry_run: bool, limit: int | None) -> int:
             continue
 
         signals = _find_signal_candidates(
-            db, epic, direction_norm, broker_open_at
+            db, epic, direction_norm, opened_at
         )
         if not signals:
             log.info(
-                "  trade #%s (%s %s @%s): nessun signal eligibile, skip",
+                "  trade #%s (%s %s opened_at=%s): nessun signal "
+                "eligibile, skip",
                 trade_id,
                 epic,
                 direction_norm,
-                broker_open_at.isoformat()[:19],
+                opened_at.isoformat()[:19],
             )
             skipped_no_signal += 1
             continue
@@ -232,12 +253,12 @@ def run(dry_run: bool, limit: int | None) -> int:
         if len(signals) > 1:
             ids = [s["id"] for s in signals]
             log.warning(
-                "  trade #%s (%s %s @%s): match AMBIGUO su signals %s, "
-                "skip per sicurezza",
+                "  trade #%s (%s %s opened_at=%s): match AMBIGUO su "
+                "signals %s, skip per sicurezza",
                 trade_id,
                 epic,
                 direction_norm,
-                broker_open_at.isoformat()[:19],
+                opened_at.isoformat()[:19],
                 ids,
             )
             skipped_ambiguous += 1
@@ -248,24 +269,27 @@ def run(dry_run: bool, limit: int | None) -> int:
             "deal_id": deal_id,
             "epic": epic,
             "direction": direction_norm,
-            "broker_open_at": activity["date"],
+            "trade_opened_at": trade["opened_at"],
+            "capital_activity_date": activity["date"],
             "signal_created_at": signal["created_at"],
             "signal_status_before": signal["status"],
-            "delta_seconds": (
-                broker_open_at - _parse_iso(signal["created_at"])
+            "delta_signal_to_trade_opened_seconds": (
+                opened_at - _parse_iso(signal["created_at"])
             ).total_seconds(),
             "backfilled_at": datetime.now(timezone.utc).isoformat(),
         }
 
+        delta_s = audit["delta_signal_to_trade_opened_seconds"]
         if dry_run:
             log.info(
                 "  [DRY-RUN] trade #%s -> signal #%s (%s %s, "
-                "delta=%.1fs, signal.status %s->executed_recovered)",
+                "signal->opened delta=%.1fs, status %s->"
+                "executed_recovered)",
                 trade_id,
                 signal["id"],
                 epic,
                 direction_norm,
-                audit["delta_seconds"],
+                delta_s,
                 signal["status"],
             )
             continue
@@ -277,7 +301,7 @@ def run(dry_run: bool, limit: int | None) -> int:
                 "  APPLIED: trade #%s -> signal #%s (delta=%.1fs)",
                 trade_id,
                 signal["id"],
-                audit["delta_seconds"],
+                delta_s,
             )
         except Exception:
             log.exception(
