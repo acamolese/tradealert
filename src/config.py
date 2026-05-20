@@ -17,6 +17,18 @@ load_dotenv()
 WEEKLY_DRAWDOWN_CAP_EUR: float = 20.0
 
 
+# Sprint 2 Fase 3: kill switch direzionale.
+# I trade aperti da SPRINT2_START in poi sono "trade Sprint 2". Al
+# raggiungimento di SPRINT2_KILL_CHECKPOINT trade chiusi, se NESSUNO e'
+# short lo scanner si ferma: il documento sprint2-bias-investigation ha
+# mostrato bidirezionalita' potenziale su 9 casi storici, se sul mercato
+# live non si manifesta in 5 trade la diagnosi va rifatta prima di
+# rischiare altro capitale. Costanti modulo (no env var) come da vincolo
+# Sprint 1. Vedi src/scanner.py::_check_directional_kill_switch.
+SPRINT2_START: str = "2026-05-20T00:00:00+00:00"
+SPRINT2_KILL_CHECKPOINT: int = 5
+
+
 @dataclass(frozen=True)
 class Config:
     capital_api_key: str

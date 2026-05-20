@@ -391,3 +391,50 @@ def record_risk_cap_notification(
             },
         }
     )
+
+
+def sprint2_directional_status(
+    db: Database, start_iso: str, checkpoint: int = 5
+) -> dict[str, Any]:
+    """Stato del kill switch direzionale Sprint 2.
+
+    Guarda i primi ``checkpoint`` trade CHIUSI aperti da ``start_iso`` in
+    poi, ordinati per closed_at. Ritorna un dict con:
+      - closed_count: quanti trade Sprint 2 chiusi (max ``checkpoint``)
+      - short_count:  quanti di quelli sono short
+      - directions:   lista delle direzioni, per audit
+
+    Il kill switch e' ARMATO quando closed_count >= checkpoint e
+    short_count == 0. Filtra status='closed' e opened_at >= start_iso.
+    """
+    response = (
+        db._client.table("trades")
+        .select("id,direction,opened_at,closed_at")
+        .eq("status", "closed")
+        .gte("opened_at", start_iso)
+        .order("closed_at")
+        .limit(checkpoint)
+        .execute()
+    )
+    rows = response.data or []
+    directions = [(r.get("direction") or "").lower() for r in rows]
+    return {
+        "closed_count": len(rows),
+        "short_count": sum(1 for d in directions if d == "short"),
+        "directions": directions,
+    }
+
+
+def sprint2_kill_notified(db: Database) -> bool:
+    """True se la notifica del kill switch direzionale e' gia' stata
+    registrata in monitoring_events. Il kill switch e' permanente (i
+    primi 5 trade sono storia immutabile), quindi la notifica va inviata
+    una sola volta, non una al giorno come per il risk_cap."""
+    response = (
+        db._client.table("monitoring_events")
+        .select("id")
+        .eq("event_type", "sprint2_directional_kill")
+        .limit(1)
+        .execute()
+    )
+    return bool(response.data)

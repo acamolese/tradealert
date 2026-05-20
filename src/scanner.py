@@ -12,11 +12,18 @@ import time
 from typing import Any
 
 from .capital_client import CapitalClient
-from .config import Config, WEEKLY_DRAWDOWN_CAP_EUR
+from .config import (
+    Config,
+    SPRINT2_KILL_CHECKPOINT,
+    SPRINT2_START,
+    WEEKLY_DRAWDOWN_CAP_EUR,
+)
 from .db import (
     Database,
     record_risk_cap_notification,
     risk_cap_notified_today,
+    sprint2_directional_status,
+    sprint2_kill_notified,
     weekly_realized_pnl,
 )
 from .discovery import discover_top_movers
@@ -144,6 +151,82 @@ def _check_drawdown_cap(
             "renotified": not already_notified,
         },
     )
+    return True
+
+
+def _check_directional_kill_switch(
+    db: Database, telegram: TelegramClient
+) -> bool:
+    """Kill switch direzionale Sprint 2 (Fase 3).
+
+    Ritorna True se i primi ``SPRINT2_KILL_CHECKPOINT`` trade chiusi di
+    Sprint 2 sono tutti long: in quel caso lo scanner si ferma perche' la
+    bidirezionalita' attesa non si e' manifestata sul mercato live e la
+    diagnosi (documento sprint2-bias-investigation) va rifatta prima di
+    rischiare altro capitale.
+
+    Inattivo finche' non si raggiunge il checkpoint; definitivamente
+    inattivo se almeno uno dei primi trade e' short. Notifica Telegram una
+    sola volta: il kill e' permanente, non auto-recupera come il risk_cap.
+    """
+    try:
+        status = sprint2_directional_status(
+            db, SPRINT2_START, checkpoint=SPRINT2_KILL_CHECKPOINT
+        )
+    except Exception:
+        log.exception(
+            "[dir_kill] lookup stato direzionale fallito, proseguo senza guard"
+        )
+        return False
+
+    if status["closed_count"] < SPRINT2_KILL_CHECKPOINT:
+        return False  # checkpoint non ancora raggiunto
+    if status["short_count"] > 0:
+        return False  # almeno uno short: kill switch disarmato per sempre
+
+    log.warning(
+        "[dir_kill] primi %d trade Sprint 2 chiusi tutti long (0 short): "
+        "scanner DISABLED",
+        SPRINT2_KILL_CHECKPOINT,
+    )
+    try:
+        already_notified = sprint2_kill_notified(db)
+    except Exception:
+        log.exception("[dir_kill] lookup notifica precedente fallito")
+        already_notified = False
+
+    if not already_notified:
+        try:
+            telegram.send_message(
+                f"🛑 <b>Kill switch direzionale Sprint 2</b>\n"
+                f"I primi {SPRINT2_KILL_CHECKPOINT} trade chiusi di Sprint 2 "
+                f"sono <b>tutti long</b>, nessuno short.\n"
+                f"La bidirezionalita' attesa dal documento di diagnosi non si "
+                f"e' manifestata sul mercato live: <b>scanner fermo</b>.\n"
+                f"La diagnosi va rifatta prima di rischiare altro capitale."
+            )
+        except Exception:
+            log.exception("[dir_kill] notifica Telegram fallita")
+        try:
+            db.insert_monitoring_event(
+                {
+                    "event_type": "sprint2_directional_kill",
+                    "reason": "no_short_in_first_trades",
+                    "details": {
+                        "checkpoint": SPRINT2_KILL_CHECKPOINT,
+                        "directions": status["directions"],
+                        "sprint2_start": SPRINT2_START,
+                    },
+                }
+            )
+        except Exception:
+            log.exception(
+                "[dir_kill] persist monitoring_event fallito "
+                "(notifica gia' inviata)"
+            )
+    else:
+        log.info("[dir_kill] notifica gia' inviata, skip Telegram")
+
     return True
 
 
@@ -1241,6 +1324,12 @@ def run_morning_scan(config: Config) -> None:
     # Il guard e' early rispetto al rank_setups come da spec, scelto qui
     # per tagliare anche le chiamate a Capital/news a monte.
     if _check_drawdown_cap(db, telegram):
+        return
+
+    # Kill switch direzionale Sprint 2 (Fase 3): se i primi 5 trade chiusi
+    # sono tutti long, la bidirezionalita' non si e' manifestata e lo
+    # scanner si ferma. Guard early come il drawdown cap.
+    if _check_directional_kill_switch(db, telegram):
         return
 
     # Discovery dinamica disabilitata in Sprint 1 (Fix 1.3): l'universo
