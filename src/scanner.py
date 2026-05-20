@@ -14,7 +14,7 @@ from typing import Any
 from .capital_client import CapitalClient
 from .config import (
     Config,
-    SPRINT2_KILL_CHECKPOINT,
+    SPRINT2_KILL_WINDOW_DAYS,
     SPRINT2_START,
     WEEKLY_DRAWDOWN_CAP_EUR,
 )
@@ -22,8 +22,8 @@ from .db import (
     Database,
     record_risk_cap_notification,
     risk_cap_notified_today,
-    sprint2_directional_status,
     sprint2_kill_notified,
+    sprint2_short_signal_count,
     weekly_realized_pnl,
 )
 from .discovery import discover_top_movers
@@ -159,35 +159,48 @@ def _check_directional_kill_switch(
 ) -> bool:
     """Kill switch direzionale Sprint 2 (Fase 3).
 
-    Ritorna True se i primi ``SPRINT2_KILL_CHECKPOINT`` trade chiusi di
-    Sprint 2 sono tutti long: in quel caso lo scanner si ferma perche' la
-    bidirezionalita' attesa non si e' manifestata sul mercato live e la
-    diagnosi (documento sprint2-bias-investigation) va rifatta prima di
-    rischiare altro capitale.
+    Misura la CAPACITA' del sistema di vedere gli short, non le condizioni
+    di mercato: conta i signal con direction='short' generati da
+    SPRINT2_START in poi, a prescindere da esecuzione, filtri o
+    cancellazioni. Se entro SPRINT2_KILL_WINDOW_DAYS giorni di calendario
+    il conteggio resta 0, la diagnosi di bias era incompleta: lo scanner
+    si ferma e si torna in Fase 2.
 
-    Inattivo finche' non si raggiunge il checkpoint; definitivamente
-    inattivo se almeno uno dei primi trade e' short. Notifica Telegram una
-    sola volta: il kill e' permanente, non auto-recupera come il risk_cap.
+    NON conta i long ne' i trade chiusi: il mercato decide quanti short si
+    concretizzano, il sistema decide solo se li propone. Basta 1 signal
+    short per disarmare il kill switch in modo permanente. Notifica
+    Telegram una sola volta: il kill non auto-recupera come il risk_cap.
     """
     try:
-        status = sprint2_directional_status(
-            db, SPRINT2_START, checkpoint=SPRINT2_KILL_CHECKPOINT
-        )
+        short_signals = sprint2_short_signal_count(db, SPRINT2_START)
     except Exception:
         log.exception(
-            "[dir_kill] lookup stato direzionale fallito, proseguo senza guard"
+            "[dir_kill] lookup signal short fallito, proseguo senza guard"
         )
         return False
 
-    if status["closed_count"] < SPRINT2_KILL_CHECKPOINT:
-        return False  # checkpoint non ancora raggiunto
-    if status["short_count"] > 0:
-        return False  # almeno uno short: kill switch disarmato per sempre
+    if short_signals > 0:
+        return False  # bidirezionalita' confermata, disarmato per sempre
+
+    # Zero signal short finora: lo scanner si ferma solo se la finestra di
+    # SPRINT2_KILL_WINDOW_DAYS giorni di calendario e' gia' scaduta.
+    from datetime import datetime, timezone
+
+    try:
+        start = datetime.fromisoformat(SPRINT2_START)
+    except ValueError:
+        log.exception(
+            "[dir_kill] SPRINT2_START non parsabile, proseguo senza guard"
+        )
+        return False
+    days_elapsed = (datetime.now(timezone.utc) - start).days
+    if days_elapsed < SPRINT2_KILL_WINDOW_DAYS:
+        return False  # finestra ancora aperta, in attesa
 
     log.warning(
-        "[dir_kill] primi %d trade Sprint 2 chiusi tutti long (0 short): "
+        "[dir_kill] %d giorni dal deploy, 0 signal short generati: "
         "scanner DISABLED",
-        SPRINT2_KILL_CHECKPOINT,
+        days_elapsed,
     )
     try:
         already_notified = sprint2_kill_notified(db)
@@ -199,11 +212,11 @@ def _check_directional_kill_switch(
         try:
             telegram.send_message(
                 f"🛑 <b>Kill switch direzionale Sprint 2</b>\n"
-                f"I primi {SPRINT2_KILL_CHECKPOINT} trade chiusi di Sprint 2 "
-                f"sono <b>tutti long</b>, nessuno short.\n"
+                f"In {days_elapsed} giorni dal deploy il sistema ha generato "
+                f"<b>0 signal short</b>.\n"
                 f"La bidirezionalita' attesa dal documento di diagnosi non si "
-                f"e' manifestata sul mercato live: <b>scanner fermo</b>.\n"
-                f"La diagnosi va rifatta prima di rischiare altro capitale."
+                f"e' manifestata: <b>scanner fermo</b>, si torna in Fase 2 per "
+                f"una nuova iterazione diagnostica."
             )
         except Exception:
             log.exception("[dir_kill] notifica Telegram fallita")
@@ -211,10 +224,11 @@ def _check_directional_kill_switch(
             db.insert_monitoring_event(
                 {
                     "event_type": "sprint2_directional_kill",
-                    "reason": "no_short_in_first_trades",
+                    "reason": "no_short_signal_in_window",
                     "details": {
-                        "checkpoint": SPRINT2_KILL_CHECKPOINT,
-                        "directions": status["directions"],
+                        "window_days": SPRINT2_KILL_WINDOW_DAYS,
+                        "days_elapsed": days_elapsed,
+                        "short_signals": 0,
                         "sprint2_start": SPRINT2_START,
                     },
                 }

@@ -606,24 +606,44 @@ Le evidenze su cui si fonda la decisione, tutte verificabili nei §7-§8:
 Il bias 40 long / 1 short documentato in Sprint 1 non si ripeterebbe con questo
 prompt. Su questa base la Fase 3 (capitale reale) parte.
 
-### Nuovo controllo: kill switch direzionale a 5 trade
+### Nuovo controllo: kill switch direzionale a 30 giorni sui signal generati
 
 La diagnosi e il gate si basano su un replay di 9 casi storici: mostrano
 bidirezionalità *potenziale*, non *osservata sul mercato live*. Per coprire il
 rischio che la diagnosi sia incompleta, la Fase 3 introduce un controllo
 aggiuntivo, oltre ai limiti esistenti (cap 5 €/trade, 20 €/settimana, -30 €
-safety totale):
+safety totale), che non sostituisce nulla.
 
-> **Kill switch direzionale.** I trade aperti dal 2026-05-20 in poi sono "trade
-> Sprint 2". Quando 5 trade Sprint 2 si sono chiusi, se **nessuno è short** lo
-> scanner si ferma immediatamente. La diagnosi va rifatta prima di rischiare
-> altro capitale.
+Nota metodologica: la prima formulazione di questo kill switch contava i trade
+chiusi (kill se nei primi 5 trade nessuno short) e aveva lo **stesso difetto**
+del gate quantitativo appena criticato. Incorporava l'assunzione implicita "se
+non ci sono short il sistema è ancora long-only", che è falsa: è il mercato a
+decidere la distribuzione. Se i 5 asset core salgono per due settimane, 5 long
+sono la risposta corretta di un sistema bidirezionale, e spegnerlo sarebbe
+l'errore del trader emotivo che si forza a shortare contro la propria lettura
+del mercato. La versione corretta misura la **capacità del sistema**, non le
+condizioni di mercato:
+
+> **Kill switch direzionale.** Misura: numero di signal con `direction='short'`
+> generati dallo scanner da SPRINT2_START in poi, a prescindere
+> dall'esecuzione (eseguiti, filtrati da RR, cancellati, scaduti: contano
+> tutti). Soglia: nei primi 30 giorni di calendario dopo il deploy, almeno 1
+> signal short generato. Se in 30 giorni il conteggio resta 0: kill switch e
+> ritorno in Fase 2 per una nuova iterazione diagnostica.
+
+Razionale: in 60 giorni pre-modifiche il sistema aveva generato 1 signal short.
+Se in 30 giorni post-modifiche ne genera 0 (dimezzamento o peggio), la diagnosi
+era incompleta. Se ne genera anche solo 1, la bidirezionalità è confermata come
+presente nel sistema: quanti se ne concretizzino in trade dipende dal mercato,
+non dal sistema. Il kill switch **non conta i long né i trade chiusi**: misura
+se il sistema *vede* gli short, non se il mercato li *offre*.
 
 Implementazione: `src/scanner.py::_check_directional_kill_switch`, guard early
 in `run_morning_scan` subito dopo il drawdown cap. Costanti `SPRINT2_START` e
-`SPRINT2_KILL_CHECKPOINT` in `src/config.py`. Inattivo finché non si chiudono 5
-trade; disarmato in modo permanente non appena uno dei primi trade è short.
-Notifica Telegram una sola volta (il kill non auto-recupera).
+`SPRINT2_KILL_WINDOW_DAYS` in `src/config.py`; conteggio via
+`db.sprint2_short_signal_count` su `signals.direction='short'`. Inattivo per i
+primi 30 giorni; disarmato in modo permanente al primo signal short. Notifica
+Telegram una sola volta (il kill non auto-recupera).
 
 ### Nota onesta per il journal
 
@@ -636,3 +656,11 @@ esperimento, è preferibile **più gate qualitativi indipendenti** (inversioni d
 direzione, assenza di regressioni, score massimo in crescita, chiusura di bug
 testuali) piuttosto che un'unica soglia numerica che può rivelarsi un'ipotesi
 errata difficile da correggere senza sembrare di "spostare i pali".
+
+Lo stesso errore si è ripresentato subito dopo, nella prima versione del kill
+switch direzionale (contare i trade chiusi): incorporava l'assunzione "niente
+short = sistema long-only", che ignora che è il mercato a decidere la
+distribuzione. È stato corretto prima del deploy spostando la misura sui signal
+generati. La lezione si rafforza: ogni soglia, prima di diventare un gate o un
+kill switch, va interrogata su quale assunzione implicita codifica e se quella
+assunzione è sotto il controllo del sistema o del mercato.

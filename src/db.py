@@ -393,36 +393,24 @@ def record_risk_cap_notification(
     )
 
 
-def sprint2_directional_status(
-    db: Database, start_iso: str, checkpoint: int = 5
-) -> dict[str, Any]:
-    """Stato del kill switch direzionale Sprint 2.
+def sprint2_short_signal_count(db: Database, start_iso: str) -> int:
+    """Numero di signal con ``direction='short'`` generati da ``start_iso``
+    in poi, a PRESCINDERE dallo status (executed, skipped, cancelled,
+    expired).
 
-    Guarda i primi ``checkpoint`` trade CHIUSI aperti da ``start_iso`` in
-    poi, ordinati per closed_at. Ritorna un dict con:
-      - closed_count: quanti trade Sprint 2 chiusi (max ``checkpoint``)
-      - short_count:  quanti di quelli sono short
-      - directions:   lista delle direzioni, per audit
-
-    Il kill switch e' ARMATO quando closed_count >= checkpoint e
-    short_count == 0. Filtra status='closed' e opened_at >= start_iso.
+    Misura la capacita' del sistema di PROPORRE short, non quanti si
+    concretizzano in trade: l'esecuzione dipende da filtri RR, cap
+    settimanale, conferma utente e condizioni di mercato, non dal bias
+    diagnosticato. Usato dal kill switch direzionale Sprint 2.
     """
     response = (
-        db._client.table("trades")
-        .select("id,direction,opened_at,closed_at")
-        .eq("status", "closed")
-        .gte("opened_at", start_iso)
-        .order("closed_at")
-        .limit(checkpoint)
+        db._client.table("signals")
+        .select("id")
+        .eq("direction", "short")
+        .gte("created_at", start_iso)
         .execute()
     )
-    rows = response.data or []
-    directions = [(r.get("direction") or "").lower() for r in rows]
-    return {
-        "closed_count": len(rows),
-        "short_count": sum(1 for d in directions if d == "short"),
-        "directions": directions,
-    }
+    return len(response.data or [])
 
 
 def sprint2_kill_notified(db: Database) -> bool:
