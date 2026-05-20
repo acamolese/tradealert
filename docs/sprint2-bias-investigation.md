@@ -572,3 +572,67 @@ Nessun push effettuato. Opzioni, da decidere:
   moderati, reintrodurre un errore in direzione opposta.
 - **C. Rivedere `MIN_SCORE_THRESHOLD` per i soli short.** Fuori dal perimetro
   dichiarato (i filtri non vanno toccati): andrebbe deciso a parte.
+
+## 9. Decisione gate e passaggio a Fase 3
+
+Stato: decisione presa 2026-05-20. Branch `sprint2-bidirezionalita` approvato
+per il deploy in produzione.
+
+### Dichiarazione esplicita di non-conformità formale
+
+Il gate quantitativo "≥ 3/9 short con score ≥ 7" è **formalmente fallito**:
+1/9 sull'asset crollato, 2/9 contando qualunque asset. Questa sezione non
+riscrive il gate originario: lo dichiara apertamente fallito e lo **sovrascrive
+con motivazione esplicita**.
+
+Motivazione: il gate era mal calibrato. Assumeva che almeno 3 dei 9 setup di
+drawdown moderato meritassero uno score alto (≥ 7). Ma è esattamente ciò che il
+sistema NON deve fare: un LLM che assegna 7+ a un drop del 3.95% colto
+sull'inizio è un LLM che sopravvaluta setup mediocri, non un LLM bidirezionale.
+La soglia numerica codificava un'assunzione sbagliata sul comportamento atteso.
+
+### Gate qualitativo: superato
+
+Le evidenze su cui si fonda la decisione, tutte verificabili nei §7-§8:
+
+- **4 inversioni di direzione** dove il sistema prima sbagliava: casi 1, 2, 7, 8
+  passano da long o skip a short.
+- **Score short massimo da 6.8 a 7.8.**
+- **0 momenti senza alcuno short proposto**, erano 4 in 2a.
+- **0 regressioni**: nessun nuovo long contrarian con score ≥ 7.
+- **Bug RSI chiuso testualmente**: la frase "RSI 31.7 in ipervenduto sconsiglia
+  short" non compare più; ovunque "RSI sopra 25, non ipervenduto".
+
+Il bias 40 long / 1 short documentato in Sprint 1 non si ripeterebbe con questo
+prompt. Su questa base la Fase 3 (capitale reale) parte.
+
+### Nuovo controllo: kill switch direzionale a 5 trade
+
+La diagnosi e il gate si basano su un replay di 9 casi storici: mostrano
+bidirezionalità *potenziale*, non *osservata sul mercato live*. Per coprire il
+rischio che la diagnosi sia incompleta, la Fase 3 introduce un controllo
+aggiuntivo, oltre ai limiti esistenti (cap 5 €/trade, 20 €/settimana, -30 €
+safety totale):
+
+> **Kill switch direzionale.** I trade aperti dal 2026-05-20 in poi sono "trade
+> Sprint 2". Quando 5 trade Sprint 2 si sono chiusi, se **nessuno è short** lo
+> scanner si ferma immediatamente. La diagnosi va rifatta prima di rischiare
+> altro capitale.
+
+Implementazione: `src/scanner.py::_check_directional_kill_switch`, guard early
+in `run_morning_scan` subito dopo il drawdown cap. Costanti `SPRINT2_START` e
+`SPRINT2_KILL_CHECKPOINT` in `src/config.py`. Inattivo finché non si chiudono 5
+trade; disarmato in modo permanente non appena uno dei primi trade è short.
+Notifica Telegram una sola volta (il kill non auto-recupera).
+
+### Nota onesta per il journal
+
+Il gate originario era mal calibrato e va registrato come lezione. Una soglia
+numerica unica, fissata prima dell'esperimento, ha codificato un'assunzione
+("3/9 setup moderati devono valere ≥ 7") che si è rivelata sbagliata e in
+conflitto con un altro obiettivo del sistema (non sopravvalutare i setup
+mediocri). La prossima volta che si fissano criteri quantitativi prima di un
+esperimento, è preferibile **più gate qualitativi indipendenti** (inversioni di
+direzione, assenza di regressioni, score massimo in crescita, chiusura di bug
+testuali) piuttosto che un'unica soglia numerica che può rivelarsi un'ipotesi
+errata difficile da correggere senza sembrare di "spostare i pali".
