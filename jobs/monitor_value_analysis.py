@@ -62,7 +62,7 @@ def _trailing_sl(entry: float, r_dist: float, peak: float, current_sl: float) ->
     return max(current_sl, new_sl)
 
 
-def simulate(trade: dict, candles: list[dict]) -> dict:
+def simulate(trade: dict, candles: list[dict], sl_at_close: float) -> dict:
     entry = float(trade["entry_price"])
     tp = float(trade["current_tp"])
     size = float(trade["size"])
@@ -78,14 +78,14 @@ def simulate(trade: dict, candles: list[dict]) -> dict:
         key=_candle_dt,
     )
 
-    # Stato SL all'istante della chiusura reale: se durante la vita reale
-    # il trailing aveva gia' mosso lo SL, ricostruiamo il picco pre-close.
-    sl = orig_sl
-    # picco raggiunto prima della chiusura -> applica il trailing iniziale
-    pre = [c for c in candles if _candle_dt(c) < closed_at]
-    if pre:
-        peak_pre = max(_mid(c["highPrice"]) for c in pre)
-        sl = _trailing_sl(entry, r_dist, peak_pre, sl)
+    # Stato SL all'istante della chiusura reale: preso dai monitoring_events
+    # reali (ultimo trailing_sl) o, in assenza di trailing, SL originale.
+    # NON va ricostruito dalle candele: il feed copre settimane prima del
+    # trade e includerebbe picchi estranei alla vita della posizione.
+    sl = sl_at_close
+
+    fwd_high = max((_mid(c["highPrice"]) for c in fwd), default=None)
+    fwd_low = min((_mid(c["lowPrice"]) for c in fwd), default=None)
 
     outcome = "OPEN"
     exit_price = None
@@ -112,13 +112,37 @@ def simulate(trade: dict, candles: list[dict]) -> dict:
         "orig_sl": orig_sl,
         "tp": tp,
         "size": size,
-        "sl_at_close": sl if outcome != "SL" else exit_price,
+        "sl_at_close": sl_at_close,
         "outcome": outcome,
         "exit_price": exit_price,
         "exit_dt": exit_dt,
         "hyp_pnl": hyp_pnl,
         "real_pnl": float(trade["pnl"]),
+        "fwd_high": fwd_high,
+        "fwd_low": fwd_low,
+        "n_fwd": len(fwd),
     }
+
+
+def _sl_at_close(sb, trade: dict) -> float:
+    """SL effettivo all'istante della chiusura reale: ultimo new_sl da
+    monitoring_events.trailing_sl, oppure SL originale se mai trailato."""
+    orig_sl = float(trade["current_sl"])
+    ev = (
+        sb.table("monitoring_events")
+        .select("*")
+        .eq("trade_id", trade["id"])
+        .eq("event_type", "trailing_sl")
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+        .data
+    )
+    if ev:
+        new_sl = (ev[0].get("details") or {}).get("new_sl")
+        if new_sl is not None:
+            return float(new_sl)
+    return orig_sl
 
 
 def main() -> int:
@@ -154,18 +178,27 @@ def main() -> int:
             continue
         if epic not in candle_cache:
             candle_cache[epic] = cap.get_prices(epic, resolution="HOUR", max_bars=300)
-        res = simulate(t, candle_cache[epic])
+        sl_close = _sl_at_close(sb, t)
+        res = simulate(t, candle_cache[epic], sl_close)
 
         real_cum += res["real_pnl"]
         hyp_cum += res["hyp_pnl"]
         delta = res["hyp_pnl"] - res["real_pnl"]
         verdict = "monitor ha SOTTRATTO" if delta > 0 else "monitor ha AGGIUNTO"
+        hi = res["fwd_high"]
+        lo = res["fwd_low"]
+        path = (
+            f"max high {hi:.3f} / min low {lo:.3f}"
+            if hi is not None
+            else "nessuna candela post-chiusura"
+        )
         print(
             f"#{tid} {t['asset']} {t['direction']}  size={res['size']:g}\n"
             f"  entry={res['entry']:.3f}  SL_orig={res['orig_sl']:.3f}  "
-            f"TP={res['tp']:.3f}\n"
+            f"SL_alla_chiusura={res['sl_at_close']:.3f}  TP={res['tp']:.3f}\n"
             f"  chiusura reale: close={t['close_price']}  "
             f"P&L reale = {res['real_pnl']:+.2f} EUR\n"
+            f"  prezzo post-chiusura ({res['n_fwd']} candele): {path}\n"
             f"  controfattuale: esito={res['outcome']}  "
             f"exit={res['exit_price']:.3f} @ {res['exit_dt']}  "
             f"P&L ipotetico = {res['hyp_pnl']:+.2f} EUR\n"
