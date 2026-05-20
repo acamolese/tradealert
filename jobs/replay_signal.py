@@ -188,6 +188,7 @@ def cmd_replay(cap: CapitalClient, llm: LLMAnalyzer) -> None:
         for _n, epic, _c in CORE
     }
 
+    results: list[dict[str, Any]] = []
     for m in moments:
         T = datetime.fromisoformat(m["T"])
         asset = m["asset"]
@@ -248,6 +249,46 @@ def cmd_replay(cap: CapitalClient, llm: LLMAnalyzer) -> None:
             print(f"    key_factors: {p.key_factors}")
             print(f"    risks: {p.risks}")
         print()
+
+        panel_asset = next((p for p in proposals if p.asset == asset), None)
+        solo_p = solo[0] if solo else None
+        results.append({
+            "asset": asset,
+            "T": m["T"][:16],
+            "drop": m["drop_pct"],
+            "prefilter": passed,
+            "panel_dir": panel_asset.direction if panel_asset else "assente",
+            "panel_score": panel_asset.score if panel_asset else None,
+            "solo_dir": solo_p.direction if solo_p else "-",
+            "solo_score": solo_p.score if solo_p else None,
+        })
+
+    # ---- SUMMARY: metriche del gate diagnostico ----
+    print("=" * 78)
+    print("SUMMARY GATE")
+    n = len(results)
+    prefilter_pass = sum(1 for r in results if r["prefilter"])
+    short_ge7 = sum(
+        1 for r in results
+        if r["panel_dir"] == "short" and (r["panel_score"] or 0) >= 7
+    )
+    long_ge7 = sum(
+        1 for r in results
+        if r["panel_dir"] == "long" and (r["panel_score"] or 0) >= 7
+    )
+    print(f"  asset crollati che passano il pre-filtro: {prefilter_pass}/{n}  "
+          f"(target >= 7/9)")
+    print(f"  short con score >= 7 nel panel (asset crollato): {short_ge7}/{n}  "
+          f"(target >= 3/9)")
+    print(f"  long contrarian con score >= 7 nel panel (regressione potenziale):"
+          f" {long_ge7}/{n}")
+    print(f"  {'asset':<12} {'T':<16} {'drop':>6}  pre-filtro  "
+          f"{'panel':<18} {'isolato':<14}")
+    for r in results:
+        ps = f"{r['panel_dir']} {r['panel_score']}" if r["panel_score"] is not None else r["panel_dir"]
+        ss = f"{r['solo_dir']} {r['solo_score']}" if r["solo_score"] is not None else r["solo_dir"]
+        print(f"  {r['asset']:<12} {r['T']:<16} {r['drop']:>5.2f}%  "
+              f"{'PASSA ' if r['prefilter'] else 'ESCLUSO':<10}  {ps:<18} {ss:<14}")
 
 
 def main() -> int:
