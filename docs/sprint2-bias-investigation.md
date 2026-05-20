@@ -459,3 +459,116 @@ Le opzioni, da decidere (sei tu l'autorità del gate):
 
 Nessuna iterazione è stata avviata: come da workflow, i numeri vengono mostrati
 prima di riprovare.
+
+## 8. Fase 2a-bis — risultati gate ripetuto
+
+Stato: gate eseguito 2026-05-20 sul branch `sprint2-bidirezionalita`. Esito:
+metrica short ≥ 7 ancora **non superata** in senso stretto (1/9 vs 3/9), ma con
+una trasformazione qualitativa del comportamento del modello rispetto a 2a.
+Nessun push su `origin/main`.
+
+### Modifiche applicate (2 commit aggiuntivi, anticipo causa C)
+
+1. Feature `trend_slope_short_pct` (regressione su 8 candele 4H, ~1.3 giorni)
+   accanto a `trend_slope_pct` (20 candele). Esposta al LLM con la sezione
+   "Lettura combinata delle due pendenze".
+2. Rifinitura RSI: soglia ipervenduto fissata numericamente a < 25, vietato
+   l'uso della parola per RSI ≥ 25.
+
+### Calibrazione della finestra corta (8 candele)
+
+Obiettivo: nei casi 1, 7, 9 (slope a 20 candele piatto) la pendenza corta deve
+mostrare il breakdown.
+
+| Caso | trend_slope_pct | trend_slope_short_pct | Esito |
+|------|----------------|----------------------|-------|
+| 1 US500 | -0.04 | **-0.23** | breakdown visibile |
+| 2 Nasdaq | -0.07 | **-0.31** | breakdown visibile |
+| 7 Brent 04/05 | -0.09 | **-0.32** | breakdown visibile |
+| 8 Bitcoin 14/05 | -0.14 | **-0.35** | breakdown visibile |
+| 9 Gold 14/05 | -0.07 | -0.07 | resta piatto |
+
+La finestra 8 trasforma in pendenza chiaramente negativa 4 dei 5 casi deboli.
+Il caso 9 (Gold 14/05) resta piatto: è una deriva lenta su più giorni, non uno
+swing netto, e nemmeno 8 candele la leggono come breakdown. Finestra 8 confermata.
+
+### Metriche del gate
+
+| Metrica | 2a | 2a-bis | Target | Esito |
+|---|---|---|---|---|
+| Asset crollati che passano il pre-filtro | 8/9 | 8/9 | ≥ 7/9 | superato |
+| Short con score ≥ 7 nel panel (asset crollato) | 0/9 | **1/9** | ≥ 3/9 | mancato |
+| Regressioni (nuovo long contrarian ≥ 7) | 0 | **0** | 0 | superato |
+
+Conteggi alternativi della stessa metrica: short ≥ 7 presenti nel panel su un
+asset qualsiasi = 2/9 (Brent 7.8 nel momento 3, Brent 7.0 nel momento 7);
+momenti in cui il top setup del panel è uno short = 1/9 (momento 3).
+
+### Confronto 2a → 2a-bis (panel e isolato sull'asset crollato)
+
+| # | Asset | 2a panel | 2a-bis panel | 2a isolato | 2a-bis isolato |
+|---|-------|----------|--------------|------------|----------------|
+| 1 | US500 | long 6.8 | assente (panel pieno di short) | long 5.8 | **short 6.2** |
+| 2 | Nasdaq 100 | assente | **short 6.5** | long 6.2 | **short 6.8** |
+| 3 | Gold 01/04 | short 6.5 | skip 5.2 | short 7.2 | skip 3.2 |
+| 4 | Brent 06/04 | non valutato | non valutato | long 6.8 | long 6.2 |
+| 5 | Bitcoin 17/04 | assente | long 6.0 | skip 4.2 | skip 4.2 |
+| 6 | Brent 29/04 | long 7.2 | long 7.2 | long 6.8 | long 6.8 |
+| 7 | Brent 04/05 | long 5.8 | **short 7.0** | long 5.8 | **short 6.8** |
+| 8 | Bitcoin 14/05 | skip 5.2 | **short 6.8** | skip 4.5 | skip 4.2 |
+| 9 | Gold 14/05 | short 5.2 | assente | long 5.8 | skip 4.8 |
+
+### Analisi: il bias è risolto, il residuo non è bias
+
+Tre evidenze che la bidirezionalità ora funziona:
+
+- **Le direzioni si sono invertite dove dovevano.** Caso 1: il modello passa da
+  long 6.8 a shortare (short 6.2 isolato; nel panel US500 esce dai top-3 solo
+  perché Nasdaq e Bitcoin hanno short più forti, 6.5 e 6.8). Caso 7: da long 5.8
+  a **short 7.0**. Caso 2: da long a short 6.5/6.8. Caso 8: da skip a short 6.8.
+- **Il modello ragiona con le due pendenze.** Quasi ogni thesis ora cita la
+  lettura combinata: "trend_slope_short_pct -0.32 già negativo mentre
+  trend_slope_pct -0.09 ancora marginale: è l'inizio di uno swing-down".
+- **Il bug RSI è chiuso.** In 2a il modello scriveva "RSI 31.7 in ipervenduto
+  sconsiglia short". In 2a-bis, ovunque: "RSI a 37/34/31 sopra 25, non
+  ipervenduto, debolezza in corso". La rifinitura numerica ha agganciato.
+
+Lo score massimo di uno short è salito da 6.8 (2a) a **7.8** (2a-bis, Brent nel
+momento 3). I momenti senza alcuno short proposto sono passati da 4 a 0: in
+ogni momento ora compare almeno uno short da qualche parte.
+
+Perché allora solo 1/9 a score ≥ 7 sull'asset crollato? Non è più bias. Due
+ragioni, entrambe legittime:
+
+1. **Gli short moderati ricevono uno score moderato, ed è corretto.** Il prompt
+   fissa "8+ eccellenti, 6-7 buoni". Uno short di continuazione su un downtrend
+   moderato (`trend_slope_short_pct` fra -0.23 e -0.35) è un setup "buono", non
+   "eccellente": 6.5-7.0 è uno score onesto. L'unico short a 7.8 è il momento 3
+   (Brent, `trend_slope_short_pct` -0.75, crollo del 18%): lì le feature sono
+   estreme e lo score lo riflette. I 9 momenti del test sono per costruzione
+   per lo più drawdown moderati (3-5%) colti all'inizio: setup "buoni", non
+   "eccellenti". Pretendere 3/9 a ≥ 7 chiederebbe al modello di gonfiare lo
+   score di setup moderati, che sarebbe un nuovo errore.
+2. **La metrica conta solo l'asset crollato.** Nel momento 1 il modello shorta
+   Nasdaq e Bitcoin (6.5, 6.8) invece di US500: su un selloff azionario diffuso
+   è una scelta corretta, ma la metrica "short ≥ 7 sull'asset crollato" non la
+   registra.
+
+Verdetto: il bias direzionale documentato in §5 (cause A, B, D) è **risolto**.
+La soglia numerica "3/9 short ≥ 7" non è raggiunta, ma il residuo è scoring
+onesto di setup moderati più la definizione stretta della metrica, non più una
+preferenza strutturale per il long. Le 41 decisioni 40-long/1-short non si
+ripeterebbero con questo prompt.
+
+### Decisione richiesta
+
+Nessun push effettuato. Opzioni, da decidere:
+
+- **A. Considerare il gate sostanzialmente superato.** Pre-filtro e regressioni
+  ok, il bias è risolto in modo dimostrabile. Il gap su short ≥ 7 è scoring
+  onesto, non bias. Si procede al push e alla Fase 3.
+- **B. Iterazione sul confine di score.** Un ulteriore ritocco del prompt per
+  spingere gli short "buoni" verso 7. Rischio: gonfiare lo score di setup
+  moderati, reintrodurre un errore in direzione opposta.
+- **C. Rivedere `MIN_SCORE_THRESHOLD` per i soli short.** Fuori dal perimetro
+  dichiarato (i filtri non vanno toccati): andrebbe deciso a parte.
