@@ -634,6 +634,19 @@ def _prefilter_candidates(
         profonda = potenziale bounce)
       - bb_width_pct <= 1.5 (compressione volatilita')
 
+    Sprint 2 Fase 2a (causa E del documento sprint2-bias-investigation):
+    i criteri sopra erano tarati su setup long (vicino ai massimi, ipervenduto
+    estremo) e non intercettavano la zona di breakdown moderato in corso, cioe'
+    l'istante di entrata short. Si aggiungono tre criteri "breakdown" (solo
+    estensione, nessuna rimozione):
+      - breakdown_day: daily_pct_change <= -1.5 e rsi_14 in [30, 48]
+        (calo giornaliero moderato con RSI nella zona di entrata short)
+      - breakdown_offhigh: pct_from_high_20 <= -2 e daily_pct_change < 0
+        (prezzo staccato dai massimi con momentum negativo del giorno)
+      - breakdown_slope: pct_from_high_20 <= -3 e trend_slope_pct < 0
+        (prezzo marcatamente sotto i massimi con pendenza 4H negativa, cattura
+        anche i breakdown in giornate di rimbalzo intraday)
+
     Cintura di sicurezza weekend (``is_weekend=True``): blocca a monte i
     pattern blow-off top, ovvero asset con ``rsi_14 > 75`` e
     ``abs(daily_pct_change) > 15`` simultaneamente. Statisticamente sono
@@ -661,6 +674,9 @@ def _prefilter_candidates(
         "near_high": 0,
         "correction": 0,
         "bb_compression": 0,
+        "breakdown_day": 0,
+        "breakdown_offhigh": 0,
+        "breakdown_slope": 0,
     }
 
     # Blow-off top filter: gira PRIMA dei criteri di passaggio cosi' un
@@ -709,6 +725,23 @@ def _prefilter_candidates(
         bb = af.get("bb_width_pct")
         if bb is not None and float(bb) <= 1.5:
             reasons.append("bb_compression")
+
+        # Sprint 2 Fase 2a: criteri breakdown per intercettare la zona di
+        # entrata short (ribasso moderato in corso). Solo estensione.
+        slope = af.get("trend_slope_pct")
+        daily_f = float(daily) if daily is not None else None
+        rsi_f = float(rsi) if rsi is not None else None
+        pct_f = float(pct_high) if pct_high is not None else None
+        slope_f = float(slope) if slope is not None else None
+        if daily_f is not None and rsi_f is not None:
+            if daily_f <= -1.5 and 30.0 <= rsi_f <= 48.0:
+                reasons.append("breakdown_day")
+        if pct_f is not None and daily_f is not None:
+            if pct_f <= -2.0 and daily_f < 0:
+                reasons.append("breakdown_offhigh")
+        if pct_f is not None and slope_f is not None:
+            if pct_f <= -3.0 and slope_f < 0:
+                reasons.append("breakdown_slope")
 
         if reasons:
             selected[name] = af
