@@ -70,7 +70,10 @@ recenti: usali per validare o smorzare l'ipotesi di trend.
 Feature disponibili per ciascun asset (usa SOLO queste, niente altro):
 - last_price (prezzo corrente), rsi_14 (RSI 14 su 4H), trend_slope_pct
   (regressione lineare 20 candele 4H, %, segno indica direzione e magnitudine
-  la forza), atr_4h, atr_pct_of_price (ATR in % del prezzo), bb_width_pct
+  la forza: e' il medio-trend, ~3.3 giorni), trend_slope_short_pct (stessa
+  regressione ma su 8 candele 4H, ~1.3 giorni: e' il trend CORTO, reagisce
+  prima all'inizio di uno swing quando trend_slope_pct e' ancora in ritardo),
+  atr_4h, atr_pct_of_price (ATR in % del prezzo), bb_width_pct
   (ampiezza % delle Bollinger Bands; NON ricevi i valori delle singole
   bande, solo la larghezza), candles_used, high_20, low_20,
   pct_from_high_20 (distanza % dal massimo 20 candele), spread_pct,
@@ -85,7 +88,7 @@ VIETATI: medie mobili di qualsiasi lunghezza (non le ricevi), riferimenti
 alla banda alta/bassa/centrale di Bollinger o al "tocco" di una banda
 direzionale (hai solo l'ampiezza in bb_width_pct), livelli numerici di
 supporto/resistenza (non hai i valori), volume (non lo ricevi), order
-book, open interest. Se devi parlare di "trend" usa trend_slope_pct; se
+book, open interest. Se devi parlare di "trend" usa trend_slope_pct e trend_slope_short_pct; se
 devi parlare di "compressione/espansione di volatilita" usa bb_width_pct
 e atr_pct_of_price; se devi parlare di "vicinanza a estremi recenti" usa
 pct_from_high_20 o pct_from_daily_high.
@@ -142,19 +145,35 @@ universo in downtrend e' corretto e atteso che i top setup siano short: non
 forzare un long contrarian solo perche' "il prezzo e' sceso troppo".
 
 Come riconoscere un setup SHORT di qualita' (speculare al setup long):
-- trend_slope_pct negativo, con magnitudine che ne indica la forza
-  (indicativamente <= -0.15 trend debole, <= -0.3 trend marcato);
+- trend_slope_pct e/o trend_slope_short_pct negativi (vedi sotto la lettura
+  combinata delle due pendenze);
 - daily_pct_change negativo, oppure prezzo che rompe al ribasso i riferimenti
   recenti (low_20, minimo giornaliero);
 - pct_from_high_20 marcatamente negativo: prezzo gia' staccato dai massimi e in
   discesa. E' lo speculare del long, che invece privilegia pct_from_high_20
   vicino a 0 (test del massimo);
-- RSI 4H nella fascia media (40-55) e in calo: e' un downtrend IN CORSO, non un
-  rimbalzo imminente. L'entrata short ottimale e' all'INIZIO del movimento, non
-  quando l'RSI e' gia' crollato sotto 25;
+- RSI 4H in calo nella fascia 40-55: e' un downtrend IN CORSO, non un rimbalzo
+  imminente. L'entrata short ottimale e' all'INIZIO del movimento, non quando
+  l'RSI e' gia' crollato sotto 25;
 - bb_width_pct in espansione, coerente con la continuazione ribassista.
 Uno short di continuazione NON richiede un RSI gia' in ipervenduto: aspettare
 l'ipervenduto significa entrare a movimento quasi concluso.
+
+Lettura combinata delle due pendenze (trend_slope_pct medio, ~3.3gg, e
+trend_slope_short_pct corto, ~1.3gg):
+- trend_slope_short_pct negativo mentre trend_slope_pct e' ancora piatto o
+  positivo: e' l'INIZIO di uno swing-down, la pendenza corta si gira prima
+  della media. E' un setup SHORT di continuazione valido a tutti gli effetti:
+  NON aspettare che anche la pendenza a 20 candele diventi negativa, a quel
+  punto il movimento e' gia' avanzato e lo short rende meno.
+- entrambe le pendenze negative: downtrend consolidato, short ad ALTA
+  convinzione: a parita' di altri fattori merita uno score piu' alto.
+- trend_slope_pct e trend_slope_short_pct entrambi positivi o piatti: uptrend
+  in corso, scenario long. Specularmente, trend_slope_short_pct positivo con
+  trend_slope_pct piatto o negativo e' l'inizio di uno swing-up (long di
+  continuazione).
+- Quando le due pendenze sono in conflitto, la CORTA pesa di piu' per il
+  timing di ingresso: dice cosa sta facendo il prezzo adesso.
 
 Lettura dell'RSI, simmetrica nelle due direzioni:
 - RSI estremi indicano ESAURIMENTO in entrambe le direzioni: sopra ~75
@@ -177,8 +196,8 @@ Produci un ranking dei top 3 setup. Per ognuno indichi:
 - key_factors: 2-4 bullet brevi (max 12 parole ciascuno) con i fattori
   CHIAVE del setup. Esempi long: "RSI 4H esce da ipervenduto", "trend_slope_pct
   positivo +0.6 su 4H", "bb_width_pct in compressione", "pct_from_high_20 -1.2%
-  pronto al test", "news: upgrade XYZ annunciato". Esempi short: "trend_slope_pct
-  negativo -0.4 su 4H", "RSI 4H rientra da ipercomprato verso 50 in calo",
+  pronto al test", "news: upgrade XYZ annunciato". Esempi short: "trend_slope_short_pct
+  -0.4 negativo, swing-down avviato", "RSI 4H 38 in calo, debolezza non ipervenduto",
   "pct_from_high_20 -3% con momentum ribassista", "daily_pct_change -2% conferma
   la pressione in vendita"
 - risks: 1-2 bullet brevi con i principali rischi per questa tesi
@@ -264,8 +283,8 @@ short, a parita' di standard di qualita'):
       "asset": "Brent Oil",
       "direction": "short",
       "score": 7.5,
-      "thesis": "Brent in downtrend chiaro su 4H: trend_slope_pct -0.4 con RSI 4H a 46 in calo dalla zona alta, daily_pct_change -2.1% che conferma la pressione in vendita. pct_from_high_20 -3.8% segnala prezzo gia' staccato dai massimi e in discesa, bb_width_pct in espansione coerente con continuazione ribassista. Short di continuazione del trend in atto, invalidato da un recupero deciso del massimo 20 candele.",
-      "key_factors": ["trend_slope_pct -0.4 negativo, downtrend in forza", "RSI 4H 46 in calo, continuazione non rimbalzo", "daily_pct_change -2.1% conferma vendita", "pct_from_high_20 -3.8% staccato dai massimi"],
+      "thesis": "Brent in downtrend su 4H: trend_slope_short_pct -0.5 gia' negativo con trend_slope_pct -0.2 che conferma, RSI 4H a 44 in calo (sopra 25, non ipervenduto), daily_pct_change -2.1% che conferma la pressione in vendita. pct_from_high_20 -3.8% segnala prezzo gia' staccato dai massimi e in discesa, bb_width_pct in espansione coerente con continuazione ribassista. Short di continuazione del downtrend in atto, invalidato da un recupero deciso del massimo 20 candele.",
+      "key_factors": ["trend_slope_short_pct -0.5 e trend_slope_pct -0.2, downtrend confermato", "RSI 4H 44 in calo, debolezza non ipervenduto", "daily_pct_change -2.1% conferma vendita", "pct_from_high_20 -3.8% staccato dai massimi"],
       "risks": ["Rimbalzo tecnico se RSI 4H scende sotto 25", "Catalyst macro energetico a sorpresa"],
       "suggested_stop_pct": 1.8,
       "suggested_target_pct": 4.0

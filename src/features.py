@@ -59,15 +59,24 @@ def _atr(arr: dict[str, np.ndarray], period: int = 14) -> float:
     return float(tr[-period:].mean())
 
 
-def _trend_strength(close: np.ndarray) -> float:
-    """Pendenza normalizzata della regressione lineare sulle ultime 20 candele.
-    Valori positivi = trend rialzista, negativi = ribassista."""
-    if len(close) < 20:
+# Finestra (in candele 4H) della pendenza corta. 8 candele ~= 32h ~= 1.3
+# giorni: cattura l'inizio di uno swing prima che la pendenza a 20 candele
+# (~3.3 giorni) si giri. Sprint 2 Fase 2a-bis, causa C del documento
+# sprint2-bias-investigation.
+SHORT_TREND_WINDOW = 8
+
+
+def _trend_strength(close: np.ndarray, window: int = 20) -> float:
+    """Pendenza normalizzata della regressione lineare sulle ultime
+    ``window`` candele. Valori positivi = trend rialzista, negativi =
+    ribassista. window=20 e' il medio-trend (~3.3 giorni su 4H);
+    window=8 e' la lettura corta che reagisce prima all'inizio di uno swing."""
+    if len(close) < window:
         return 0.0
-    window = close[-20:]
-    x = np.arange(len(window))
-    slope, _ = np.polyfit(x, window, 1)
-    return float(slope / window.mean() * 100)  # in percentuale del prezzo medio
+    w = close[-window:]
+    x = np.arange(len(w))
+    slope, _ = np.polyfit(x, w, 1)
+    return float(slope / w.mean() * 100)  # in percentuale del prezzo medio
 
 
 def _bollinger_width(close: np.ndarray, period: int = 20) -> float:
@@ -105,6 +114,9 @@ def compute_features(
         "last_price": round(float(last), 5) if last is not None else None,
         "rsi_14": round(_rsi(close), 1),
         "trend_slope_pct": round(_trend_strength(close), 3),
+        "trend_slope_short_pct": round(
+            _trend_strength(close, window=SHORT_TREND_WINDOW), 3
+        ),
         "atr_4h": round(atr, 5),
         "atr_pct_of_price": round(atr / last * 100, 3) if last else None,
         "bb_width_pct": round(_bollinger_width(close), 3),

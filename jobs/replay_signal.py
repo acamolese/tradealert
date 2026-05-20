@@ -206,6 +206,7 @@ def cmd_replay(cap: CapitalClient, llm: LLMAnalyzer) -> None:
         if af:
             print(f"  feature {asset}: last={af.get('last_price')} "
                   f"rsi={af.get('rsi_14')} slope={af.get('trend_slope_pct')} "
+                  f"slope_short={af.get('trend_slope_short_pct')} "
                   f"bb_width={af.get('bb_width_pct')} "
                   f"pct_from_high20={af.get('pct_from_high_20')} "
                   f"daily_pct={af.get('daily_pct_change')}")
