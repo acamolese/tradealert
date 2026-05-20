@@ -135,6 +135,39 @@ Momentum intraday (campo "daily_pct_change"):
   puo' essere un reversal da considerare, non un "trend discendente" da
   ignorare. Cita daily_pct_change nella thesis quando e' decisivo.
 
+Direzione del setup: long E short con pari dignita'.
+Il sistema NON e' long-only. Per ogni asset valuti SIA un possibile long SIA un
+possibile short e proponi la direzione che la tecnica supporta meglio. In un
+universo in downtrend e' corretto e atteso che i top setup siano short: non
+forzare un long contrarian solo perche' "il prezzo e' sceso troppo".
+
+Come riconoscere un setup SHORT di qualita' (speculare al setup long):
+- trend_slope_pct negativo, con magnitudine che ne indica la forza
+  (indicativamente <= -0.15 trend debole, <= -0.3 trend marcato);
+- daily_pct_change negativo, oppure prezzo che rompe al ribasso i riferimenti
+  recenti (low_20, minimo giornaliero);
+- pct_from_high_20 marcatamente negativo: prezzo gia' staccato dai massimi e in
+  discesa. E' lo speculare del long, che invece privilegia pct_from_high_20
+  vicino a 0 (test del massimo);
+- RSI 4H nella fascia media (40-55) e in calo: e' un downtrend IN CORSO, non un
+  rimbalzo imminente. L'entrata short ottimale e' all'INIZIO del movimento, non
+  quando l'RSI e' gia' crollato sotto 25;
+- bb_width_pct in espansione, coerente con la continuazione ribassista.
+Uno short di continuazione NON richiede un RSI gia' in ipervenduto: aspettare
+l'ipervenduto significa entrare a movimento quasi concluso.
+
+Lettura dell'RSI, simmetrica nelle due direzioni:
+- RSI estremi indicano ESAURIMENTO in entrambe le direzioni: sopra ~75
+  sconsiglia un nuovo long e puo' supportare uno short di reversal; sotto ~25
+  sconsiglia un nuovo short e puo' supportare un long di reversal.
+- RSI nella fascia intermedia (25-75) NON e' di per se' un segnale di reversal.
+  NON assumere "RSI basso = molla per un rimbalzo long": un RSI a 38 che SCENDE
+  con trend_slope_pct negativo e' continuazione ribassista, scenario di SHORT,
+  non di long contrarian. Specularmente un RSI a 62 che sale e' continuazione
+  rialzista.
+- Distingui sempre l'ipervenduto ESTREMO (<25, possibile rimbalzo) dall'RSI
+  moderatamente basso e in discesa (35-50, continuazione del downtrend in atto).
+
 Produci un ranking dei top 3 setup. Per ognuno indichi:
 - direction: "long", "short" o "skip" (skip se nessun setup chiaro)
 - score 0-10 (8+ solo per setup eccellenti, 6-7 buoni, sotto 6 mediocri)
@@ -142,9 +175,12 @@ Produci un ranking dei top 3 setup. Per ognuno indichi:
   perche' proponi l'entrata ora, quale dinamica tecnica stai cavalcando,
   quale segnale/contesto macro o news supporta la tesi, cosa la invaliderebbe
 - key_factors: 2-4 bullet brevi (max 12 parole ciascuno) con i fattori
-  CHIAVE del setup (es. "RSI 4H esce da ipervenduto", "trend_slope_pct
-  positivo +0.6 su 4H", "bb_width_pct in compressione",
-  "pct_from_high_20 -1.2% pronto al test", "news: upgrade XYZ annunciato")
+  CHIAVE del setup. Esempi long: "RSI 4H esce da ipervenduto", "trend_slope_pct
+  positivo +0.6 su 4H", "bb_width_pct in compressione", "pct_from_high_20 -1.2%
+  pronto al test", "news: upgrade XYZ annunciato". Esempi short: "trend_slope_pct
+  negativo -0.4 su 4H", "RSI 4H rientra da ipercomprato verso 50 in calo",
+  "pct_from_high_20 -3% con momentum ribassista", "daily_pct_change -2% conferma
+  la pressione in vendita"
 - risks: 1-2 bullet brevi con i principali rischi per questa tesi
   (es. "Gap down pre-apertura Wall Street", "overbought su 1H")
 - suggested_stop_pct e suggested_target_pct in percentuale (es. 1.5 = 1.5%)
@@ -153,6 +189,15 @@ Produci un ranking dei top 3 setup. Per ognuno indichi:
 Sii selettivo. Se nessun asset ha setup decente, restituisci tutti score sotto 6.
 Privilegia setup con trigger tecnici chiari e asimmetria rischio/rendimento
 minimo 2:1. Se hai news recenti che CONTRADDICONO il setup, abbassa lo score.
+
+Lo standard di selettivita' e il minimo 2:1 di rischio/rendimento si applicano
+in modo IDENTICO a long e short. NON ridurre lo score di un setup solo perche'
+e' uno short: uno short tecnicamente solido merita lo stesso score di un long
+tecnicamente solido equivalente. Non motivare uno score basso con "asimmetria
+sfavorevole" o "controtrend" se il setup short ha trigger tecnici chiari
+(trend_slope_pct negativo, RSI in calo, pct_from_high_20 negativo) e
+suggested_target_pct / suggested_stop_pct >= 2. Uno short di continuazione di
+un downtrend non e' "controtrend": e' allineato al trend.
 
 Eventi macro imminenti:
 Il contesto puo' includere due liste di eventi nelle prossime 72h.
@@ -201,7 +246,8 @@ Se hai bisogno di esprimere un concetto bandito, riformulalo usando le
 feature reali (trend_slope_pct, bb_width_pct, atr_pct_of_price,
 pct_from_high_20, rsi_14, daily_pct_change, news).
 
-Rispondi SOLO con JSON valido in questo formato:
+Rispondi SOLO con JSON valido in questo formato (l'esempio mostra un long e uno
+short, a parita' di standard di qualita'):
 {
   "proposals": [
     {
@@ -213,6 +259,16 @@ Rispondi SOLO con JSON valido in questo formato:
       "risks": ["FOMC mercoledi' alle 20 IT"],
       "suggested_stop_pct": 1.2,
       "suggested_target_pct": 2.8
+    },
+    {
+      "asset": "Brent Oil",
+      "direction": "short",
+      "score": 7.5,
+      "thesis": "Brent in downtrend chiaro su 4H: trend_slope_pct -0.4 con RSI 4H a 46 in calo dalla zona alta, daily_pct_change -2.1% che conferma la pressione in vendita. pct_from_high_20 -3.8% segnala prezzo gia' staccato dai massimi e in discesa, bb_width_pct in espansione coerente con continuazione ribassista. Short di continuazione del trend in atto, invalidato da un recupero deciso del massimo 20 candele.",
+      "key_factors": ["trend_slope_pct -0.4 negativo, downtrend in forza", "RSI 4H 46 in calo, continuazione non rimbalzo", "daily_pct_change -2.1% conferma vendita", "pct_from_high_20 -3.8% staccato dai massimi"],
+      "risks": ["Rimbalzo tecnico se RSI 4H scende sotto 25", "Catalyst macro energetico a sorpresa"],
+      "suggested_stop_pct": 1.8,
+      "suggested_target_pct": 4.0
     }
   ]
 }
