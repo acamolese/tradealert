@@ -362,3 +362,100 @@ in tandem (vedi Conclusione): nessuno dei due, da solo, chiude il bias.
    sistematicamente gli short (causa D).
 4. Valutare una feature di trend a finestra più corta (o un secondo slope
    veloce) per ridurre il ritardo dei casi FEATURE (causa C).
+
+## 7. Fase 2a — Risultati gate
+
+Stato: gate eseguito 2026-05-20 sul branch `sprint2-bidirezionalita`. Esito:
+**NON SUPERATO** (1 metrica su 3 mancata). Nessun push su `origin/main`.
+
+### Modifiche applicate (branch `sprint2-bidirezionalita`, 3 commit)
+
+1. System prompt `src/llm_analyzer.py`: sezione "Direzione del setup: long E
+   short con pari dignità" con template short, sezione RSI simmetrica, regola
+   2:1 resa esplicitamente simmetrica, key_factors short, esempio JSON short.
+2. `_prefilter_candidates` in `src/scanner.py`: tre criteri "breakdown"
+   (breakdown_day, breakdown_offhigh, breakdown_slope), solo estensione.
+3. Tooling: `replay_signal.py` stampa le metriche del gate.
+
+Gate eseguito in locale (Capital + Anthropic via `.env` locale), la VM di
+produzione è rimasta su `main`. Nessuna modifica al sistema in produzione.
+
+### Confronto prima / dopo sui 9 casi
+
+| # | Asset | Pre-filtro | Panel (asset) | Isolato |
+|---|-------|-----------|---------------|---------|
+| 1 | US500 | ESCL → **PASSA** | non valutato → long 6.8 | long 5.5 → long 5.8 + **short 5.2** |
+| 2 | Nasdaq 100 | PASSA → PASSA | long 5.5 → assente | long 6.5 → long 6.2 |
+| 3 | Gold 01/04 | PASSA → PASSA | skip 4.0 → **short 6.5** | skip 4.5 → **short 7.2** |
+| 4 | Brent 06/04 | ESCL → ESCL | non valutato → non valutato | long 5.5 → long 6.8 |
+| 5 | Bitcoin 17/04 | PASSA → PASSA | skip 4.5 → assente | long 5.5 → skip 4.2 |
+| 6 | Brent 29/04 | PASSA → PASSA | long 7.5 → long 7.2 | long 7.0 → long 6.8 |
+| 7 | Brent 04/05 | ESCL → **PASSA** | non valutato → long 5.8 | long 5.5 → long 5.8 + **short 5.2** |
+| 8 | Bitcoin 14/05 | PASSA → PASSA | non in top 3 → skip 5.2 | skip 4.5 → skip 5.2 |
+| 9 | Gold 14/05 | ESCL → **PASSA** | non valutato → **short 5.2** | skip 4.5 → long 5.8 |
+
+### Le tre metriche del gate
+
+| Metrica | Prima | Dopo | Target | Esito |
+|---|---|---|---|---|
+| Asset crollati che passano il pre-filtro | 5/9 | **8/9** | ≥ 7/9 | superato |
+| Short con score ≥ 7 nel panel (asset crollato) | 0/9 | **0/9** | ≥ 3/9 | **mancato** |
+| Regressioni (nuovo long contrarian ≥ 7 dove prima skip o long < 7) | — | **0** | 0 | superato |
+
+L'unico long ≥ 7 nel panel è il caso 6 (Brent 29/04, long 7.2), già long 7.5
+prima: non è una regressione nuova, ed è un caso FEATURE atteso. Verdetto del
+gate: **NON SUPERATO**, manca la metrica short ≥ 7.
+
+### Analisi: cosa è cambiato e cosa no
+
+La modifica del prompt ha avuto un effetto direzionale netto, anche se non
+sufficiente a superare la soglia:
+
+- **Il modello ora propone short.** Prima, su 9 letture isolate: 0 short. Dopo:
+  short proposti nei casi 1, 3, 7 (isolato) e 3, 9 (panel), più short su altri
+  asset nei panel dei casi 5 e 7. La causa A (assenza di template short) è di
+  fatto risolta: il modello vede e formula gli short.
+- **Lo score degli short resta sotto 7.** Massimo short: 7.2 isolato (caso 3),
+  6.8 panel (Nasdaq nel caso 7). Prima il massimo era 6.5. C'è un miglioramento
+  ma non basta.
+
+Perché lo score resta sotto soglia, due sotto-cause distinte:
+
+1. **Feature genuinamente deboli a T (causa C, fuori perimetro 2a).** Nei casi
+   1, 7, 9 il `trend_slope_pct` a T è -0.04, -0.09, -0.07: piatto. Lo slope è
+   la regressione su 20 candele 4H e all'inizio del movimento è ancora
+   dominato dal trend precedente (è esattamente la causa C, deferita a 2b). Un
+   analista onesto non darebbe 7+ a uno short con slope piatto: lo score 5.2
+   di quei casi è in parte corretto. Senza la feature di trend più reattiva
+   (causa C), il modello non ha i numeri per uno short ad alta convinzione.
+2. **Residuo di lettura asimmetrica dell'RSI.** Nel caso 1 il modello scrive
+   ancora "RSI 31.7 in ipervenduto sconsiglia nuovo short": continua a trattare
+   un RSI a 31 come ipervenduto, mentre il prompt fissa l'estremo a <25. E nel
+   caso 3 lo stesso identico setup riceve 6.5 nel panel ma 7.2 isolato: lo
+   score dello short è ancora instabile e dipende dal contesto.
+
+In sintesi: la metà qualitativa del bias (il modello non proponeva short) è
+risolta. La metà quantitativa (lo short raggiunge la soglia di signal) è
+bloccata per circa due terzi dalla causa C, esplicitamente fuori dal perimetro
+di 2a, e per circa un terzo da un residuo di prompt correggibile.
+
+### Raccomandazione
+
+Il gate non è superato, quindi nessun push e nessun deploy: Fase 3 non parte.
+Le opzioni, da decidere (sei tu l'autorità del gate):
+
+- **A. Iterazione di prompt e re-run.** Rinforzare la sezione RSI (fascia 28-45
+  esplicitamente NON ipervenduta) e la stabilità di score dello short. Realistico
+  recuperare 1-2 short ≥ 7, difficile arrivare a 3/9 finché la causa C resta
+  aperta: i casi 1/7/9 hanno slope piatto per costruzione.
+- **B. Ri-sequenziare: anticipare la causa C (Fase 2b) dentro questa release.**
+  La metrica short ≥ 7 dipende da una feature di trend reattiva. Se la causa C
+  rientra nel perimetro, il gate diventa raggiungibile. Costo: la release tocca
+  tre cose invece di due, l'eccezione a "una variabile alla volta" si allarga.
+- **C. Ricalibrare il gate.** La metrica "short ≥ 7" presuppone feature che 2a
+  non modifica. Una metrica di 2a più fedele al suo perimetro: "il modello
+  propone short con direzione corretta in ≥ N casi" (oggi soddisfatta) e
+  "nessuna regressione" (soddisfatta), rimandando la soglia di score a dopo 2b.
+
+Nessuna iterazione è stata avviata: come da workflow, i numeri vengono mostrati
+prima di riprovare.
