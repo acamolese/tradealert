@@ -29,7 +29,14 @@ WEEKLY_DRAWDOWN_CAP_EUR: float = 20.0
 # concretizzano, il sistema decide solo se li propone. Costanti modulo
 # (no env var) come da vincolo Sprint 1.
 # Vedi src/scanner.py::_check_directional_kill_switch.
-SPRINT2_START: str = "2026-05-20T00:00:00+00:00"
+#
+# SPRINT2_START e' l'ISTANTE DEL DEPLOY del codice bidirezionale in
+# produzione (git reflog: pull --ff-only del 2026-05-20 18:54:34 UTC),
+# non la mezzanotte: i signal generati prima dal codice vecchio
+# long-biased non devono contare. Il signal short #85 (Brent, 16:05 UTC,
+# pre-deploy) e' percio' escluso: contarlo disarmerebbe il kill switch
+# prima ancora che la Fase 3 cominci.
+SPRINT2_START: str = "2026-05-20T18:54:34+00:00"
 SPRINT2_KILL_WINDOW_DAYS: int = 30
 
 
