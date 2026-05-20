@@ -1,7 +1,7 @@
 """Esporta la tabella ``trades`` completa in CSV canonico.
 
 La sorgente di verita' resta Supabase. Questo script produce uno
-snapshot versionabile (data/trades.csv) con TUTTE le colonne del DB,
+snapshot versionabile (docs/trades.csv) con TUTTE le colonne del DB,
 tutti i trade, ordinati per id. Va ri-eseguito per aggiornarlo.
 
 Uso (lato VM, serve service_role key):
@@ -45,8 +45,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Export canonico trades -> CSV")
     parser.add_argument(
         "--out",
-        default="data/trades.csv",
-        help="Percorso file CSV di output (default data/trades.csv)",
+        default="docs/trades.csv",
+        help="Percorso file CSV di output (default docs/trades.csv)",
     )
     args = parser.parse_args()
 
