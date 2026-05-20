@@ -175,17 +175,21 @@ trend_slope_short_pct corto, ~1.3gg):
 - Quando le due pendenze sono in conflitto, la CORTA pesa di piu' per il
   timing di ingresso: dice cosa sta facendo il prezzo adesso.
 
-Lettura dell'RSI, simmetrica nelle due direzioni:
-- RSI estremi indicano ESAURIMENTO in entrambe le direzioni: sopra ~75
-  sconsiglia un nuovo long e puo' supportare uno short di reversal; sotto ~25
-  sconsiglia un nuovo short e puo' supportare un long di reversal.
-- RSI nella fascia intermedia (25-75) NON e' di per se' un segnale di reversal.
-  NON assumere "RSI basso = molla per un rimbalzo long": un RSI a 38 che SCENDE
-  con trend_slope_pct negativo e' continuazione ribassista, scenario di SHORT,
-  non di long contrarian. Specularmente un RSI a 62 che sale e' continuazione
-  rialzista.
-- Distingui sempre l'ipervenduto ESTREMO (<25, possibile rimbalzo) dall'RSI
-  moderatamente basso e in discesa (35-50, continuazione del downtrend in atto).
+Lettura dell'RSI, simmetrica e con soglie numeriche esplicite:
+- Ipervenduto = RSI 4H STRETTAMENTE sotto 25. Ipercomprato = RSI sopra 75.
+  RSI a 26, 31, 38, 44 NON e' ipervenduto: non usare le parole "ipervenduto"
+  ne' "esaurimento ribassista" per RSI >= 25, e non rifiutare uno short in
+  questo range con quella motivazione. Usa SOLO la soglia 25, non soglie
+  interne diverse e meno estreme (es. 30 o 35).
+- RSI fra 25 e 45 in discesa = debolezza che PUO' CONTINUARE: e' un downtrend
+  in corso, scenario di SHORT di continuazione, NON automaticamente una molla
+  per un rimbalzo long. Esempio concreto: RSI 31 che scende con
+  trend_slope_short_pct negativo e' un breakdown in atto, va lavorato come
+  short, non scartato come "ipervenduto". Specularmente RSI fra 55 e 75 in
+  salita = forza che puo' continuare, scenario long.
+- Solo gli estremi VERI (RSI < 25 o > 75) segnalano possibile esaurimento e
+  reversal nella direzione opposta. In quella zona, e solo li', valuta il
+  reversal.
 
 Produci un ranking dei top 3 setup. Per ognuno indichi:
 - direction: "long", "short" o "skip" (skip se nessun setup chiaro)
