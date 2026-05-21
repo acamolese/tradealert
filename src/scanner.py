@@ -14,6 +14,7 @@ from typing import Any
 from .capital_client import CapitalClient
 from .config import (
     Config,
+    SPRINT2_KILL_DISCARDED_TOLERANCE,
     SPRINT2_KILL_WINDOW_DAYS,
     SPRINT2_START,
     WEEKLY_DRAWDOWN_CAP_EUR,
@@ -22,6 +23,7 @@ from .db import (
     Database,
     record_risk_cap_notification,
     risk_cap_notified_today,
+    sprint2_discarded_short_proposals,
     sprint2_kill_notified,
     sprint2_short_signal_count,
     weekly_realized_pnl,
@@ -155,21 +157,29 @@ def _check_drawdown_cap(
 
 
 def _check_directional_kill_switch(
-    db: Database, telegram: TelegramClient
+    db: Database, telegram: TelegramClient, min_score: float
 ) -> bool:
     """Kill switch direzionale Sprint 2 (Fase 3).
 
     Misura la CAPACITA' del sistema di vedere gli short, non le condizioni
-    di mercato: conta i signal con direction='short' generati da
-    SPRINT2_START in poi, a prescindere da esecuzione, filtri o
-    cancellazioni. Se entro SPRINT2_KILL_WINDOW_DAYS giorni di calendario
-    il conteggio resta 0, la diagnosi di bias era incompleta: lo scanner
-    si ferma e si torna in Fase 2.
+    di mercato. Logica a tre rami:
 
-    NON conta i long ne' i trade chiusi: il mercato decide quanti short si
-    concretizzano, il sistema decide solo se li propone. Basta 1 signal
-    short per disarmare il kill switch in modo permanente. Notifica
-    Telegram una sola volta: il kill non auto-recupera come il risk_cap.
+    1. Almeno 1 signal con direction='short' generato da SPRINT2_START:
+       bidirezionalita' confermata, kill disarmato per sempre.
+    2. 0 signal short ma la finestra di SPRINT2_KILL_WINDOW_DAYS giorni e'
+       ancora aperta: in attesa, nessuna azione.
+    3. 0 signal short a finestra scaduta: si distingue il kill reale dal
+       FALSO POSITIVO. Un signal short puo' non nascere anche quando lo
+       scanner lo propone: il dedup 24h, i cap o market_status possono
+       sopprimere uno short di qualita' prima che diventi signal. Se ci
+       sono almeno SPRINT2_KILL_DISCARDED_TOLERANCE run con uno short
+       proposto a score >= min_score poi scartato, la bidirezionalita'
+       esiste a livello scanner: il kill NON scatta, parte solo un avviso
+       Telegram (pausa cautelativa). Sotto quella soglia il kill scatta e
+       si torna in Fase 2.
+
+    NON conta i long ne' i trade chiusi. Notifica Telegram una sola volta
+    per tipo di evento: il kill non auto-recupera come il risk_cap.
     """
     try:
         short_signals = sprint2_short_signal_count(db, SPRINT2_START)
@@ -180,10 +190,9 @@ def _check_directional_kill_switch(
         return False
 
     if short_signals > 0:
-        return False  # bidirezionalita' confermata, disarmato per sempre
+        return False  # ramo 1: bidirezionalita' confermata via signal
 
-    # Zero signal short finora: lo scanner si ferma solo se la finestra di
-    # SPRINT2_KILL_WINDOW_DAYS giorni di calendario e' gia' scaduta.
+    # Ramo 2: zero signal short, finestra ancora aperta -> in attesa.
     from datetime import datetime, timezone
 
     try:
@@ -195,12 +204,65 @@ def _check_directional_kill_switch(
         return False
     days_elapsed = (datetime.now(timezone.utc) - start).days
     if days_elapsed < SPRINT2_KILL_WINDOW_DAYS:
-        return False  # finestra ancora aperta, in attesa
+        return False
 
+    # Ramo 3: finestra scaduta con 0 signal short. Conta le proposte short
+    # di qualita' soppresse dai filtri operativi per distinguere il falso
+    # positivo dal kill reale.
+    try:
+        discarded = sprint2_discarded_short_proposals(
+            db, SPRINT2_START, min_score
+        )
+    except Exception:
+        log.exception(
+            "[dir_kill] conteggio proposte short scartate fallito, assumo 0"
+        )
+        discarded = 0
+
+    if discarded >= SPRINT2_KILL_DISCARDED_TOLERANCE:
+        # Falso positivo: lo scanner VEDE gli short, sono i filtri (dedup,
+        # cap, market_status) ad averli soppressi. Lo scanner NON si ferma.
+        log.warning(
+            "[dir_kill] %d giorni, 0 signal short ma %d run con short "
+            ">=%.1f scartati: pausa cautelativa, scanner attivo",
+            days_elapsed,
+            discarded,
+            min_score,
+        )
+        try:
+            if not sprint2_kill_notified(db, "sprint2_directional_kill_paused"):
+                telegram.send_message(
+                    f"⚠️ <b>Kill switch direzionale: pausa cautelativa</b>\n"
+                    f"In {days_elapsed} giorni 0 signal short, MA lo scanner "
+                    f"ha proposto uno short con score &gt;= {min_score:g} in "
+                    f"<b>{discarded} run</b>, poi scartati da dedup/filtri.\n"
+                    f"La bidirezionalita' c'e' a livello scanner: il kill NON "
+                    f"scatta. Indagare se e' effetto cumulativo del dedup."
+                )
+                db.insert_monitoring_event(
+                    {
+                        "event_type": "sprint2_directional_kill_paused",
+                        "reason": "short_proposals_suppressed_by_filters",
+                        "details": {
+                            "window_days": SPRINT2_KILL_WINDOW_DAYS,
+                            "days_elapsed": days_elapsed,
+                            "short_signals": 0,
+                            "discarded_short_runs": discarded,
+                            "min_score": min_score,
+                        },
+                    }
+                )
+        except Exception:
+            log.exception("[dir_kill] notifica/persist pausa cautelativa fallita")
+        return False
+
+    # Kill reale: 0 signal short e nemmeno proposte short di qualita'.
     log.warning(
-        "[dir_kill] %d giorni dal deploy, 0 signal short generati: "
-        "scanner DISABLED",
+        "[dir_kill] %d giorni dal deploy, 0 signal short e solo %d run con "
+        "short scartati (<%d): scanner DISABLED",
         days_elapsed,
+        discarded,
+        SPRINT2_KILL_DISCARDED_TOLERANCE,
     )
     try:
         already_notified = sprint2_kill_notified(db)
@@ -213,7 +275,8 @@ def _check_directional_kill_switch(
             telegram.send_message(
                 f"🛑 <b>Kill switch direzionale Sprint 2</b>\n"
                 f"In {days_elapsed} giorni dal deploy il sistema ha generato "
-                f"<b>0 signal short</b>.\n"
+                f"<b>0 signal short</b> e solo {discarded} run con uno short "
+                f"di qualita' proposto.\n"
                 f"La bidirezionalita' attesa dal documento di diagnosi non si "
                 f"e' manifestata: <b>scanner fermo</b>, si torna in Fase 2 per "
                 f"una nuova iterazione diagnostica."
@@ -229,6 +292,7 @@ def _check_directional_kill_switch(
                         "window_days": SPRINT2_KILL_WINDOW_DAYS,
                         "days_elapsed": days_elapsed,
                         "short_signals": 0,
+                        "discarded_short_runs": discarded,
                         "sprint2_start": SPRINT2_START,
                     },
                 }
@@ -1340,10 +1404,11 @@ def run_morning_scan(config: Config) -> None:
     if _check_drawdown_cap(db, telegram):
         return
 
-    # Kill switch direzionale Sprint 2 (Fase 3): se i primi 5 trade chiusi
-    # sono tutti long, la bidirezionalita' non si e' manifestata e lo
-    # scanner si ferma. Guard early come il drawdown cap.
-    if _check_directional_kill_switch(db, telegram):
+    # Kill switch direzionale Sprint 2 (Fase 3): se a finestra scaduta il
+    # sistema non ha generato ne' proposto short, la bidirezionalita' non
+    # si e' manifestata e lo scanner si ferma. Guard early come il
+    # drawdown cap.
+    if _check_directional_kill_switch(db, telegram, config.min_score_threshold):
         return
 
     # Discovery dinamica disabilitata in Sprint 1 (Fix 1.3): l'universo

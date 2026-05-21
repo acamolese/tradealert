@@ -645,6 +645,34 @@ in `run_morning_scan` subito dopo il drawdown cap. Costanti `SPRINT2_START` e
 primi 30 giorni; disarmato in modo permanente al primo signal short. Notifica
 Telegram una sola volta (il kill non auto-recupera).
 
+### Refinement (giorno 1 di Fase 3): falso positivo da dedup
+
+Il primo giorno di Fase 3 (2026-05-21) ha mostrato un limite del conteggio
+basato sui soli signal. Lo scanner ha proposto Brent Oil short con score 7.0 in
+3 run distinte (07:05, 08:05, 11:05 UTC), ma il dedup 24h le ha soppresse tutte:
+Brent era già stato segnalato il giorno prima (signal #85). Risultato 0 signal
+short, ma bidirezionalità chiaramente funzionante a livello scanner.
+
+Se il kill switch contasse solo `signals.direction='short'`, fra 30 giorni
+potrebbe scattare come falso positivo: 0 signal non perché il sistema non veda
+gli short, ma perché dedup e filtri li hanno soppressi a valle. Il check è stato
+quindi esteso con un secondo conteggio:
+
+> A finestra scaduta con 0 signal short, si contano le run dello scanner in cui
+> una proposta del LLM era uno short con score ≥ `MIN_SCORE_THRESHOLD` poi
+> scartato per motivi operativi (dedup, cap, market_status). Se queste run sono
+> ≥ `SPRINT2_KILL_DISCARDED_TOLERANCE` (3), il kill **non scatta**: la
+> bidirezionalità esiste a livello scanner. Parte solo un avviso Telegram di
+> pausa cautelativa, da indagare come possibile effetto cumulativo del dedup.
+> Sotto la soglia 3, il kill scatta e si torna in Fase 2.
+
+Fonte del conteggio: `scanner_runs.notes.proposals` via
+`db.sprint2_discarded_short_proposals`. La soglia 3 è un minimo di evidenza: 3
+scansioni distinte che propongono uno short di qualità bastano a escludere il
+riemergere del bias di generazione. È lo stesso principio della §9 sui gate
+qualitativi: non punire il sistema per ciò che non controlla (qui, il fatto che
+il dedup sopprima uno short già visto).
+
 ### Nota onesta per il journal
 
 Il gate originario era mal calibrato e va registrato come lezione. Una soglia

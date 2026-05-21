@@ -413,16 +413,59 @@ def sprint2_short_signal_count(db: Database, start_iso: str) -> int:
     return len(response.data or [])
 
 
-def sprint2_kill_notified(db: Database) -> bool:
-    """True se la notifica del kill switch direzionale e' gia' stata
-    registrata in monitoring_events. Il kill switch e' permanente (i
-    primi 5 trade sono storia immutabile), quindi la notifica va inviata
-    una sola volta, non una al giorno come per il risk_cap."""
+def sprint2_kill_notified(
+    db: Database, event_type: str = "sprint2_directional_kill"
+) -> bool:
+    """True se una notifica del kill switch direzionale di tipo
+    ``event_type`` e' gia' stata registrata in monitoring_events. La
+    notifica va inviata una sola volta (lo stato del kill non oscilla
+    avanti e indietro), non una al giorno come per il risk_cap.
+
+    Due event_type usati dal guard:
+      - 'sprint2_directional_kill'        kill reale, scanner fermo
+      - 'sprint2_directional_kill_paused' falso positivo, pausa cautelativa
+    """
     response = (
         db._client.table("monitoring_events")
         .select("id")
-        .eq("event_type", "sprint2_directional_kill")
+        .eq("event_type", event_type)
         .limit(1)
         .execute()
     )
     return bool(response.data)
+
+
+def sprint2_discarded_short_proposals(
+    db: Database, start_iso: str, min_score: float
+) -> int:
+    """Numero di run dello scanner da ``start_iso`` in poi in cui almeno
+    una proposta del LLM era uno short con score >= ``min_score`` ma NON
+    e' diventata un signal (soppressa da dedup 24h, slot pieni,
+    market_status, ecc.).
+
+    Legge ``scanner_runs.notes.proposals`` (la sintesi loggata da
+    ``_proposals_summary``). Conta al massimo una volta per run. Serve al
+    kill switch direzionale per distinguere un kill reale (il sistema non
+    vede gli short) da un falso positivo (li vede e propone, ma i filtri
+    operativi li sopprimono prima che diventino signal).
+    """
+    response = (
+        db._client.table("scanner_runs")
+        .select("notes")
+        .gte("ran_at", start_iso)
+        .execute()
+    )
+    runs = 0
+    for row in response.data or []:
+        proposals = (row.get("notes") or {}).get("proposals") or []
+        for p in proposals:
+            if (p.get("direction") or "").lower() != "short":
+                continue
+            try:
+                score = float(p.get("score") or 0)
+            except (TypeError, ValueError):
+                continue
+            if score >= min_score:
+                runs += 1
+                break  # una sola proposta short di qualita' per run
+    return runs

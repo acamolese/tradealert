@@ -39,6 +39,20 @@ WEEKLY_DRAWDOWN_CAP_EUR: float = 20.0
 SPRINT2_START: str = "2026-05-20T18:54:34+00:00"
 SPRINT2_KILL_WINDOW_DAYS: int = 30
 
+# Refinement (giorno 1 di Fase 3): contare solo i signal short rischia un
+# falso positivo. Il dedup 24h e gli altri filtri possono sopprimere short
+# di qualita' proposti dallo scanner prima che diventino signal (es. il
+# 2026-05-21 lo scanner ha proposto Brent short score 7.0 in 3 run, tutte
+# soppresse dal dedup perche' Brent gia' segnalato). Se a fine finestra ci
+# sono 0 signal short MA almeno SPRINT2_KILL_DISCARDED_TOLERANCE run hanno
+# proposto uno short con score >= soglia poi scartato, il kill NON scatta:
+# la bidirezionalita' c'e' a livello scanner, e' il dedup/i filtri ad aver
+# soppresso. In quel caso si manda solo un avviso Telegram (pausa
+# cautelativa). La soglia 3 e' un minimo di evidenza: 3 scansioni distinte
+# che propongono uno short di qualita' bastano a escludere il riemergere
+# del bias di generazione.
+SPRINT2_KILL_DISCARDED_TOLERANCE: int = 3
+
 
 @dataclass(frozen=True)
 class Config:
