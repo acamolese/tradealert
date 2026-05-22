@@ -12,6 +12,12 @@ Sprint 2 - indagine sul bias long. Permette di:
           rigira la pipeline: pre-filtro -> LLM rank_setups -> guardrail.
           Restituisce cosa ha proposto il modello sull'asset di interesse.
 
+  reactivity  test dell'ipotesi "il sistema entra in ritardo". Per ciascun
+          trade indicato, rigira lo scanner sull'asset del trade a intervalli
+          regolari da 24h prima del signal fino al signal stesso, e mostra
+          come direction/score sarebbero evoluti. Distingue "vede tardi" da
+          "vede in tempo ma la soglia di trigger e' alta".
+
 Limiti noti della ricostruzione storica (dichiarati nel report):
   - news, critical_events, economic_calendar NON sono ricostruibili
     a posteriori: vengono passati vuoti. I guardrail macro diventano
@@ -25,14 +31,17 @@ Limiti noti della ricostruzione storica (dichiarati nel report):
 Uso (lato VM):
     .venv/bin/python -m jobs.replay_signal scan --days 60
     .venv/bin/python -m jobs.replay_signal replay
+    .venv/bin/python -m jobs.replay_signal reactivity --trades 19,23,25,29,30,31
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
+
+from supabase import create_client
 
 from src.capital_client import CapitalClient
 from src.config import load_config
@@ -292,12 +301,125 @@ def cmd_replay(cap: CapitalClient, llm: LLMAnalyzer) -> None:
               f"{'PASSA ' if r['prefilter'] else 'ESCLUSO':<10}  {ps:<18} {ss:<14}")
 
 
+# --------------------------------------------------------------------------
+# REACTIVITY: timeline T-24h -> T per testare il ritardo del ciclo del setup
+# --------------------------------------------------------------------------
+
+def cmd_reactivity(cap: CapitalClient, llm: LLMAnalyzer, sb: Any,
+                   trade_ids: list[int], lookback_hours: int = 24,
+                   step_hours: int = 4, min_score: float = 7.0) -> None:
+    """Per ogni trade rigira la lettura del modello sull'asset a intervalli
+    di step_hours, da lookback_hours prima del signal fino al signal."""
+    epic_of = {n: e for n, e, _c in CORE}
+    c4h_cache: dict[str, list[dict]] = {}
+
+    for tid in trade_ids:
+        tr = sb.table("trades").select("*").eq("id", tid).execute().data
+        if not tr:
+            print(f"#{tid}: trade non trovato\n")
+            continue
+        tr = tr[0]
+        asset = tr["asset"]
+        if asset not in epic_of:
+            print(f"#{tid} {asset}: asset non core, skip\n")
+            continue
+        sig_rows = (
+            sb.table("signals").select("*").eq("id", tr["signal_id"]).execute().data
+            if tr.get("signal_id") else []
+        )
+        if not sig_rows:
+            print(f"#{tid}: signal {tr.get('signal_id')} non trovato\n")
+            continue
+        sig = sig_rows[0]
+        T = datetime.fromisoformat(sig["created_at"])
+        pnl = tr.get("pnl")
+        esito = ("WIN" if (pnl is not None and float(pnl) > 0)
+                 else "LOSS" if pnl is not None else "n/d")
+
+        for _n, e, _c in CORE:
+            if e not in c4h_cache:
+                c4h_cache[e] = cap.get_prices(e, resolution="HOUR_4", max_bars=420)
+
+        print("=" * 78)
+        print(f"TRADE {tid}  {asset}  {tr['direction']}  esito {esito} "
+              f"(pnl {pnl})")
+        print(f"signal reale #{sig['id']}: {sig['created_at'][:16]}  "
+              f"direction={sig['direction']}  score={sig.get('score')}")
+        print(f"timeline (lettura isolata sull'asset, step {step_hours}h):")
+
+        points = [T - timedelta(hours=h)
+                  for h in range(lookback_hours, -1, -step_hours)]
+        first_dir_match: str | None = None
+        first_score_ge: str | None = None
+        first_seen_below: str | None = None  # prima volta direzione giusta ma score < soglia
+
+        for ts in points:
+            feats: dict[str, dict[str, Any]] = {}
+            for n, e, c in CORE:
+                f = reconstruct_features(n, c, c4h_cache[e], ts)
+                if f:
+                    feats[n] = f
+            delta_h = round((T - ts).total_seconds() / 3600)
+            label = "T" if delta_h == 0 else f"T-{delta_h}h"
+            af = feats.get(asset)
+            if af is None:
+                print(f"  {label:<6} {ts.strftime('%m-%d %H:%M')}  dati insufficienti")
+                continue
+            is_weekend = ts.weekday() >= 5
+            ctx = {
+                "is_weekend": is_weekend,
+                "weekday": ts.strftime("%A"),
+                "traditional_markets_open": sum(
+                    1 for x in feats.values() if x.get("asset_class") != "crypto"
+                ),
+                "tradeable_count": len(feats),
+                "critical_events": [],
+                "economic_calendar": [],
+            }
+            filtered, _ = _prefilter_candidates(feats, is_weekend=is_weekend)
+            pf = "PASSA  " if asset in filtered else "ESCLUSO"
+            solo = llm.rank_setups({asset: af}, context=ctx)
+            mark = "  <== signal reale" if delta_h == 0 else ""
+            if not solo:
+                print(f"  {label:<6} {ts.strftime('%m-%d %H:%M')}  "
+                      f"prefiltro {pf}  (nessuna proposta){mark}")
+                continue
+            p = solo[0]
+            if p.direction == sig["direction"] and first_dir_match is None:
+                first_dir_match = label
+            if (p.direction == sig["direction"] and p.score >= min_score
+                    and first_score_ge is None):
+                first_score_ge = label
+            if (p.direction == sig["direction"] and p.score < min_score
+                    and first_seen_below is None):
+                first_seen_below = label
+            print(f"  {label:<6} {ts.strftime('%m-%d %H:%M')}  prefiltro {pf}  "
+                  f"{p.direction:<5} score={p.score:<4}"
+                  f"| rsi {af.get('rsi_14')} slope {af.get('trend_slope_pct')} "
+                  f"slope_s {af.get('trend_slope_short_pct')} "
+                  f"pfh {af.get('pct_from_high_20')}{mark}")
+            print(f"         {(p.thesis or '')[:150]}")
+
+        print(f"  --> direzione del signal vista per la prima volta a: "
+              f"{first_dir_match or 'mai prima di T'}")
+        print(f"  --> score >= {min_score:g} (stessa direzione) per la prima "
+              f"volta a: {first_score_ge or 'solo a T o mai'}")
+        print(f"  --> setup gia' visto ma sotto soglia per la prima volta a: "
+              f"{first_seen_below or '-'}")
+        print()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Replay diagnostico scanner")
     sub = parser.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("scan")
     s.add_argument("--days", type=int, default=60)
     sub.add_parser("replay")
+    r = sub.add_parser("reactivity")
+    r.add_argument("--trades", default="19,23,25,29,30,31",
+                   help="ID trade separati da virgola")
+    r.add_argument("--lookback", type=int, default=24, help="ore prima del signal")
+    r.add_argument("--step", type=int, default=4, help="passo in ore")
     args = parser.parse_args()
 
     config = load_config()
@@ -306,6 +428,15 @@ def main() -> int:
 
     if args.cmd == "scan":
         cmd_scan(cap, args.days)
+    elif args.cmd == "reactivity":
+        sb = create_client(
+            config.supabase_url,
+            config.supabase_service_role_key or config.supabase_anon_key,
+        )
+        ids = [int(x) for x in args.trades.split(",")]
+        cmd_reactivity(cap, LLMAnalyzer(config), sb, ids,
+                       lookback_hours=args.lookback, step_hours=args.step,
+                       min_score=config.min_score_threshold)
     else:
         cmd_replay(cap, LLMAnalyzer(config))
     return 0
