@@ -52,14 +52,17 @@ def estimate_cost_usd(
 ) -> float:
     """Costo stimato in USD per una singola chiamata.
 
-    Cache pricing Anthropic: cache write costa 1.25x input base, cache
-    read costa 0.10x. I ``input_tokens`` riportati dall'API NON includono
-    i token serviti dalla cache, quindi si sommano.
+    Cache pricing Anthropic: cache write 5m TTL = 1.25x input base, write
+    1h TTL = 2.0x, read = 0.10x. L'API non riporta il TTL usato nella
+    write, quindi assumiamo 2.0x perche' lo scanner (oggi unico caller con
+    caching) usa il TTL 1h: gli altri caller per ora non cachano. I
+    ``input_tokens`` riportati dall'API NON includono i token serviti dalla
+    cache, quindi si sommano.
     """
     in_price, out_price = _price_for(model)
     cost = (
         input_tokens * in_price
-        + cache_creation_input_tokens * in_price * 1.25
+        + cache_creation_input_tokens * in_price * 2.00
         + cache_read_input_tokens * in_price * 0.10
         + output_tokens * out_price
     ) / 1_000_000

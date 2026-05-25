@@ -300,7 +300,15 @@ Niente testo prima o dopo il JSON."""
 
 class LLMAnalyzer:
     def __init__(self, config: Config) -> None:
-        self._client = Anthropic(api_key=config.anthropic_api_key)
+        # Beta header per il TTL esteso a 1h sulla prompt cache: il system
+        # prompt e' identico ad ogni scan, la cache viene scritta la prima
+        # volta e riletta dagli scan successivi a 1/10 del prezzo input.
+        # Lo scanner gira ogni ora: 1h TTL e' il match naturale, ogni lettura
+        # rinfresca la cache e mantiene il break-even fra write e read.
+        self._client = Anthropic(
+            api_key=config.anthropic_api_key,
+            default_headers={"anthropic-beta": "extended-cache-ttl-2025-04-11"},
+        )
         self._model = config.anthropic_model
         self._config = config
 
@@ -321,10 +329,21 @@ class LLMAnalyzer:
         # i token di input: il modello non ha bisogno del pretty-print.
         user_message = json.dumps(payload, default=str, separators=(",", ":"))
 
+        # Prompt cache 1h sul system prompt (verificato: ~3.5k char =
+        # ~5k tokens, sopra il minimo di 1024/2048 per Sonnet/Haiku).
+        # La logica del modello e' invariata: il caching e' trasparente
+        # alla generazione, riduce solo il costo input dell'~90% sul
+        # cached portion (system prompt) dopo la prima scrittura.
         response = self._client.messages.create(
             model=self._model,
             max_tokens=2000,
-            system=SYSTEM_PROMPT,
+            system=[
+                {
+                    "type": "text",
+                    "text": SYSTEM_PROMPT,
+                    "cache_control": {"type": "ephemeral", "ttl": "1h"},
+                }
+            ],
             messages=[{"role": "user", "content": user_message}],
         )
         log_usage(self._config, "scanner", response)
