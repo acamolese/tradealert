@@ -8,6 +8,7 @@ permettere parsing affidabile.
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -15,6 +16,8 @@ from anthropic import Anthropic
 
 from .config import Config
 from .llm_usage import log_usage
+
+log = logging.getLogger(__name__)
 
 
 def _compress_features(
@@ -355,7 +358,37 @@ class LLMAnalyzer:
             if raw_text.startswith("json"):
                 raw_text = raw_text[4:].strip()
 
-        parsed = json.loads(raw_text)
+        # Difensivo: il modello a volte produce JSON valido + testo extra
+        # dopo (es. hit di max_tokens su un secondo blocco, oppure
+        # markdown/note finali nonostante il "Niente testo prima o dopo").
+        # Usa raw_decode per parsare il PRIMO valore JSON valido e ignorare
+        # qualunque trailing extra. Compatibile col caso normale.
+        try:
+            parsed = json.loads(raw_text)
+        except json.JSONDecodeError as exc:
+            if "Extra data" in str(exc):
+                try:
+                    parsed, _end = json.JSONDecoder().raw_decode(raw_text)
+                    log.warning(
+                        "LLM ha output extra data dopo il JSON valido "
+                        "(raw_text len=%d, end=%d); parsato solo il primo "
+                        "blocco. output_tokens=%s",
+                        len(raw_text), _end,
+                        getattr(getattr(response, "usage", None),
+                                "output_tokens", None),
+                    )
+                except json.JSONDecodeError:
+                    log.error(
+                        "LLM JSON parse fallito anche con raw_decode: %s. "
+                        "raw_text[:500]=%r", exc, raw_text[:500],
+                    )
+                    raise
+            else:
+                log.error(
+                    "LLM JSON parse fallito (%s). raw_text[:500]=%r",
+                    exc, raw_text[:500],
+                )
+                raise
         out: list[SetupProposal] = []
         for p in parsed.get("proposals", []):
             # Tolleranti a chiavi sconosciute: teniamo solo quelle previste
