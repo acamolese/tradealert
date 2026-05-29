@@ -1,4 +1,4 @@
-"""Esporta i dettagli approfonditi dei setup (signal -> trade) in EURO.
+"""Esporta i dettagli approfonditi dei setup (signal -> trade).
 
 Un "setup" qui e' un signal che si e' concretizzato in un trade reale su
 Capital. Lo stato del setup coincide con lo stato del trade:
@@ -10,17 +10,20 @@ Per ogni setup lo script raccoglie:
   - il signal sorgente (score, tesi, costo atteso, feature alla decisione)
   - la cronologia dei monitoring_events (apertura, trailing, chiusura, ...)
 
-Tutti gli importi monetari sono in EURO: il conto Capital.com e' in EUR,
-quindi pnl, entry_price, close_price, expected_cost sono gia' nella valuta
-del conto e non serve conversione.
+Valuta: tutti gli importi (prezzi, P&L, costi) sono in USD. Sulla
+piattaforma Capital i movimenti del conto e i livelli di prezzo di
+indici/commodity USA (Brent ~92, Nasdaq ~30000) sono in dollari, anche
+se l'API /accounts riporta EUR. La fonte autorevole e' la piattaforma.
+Usa --currency XYZ per cambiare l'etichetta se il conto cambia valuta.
 
 Di default esporta TUTTI i setup dall'inizio in ordine cronologico.
-Usa --limit N per limitarti agli ultimi N setup aperti.
+Usa --limit N per limitarti agli ultimi N setup.
 
 Uso (lato VM, serve service_role key per via di RLS):
     .venv/bin/python -m jobs.export_setups
     .venv/bin/python -m jobs.export_setups --limit 10
     .venv/bin/python -m jobs.export_setups --status closed
+    .venv/bin/python -m jobs.export_setups --currency EUR
     .venv/bin/python -m jobs.export_setups --json --out docs/setups.json
     .venv/bin/python -m jobs.export_setups --out docs/setups.txt
 """
@@ -37,22 +40,34 @@ from src.config import load_config
 from src.db import Database
 
 
-def _eur(value: Any) -> str:
-    """Formatta un importo in euro, gestendo None e segno esplicito assente."""
+def _money(value: Any, currency: str) -> str:
+    """Formatta un importo nella valuta del CONTO (P&L, costi)."""
     if value is None:
         return "n/d"
     try:
-        return f"{float(value):,.2f} EUR".replace(",", " ")
+        return f"{float(value):,.2f} {currency}".replace(",", " ")
     except (TypeError, ValueError):
         return str(value)
 
 
-def _eur_signed(value: Any) -> str:
-    """Come _eur ma con segno esplicito (per P&L)."""
+def _money_signed(value: Any, currency: str) -> str:
+    """Come _money ma con segno esplicito (per P&L)."""
     if value is None:
         return "n/d"
     try:
-        return f"{float(value):+,.2f} EUR".replace(",", " ")
+        return f"{float(value):+,.2f} {currency}".replace(",", " ")
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _price(value: Any) -> str:
+    """Formatta un livello di PREZZO dello strumento. Niente simbolo di
+    valuta del conto: e' quotato nella valuta dello strumento (di norma
+    USD per indici/commodity USA), non in quella del conto."""
+    if value is None:
+        return "n/d"
+    try:
+        return f"{float(value):,.2f}".replace(",", " ")
     except (TypeError, ValueError):
         return str(value)
 
@@ -115,12 +130,12 @@ def fetch_setups(db: Database, status: str, limit: int | None) -> list[dict[str,
     return setups
 
 
-def render_text(setups: list[dict[str, Any]]) -> str:
+def render_text(setups: list[dict[str, Any]], currency: str) -> str:
     lines: list[str] = []
     out = lines.append
 
     out("=" * 72)
-    out(f"EXPORT SETUP TRADEALERT  ({len(setups)} setup, importi in EURO)")
+    out(f"EXPORT SETUP TRADEALERT  ({len(setups)} setup, importi in {currency})")
     out("=" * 72)
 
     realized = 0.0
@@ -156,14 +171,14 @@ def render_text(setups: list[dict[str, Any]]) -> str:
         if status == "closed":
             out(f"  Chiuso:       {tr.get('closed_at')}")
         out(f"  Size:         {_num(tr.get('size'))}")
-        out(f"  Entry:        {_eur(tr.get('entry_price'))}")
-        out(f"  Stop loss:    {_eur(tr.get('current_sl'))}")
-        out(f"  Take profit:  {_eur(tr.get('current_tp'))}")
+        out(f"  Entry:        {_price(tr.get('entry_price'))}")
+        out(f"  Stop loss:    {_price(tr.get('current_sl'))}")
+        out(f"  Take profit:  {_price(tr.get('current_tp'))}")
         if status == "closed":
-            out(f"  Prezzo uscita:{_eur(tr.get('close_price'))}")
+            out(f"  Prezzo uscita:{_price(tr.get('close_price'))}")
             out(f"  Motivo uscita:{tr.get('exit_reason') or 'n/d'}")
         out(
-            f"  P&L:          {_eur_signed(tr.get('pnl'))}  "
+            f"  P&L:          {_money_signed(tr.get('pnl'), currency)}  "
             f"({_pct(tr.get('pnl_pct'))})"
         )
 
@@ -172,7 +187,7 @@ def render_text(setups: list[dict[str, Any]]) -> str:
         if sig:
             out("  -- Setup originario (signal) --")
             out(f"  Score:        {_num(sig.get('score'))}")
-            out(f"  Costo atteso: {_eur(sig.get('expected_cost'))}")
+            out(f"  Costo atteso: {_money(sig.get('expected_cost'), currency)}")
             out(f"  Stato signal: {sig.get('status')}")
             out(f"  Creato:       {sig.get('created_at')}")
             thesis = (sig.get("thesis") or "").strip()
@@ -209,18 +224,40 @@ def render_text(setups: list[dict[str, Any]]) -> str:
 
     out("")
     out("=" * 72)
-    out("RIEPILOGO (EURO)")
+    out(f"RIEPILOGO ({currency})")
     out("=" * 72)
-    out(f"  Setup chiusi:    {n_closed}   P&L realizzato:  {_eur_signed(realized)}")
-    out(f"  Setup in corso:  {n_open}   P&L flottante:   {_eur_signed(floating)}")
-    out(f"  Totale combinato:            {_eur_signed(realized + floating)}")
+    out(
+        f"  Setup chiusi:    {n_closed}   P&L realizzato:  "
+        f"{_money_signed(realized, currency)}"
+    )
+    out(
+        f"  Setup in corso:  {n_open}   P&L flottante:   "
+        f"{_money_signed(floating, currency)}"
+    )
+    out(
+        f"  Totale combinato:            "
+        f"{_money_signed(realized + floating, currency)}"
+    )
+    out("")
+    out(
+        "  Nota: il P&L e' il valore nativo dello strumento (USD). "
+        "L'accredito"
+    )
+    out(
+        "  reale sul conto EUR e' convertito al cambio del momento "
+        "(circa 0.85x)."
+    )
     return "\n".join(lines)
 
 
-def render_json(setups: list[dict[str, Any]]) -> str:
+def render_json(setups: list[dict[str, Any]], currency: str) -> str:
     """Output JSON grezzo con metadati di valuta espliciti."""
     payload = {
-        "currency": "EUR",
+        "currency": currency,
+        "currency_note": (
+            "P&L e prezzi sono valori nativi dello strumento in USD; "
+            "l'accredito reale sul conto EUR e' convertito al cambio."
+        ),
         "count": len(setups),
         "setups": setups,
     }
@@ -229,13 +266,18 @@ def render_json(setups: list[dict[str, Any]]) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Export dettagliato dei setup (signal->trade) in EURO"
+        description="Export dettagliato dei setup (signal->trade), importi in USD"
     )
     parser.add_argument(
         "--status",
         choices=["all", "open", "closed"],
         default="all",
         help="Filtra per stato del setup (default: all)",
+    )
+    parser.add_argument(
+        "--currency",
+        default="USD",
+        help="Etichetta valuta per P&L e costi (default: USD)",
     )
     parser.add_argument(
         "--limit",
@@ -265,13 +307,20 @@ def main() -> int:
     db = Database(config)
 
     setups = fetch_setups(db, args.status, args.limit)
-    rendered = render_json(setups) if args.json else render_text(setups)
+    rendered = (
+        render_json(setups, args.currency)
+        if args.json
+        else render_text(setups, args.currency)
+    )
 
     if args.out:
         out_path = Path(args.out)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(rendered + "\n", encoding="utf-8")
-        print(f"Export completato: {out_path}  ({len(setups)} setup, EURO)")
+        print(
+            f"Export completato: {out_path}  "
+            f"({len(setups)} setup, {args.currency})"
+        )
     else:
         print(rendered)
     return 0
