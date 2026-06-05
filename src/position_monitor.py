@@ -112,6 +112,50 @@ def _quantize_to_tick(value: float, tick: float) -> float:
     return round(round(value / tick) * tick, n_decimals + 2)
 
 
+# --- Trailing opzione D (Sprint 3) ----------------------------------------
+# Ibrido: granularita' R a 0.25 (opzione A) + lock TP-aware "tardivo" che si
+# attiva solo da >=80% del cammino entry->TP. Cosi' si protegge il profit in
+# prossimita' del target (casi #45/#51/#55 dello Sprint 2) senza tagliare i
+# mid-runner che ritracciano dal 50-70%. Razionale e simulazione in
+# docs/sprint3-trailing-design.md.
+#
+# SOGLIE PRELIMINARI (80/90% e lock 0.45/0.65*rr): da calibrare dopo 5-10
+# trade Sprint 3 con dati intra_trade_extreme reali. NON modificare nei primi
+# trade per non contaminare la valutazione del fix.
+_TRAIL_A_STEP_R = 0.25
+_TRAIL_TP_LOCK_THRESHOLDS = ((0.90, 0.65), (0.80, 0.45))  # (frac_min, lock_frac)
+
+
+def _trail_offset_granular(profit_r: float, step: float = _TRAIL_A_STEP_R) -> float:
+    """Opzione A: half-risk granulare tra 0.5R e 1R, poi step sopra il BE.
+    0.5R->-0.5, 0.75R->-0.25, 1R->0 (BE), 1.25R->+0.25, 1.5R->+0.5, ..."""
+    if profit_r < 1.0:
+        return -0.5 + math.floor((profit_r - 0.5) / step) * step
+    return math.floor((profit_r - 1.0) / step) * step
+
+
+def _trail_offset_tp_lock(frac_tp: float | None, rr: float | None) -> float | None:
+    """Lock TP-aware tardivo, in unita' di R. None se sotto la soglia di
+    attivazione o se TP/rr non disponibili."""
+    if frac_tp is None or rr is None:
+        return None
+    for frac_min, lock_frac in _TRAIL_TP_LOCK_THRESHOLDS:
+        if frac_tp >= frac_min:
+            return lock_frac * rr
+    return None
+
+
+def _trailing_offset_r(profit_r: float, frac_tp: float | None,
+                       rr: float | None) -> float:
+    """Offset SL in unita' di R per l'opzione D: il piu' protettivo tra la
+    granularita' A e il lock TP-aware tardivo."""
+    off = _trail_offset_granular(profit_r)
+    tp_off = _trail_offset_tp_lock(frac_tp, rr)
+    if tp_off is not None and tp_off > off:
+        off = tp_off
+    return off
+
+
 def _apply_trailing_stop(
     capital: CapitalClient,
     db: Database,
@@ -119,16 +163,16 @@ def _apply_trailing_stop(
     position: dict[str, Any],
     step_r: float = 0.5,
 ) -> None:
-    """Trailing stop R-multiple. Logica:
-    - profit >= 0.5R                     -> SL a entry +/- 0.5R (half-risk).
-    - profit >= 1R                       -> SL a entry (breakeven).
-    - poi step di ``step_r`` sopra il BE -> SL a entry + (n*step_r)
-      con n = floor((profit_r - 1) / step_r).
-    Esempio con step_r=0.5: 1R -> BE, 1.5R -> +0.5R, 2R -> +1R,
-    2.5R -> +1.5R, ecc. Con step_r=1.0 (vecchio comportamento): 1R -> BE,
-    2R -> +1R, 3R -> +2R.
+    """Trailing stop opzione D (Sprint 3), vedi docs/sprint3-trailing-design.md.
+    L'offset dello SL in unita' di R e' il piu' protettivo tra:
+    - granularita' A a 0.25R: 0.5R->-0.5, 0.75R->-0.25, 1R->BE, 1.25R->+0.25,
+      1.5R->+0.5, ... (riempie il buco 1.0-1.5R del vecchio trailing);
+    - lock TP-aware tardivo: da >=80% del cammino entry->TP blocca 0.45*rr,
+      da >=90% blocca 0.65*rr (protegge la prossimita' al target).
     Solo migliorativo: se il nuovo SL e' peggiore dell'attuale non tocca.
-    R e' derivato dallo stop originale del signal o dal trade orphan.
+    R e' derivato dallo stop originale del signal o dal trade orphan; il TP
+    dal broker (``profitLevel``) o, in fallback, dal trade. ``step_r`` e'
+    legacy (vecchia policy) e non e' piu' usato dalla D.
     """
     pos = position.get("position", {}) or {}
     market = position.get("market", {}) or {}
@@ -455,14 +499,23 @@ def _apply_trailing_stop(
     if profit_r < 0.5:
         return
 
-    # Half-risk fra 0.5R e 1R, poi step di step_r partendo da BE a 1R.
-    if profit_r < 1:
-        offset_r = -0.5  # SL a entry - 0.5R (long) / entry + 0.5R (short)
+    # Opzione D: offset = max protettivo tra granularita' A e lock TP-aware
+    # tardivo. Il TP serve per la frazione di cammino entry->TP; se assente
+    # (raro) la D degrada all'opzione A, comunque migliorativa.
+    broker_tp_now = pos.get("profitLevel")
+    if broker_tp_now:
+        tp_price: float | None = float(broker_tp_now)
+    elif trade and trade.get("current_tp"):
+        tp_price = float(trade["current_tp"])
     else:
-        # extra = quanto siamo sopra il breakeven, in unita' di R.
-        extra = profit_r - 1.0
-        n_steps = int(extra / step_r) if step_r > 0 else 0
-        offset_r = n_steps * step_r
+        tp_price = None
+    if tp_price is not None and abs(tp_price - entry) > 0:
+        rr = abs(tp_price - entry) / r_distance
+        frac_tp: float | None = profit / abs(tp_price - entry)
+    else:
+        rr = None
+        frac_tp = None
+    offset_r = _trailing_offset_r(profit_r, frac_tp, rr)
 
     if direction == "BUY":
         new_sl_raw = entry + offset_r * r_distance
