@@ -603,11 +603,13 @@ def _apply_trailing_stop(
             }
         )
     if offset_r < 0:
-        label = "half-risk (rischio dimezzato)"
+        # offset -0.5 -> 0.5R di rischio residuo, -0.25 -> 0.25R, ecc.
+        # Con i gradini fini di D il rischio residuo non e' sempre "meta'".
+        label = f"rischio residuo {-offset_r:g}R"
     elif offset_r == 0:
         label = "breakeven (rischio zero)"
     else:
-        label = f"+{offset_r}R in profitto"
+        label = f"+{offset_r:g}R in profitto"
     if suppress_telegram:
         log.info(
             "Trailing notifica soppressa per %s: stesso SL entro tick "
