@@ -84,6 +84,7 @@ class Config:
     budget_options: list[float]  # preset EUR per bottoni budget Telegram
     trailing_step_r: float  # step in unita' di R per il trailing stop (1.0 conservativo, 0.5 aggressivo)
     max_loss_per_trade_eur: float  # cap perdita massima per singolo trade (EUR)
+    scoring_shadow_enabled: bool  # se true, logga score shadow temp0.2 accanto al reale (Sprint 4 troncone 1)
 
     @property
     def capital_base_url(self) -> str:
@@ -164,4 +165,8 @@ def load_config() -> Config:
         max_loss_per_trade_eur=float(
             os.environ.get("MAX_LOSS_PER_TRADE_EUR", "5")
         ),
+        scoring_shadow_enabled=os.environ.get(
+            "SCORING_SHADOW", "false"
+        ).strip().lower()
+        == "true",
     )

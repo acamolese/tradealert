@@ -318,6 +318,7 @@ class LLMAnalyzer:
         self,
         market_features: dict[str, dict[str, Any]],
         context: dict[str, Any] | None = None,
+        temperature: float | None = None,
     ) -> list[SetupProposal]:
         """market_features: {asset_name: {feature_name: value, ...}}
 
@@ -336,7 +337,7 @@ class LLMAnalyzer:
         # La logica del modello e' invariata: il caching e' trasparente
         # alla generazione, riduce solo il costo input dell'~90% sul
         # cached portion (system prompt) dopo la prima scrittura.
-        response = self._client.messages.create(
+        create_kwargs: dict[str, Any] = dict(
             model=self._model,
             max_tokens=2000,
             system=[
@@ -348,6 +349,11 @@ class LLMAnalyzer:
             ],
             messages=[{"role": "user", "content": user_message}],
         )
+        # temperature=None -> omessa -> default API 1.0 (comportamento storico
+        # invariato). Lo shadow (Sprint 4) passa 0.2 per misurare la stabilita'.
+        if temperature is not None:
+            create_kwargs["temperature"] = temperature
+        response = self._client.messages.create(**create_kwargs)
         log_usage(self._config, "scanner", response)
 
         raw_text = response.content[0].text.strip()

@@ -1551,6 +1551,37 @@ def run_morning_scan(config: Config) -> None:
 
     proposals = llm.rank_setups(filtered_features, context=context)
 
+    # Shadow scoring (Sprint 4 troncone 1): se abilitato, ri-scora lo STESSO
+    # universo a temp 0.2 e logga score reale (temp 1.0) vs shadow su
+    # monitoring_events, SENZA agire. Serve a misurare in produzione se la
+    # temperatura bassa cambia quali candidati superano la soglia. Best-effort:
+    # un errore qui non deve mai impattare lo scan reale.
+    if getattr(config, "scoring_shadow_enabled", False):
+        try:
+            shadow_proposals = llm.rank_setups(
+                filtered_features, context=context, temperature=0.2
+            )
+            db.insert_monitoring_event(
+                {
+                    "trade_id": None,
+                    "event_type": "scoring_shadow",
+                    "reason": "shadow temp0.2 vs reale temp1.0",
+                    "details": {
+                        "real": [
+                            {"asset": p.asset, "direction": p.direction, "score": p.score}
+                            for p in proposals
+                        ],
+                        "shadow": [
+                            {"asset": p.asset, "direction": p.direction, "score": p.score}
+                            for p in shadow_proposals
+                        ],
+                        "min_score": config.min_score_threshold,
+                    },
+                }
+            )
+        except Exception:
+            log.exception("Shadow scoring fallito (ignoro, scan reale intatto)")
+
     # Guardrail deterministici: il prompt chiede al LLM di applicare
     # le regole macro, ma a volte le ignora quando il setup tecnico
     # gli piace. Qui le imponiamo in Python prima del ranking finale.
