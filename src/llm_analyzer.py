@@ -197,9 +197,8 @@ Lettura dell'RSI, simmetrica e con soglie numeriche esplicite:
 Produci un ranking dei top 3 setup. Per ognuno indichi:
 - direction: "long", "short" o "skip" (skip se nessun setup chiaro)
 - score 0-10 (8+ solo per setup eccellenti, 6-7 buoni, sotto 6 mediocri)
-- thesis: 3-5 righe in italiano che spiegano il RAGIONAMENTO completo:
-  perche' proponi l'entrata ora, quale dinamica tecnica stai cavalcando,
-  quale segnale/contesto macro o news supporta la tesi, cosa la invaliderebbe
+- thesis: massimo 2 righe asciutte in italiano col nocciolo del ragionamento
+  (dinamica tecnica principale e cosa la invaliderebbe). Niente prosa estesa.
 - key_factors: 2-4 bullet brevi (max 12 parole ciascuno) con i fattori
   CHIAVE del setup. Esempi long: "RSI 4H esce da ipervenduto", "trend_slope_pct
   positivo +0.6 su 4H", "bb_width_pct in compressione", "pct_from_high_20 -1.2%
@@ -290,7 +289,7 @@ short, a parita' di standard di qualita'):
       "asset": "Brent Oil",
       "direction": "short",
       "score": 7.5,
-      "thesis": "Brent in downtrend su 4H: trend_slope_short_pct -0.5 gia' negativo con trend_slope_pct -0.2 che conferma, RSI 4H a 44 in calo (sopra 25, non ipervenduto), daily_pct_change -2.1% che conferma la pressione in vendita. pct_from_high_20 -3.8% segnala prezzo gia' staccato dai massimi e in discesa, bb_width_pct in espansione coerente con continuazione ribassista. Short di continuazione del downtrend in atto, invalidato da un recupero deciso del massimo 20 candele.",
+      "thesis": "Brent in downtrend su 4H: trend_slope_short_pct -0.5 e trend_slope_pct -0.2, RSI 4H 44 in calo non ipervenduto, daily_pct_change -2.1%. Short di continuazione, invalidato dal recupero del massimo 20 candele.",
       "key_factors": ["trend_slope_short_pct -0.5 e trend_slope_pct -0.2, downtrend confermato", "RSI 4H 44 in calo, debolezza non ipervenduto", "daily_pct_change -2.1% conferma vendita", "pct_from_high_20 -3.8% staccato dai massimi"],
       "risks": ["Rimbalzo tecnico se RSI 4H scende sotto 25", "Catalyst macro energetico a sorpresa"],
       "suggested_stop_pct": 1.8,
