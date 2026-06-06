@@ -27,6 +27,9 @@ TRADEALERT_HOME=/home/ubuntu/tradealert
 # ---------- Logging high/low intra-trade: ogni 30 min H24 (Sprint 3, read+append) ----------
 */30 * * * *         cd $TRADEALERT_HOME && python -m jobs.intra_trade_log >> logs/intra_trade.log 2>&1
 
+# ---------- Shadow check scoring: 1x/giorno 22:30, report Telegram a campione pronto (Sprint 4 t1) ----------
+30 22 * * *          cd $TRADEALERT_HOME && python -m jobs.shadow_check >> logs/shadow_check.log 2>&1
+
 # ---------- Briefing: DISABILITATI (2026-04-24) per taglio costi API (~€6/mese).
 # Doppio gate: crontab commentato qui + guard BRIEFING_ENABLED in jobs/briefing.py.
 # Per riabilitare: scommenta le 3 righe sotto, imposta BRIEFING_ENABLED=true nel
