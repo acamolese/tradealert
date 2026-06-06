@@ -120,3 +120,37 @@ costo resta ~$0.53/giorno. Le strade reali di risparmio (corretto output
 trim a due chiamate; screen Haiku ricalibrato; trim delle ore morte
 in-window) richiedono tutte una fase di validazione e sono candidate per
 Sprint 4. Il monitor LLM resta invariato come da vincolo.
+
+## Aggiornamento 2026-06-06 — Leva 1 Proposta 3 (thesis corta per tutti)
+
+Tentativo a rischio minimo: ridurre la thesis da "3-5 righe" a "massimo 2
+righe asciutte", senza condizionali e senza nominare la soglia, accorciando
+anche l'esempio few-shot Brent (era ~5 righe, anchor di lunghezza). Sezione
+di scoring byte-identica.
+
+Gate (temp=0, 2 universi da 3 asset, 3 run per prompt, Gold incluso):
+
+| asset | OLD ×3 | NEW ×3 | self-jitter | drift | esito |
+|-------|--------|--------|-------------|-------|-------|
+| Gold | 6.5,6.5,6.5 | 6.5,6.5,6.5 | 0.0 | 0.0 | PULITO |
+| Brent Oil | 7.5,7.5,7.5 | 7.5,7.5,7.5 | 0.0 | 0.0 | PULITO |
+| Nasdaq 100 | 5.5,5.5,5.5 | 5.5,6.0,5.5 | 0.0 | 0.5 | DRIFT |
+| US500 | 6.5,6.5,6.0 | 6.5,6.5,6.5 | 0.5 | 0.5 | PULITO |
+| Bitcoin | 6.0,6.0,6.5 | 4.0,6.0,6.0 | 0.5 | 2.5 | DRIFT |
+
+Output risparmiato ~22% (out/call 1440 -> 1130).
+
+VERDETTO: NON DEPLOYATA. Bitcoin drift 2.5 fuori dal self-jitter, Nasdaq
+0.5 oltre il jitter zero. Per il gate ("drift fuori -> fermarsi") non si
+deploya.
+
+Nota interpretativa (non cambia il verdetto): a differenza del +0.5 STABILE
+di Gold del tentativo precedente (6.5x3 -> 7.0x3, sistematico), qui i drift
+sono OUTLIER singoli su 3 run (Nasdaq 2/3 invariati, Bitcoin 2/3 invariati):
+sembrano jitter, non shift sistematici. Inoltre cadono su asset SOTTO la
+soglia 7 (Nasdaq 5.5-6, Bitcoin 4-6.5): nessuno attraversa la soglia, quindi
+la DECISIONE di apertura non cambierebbe. Gli unici asset vicini/sopra la
+soglia (Gold 6.5, Brent 7.5) sono perfettamente stabili (drift 0). La
+thesis corta sembra pero' aumentare leggermente la varianza di scoring sugli
+asset deboli. Per prudenza, e per rispettare il gate alla lettera, si
+rimanda tutto a Sprint 4 (Leva 1 corretta a due chiamate + Leva 2).
