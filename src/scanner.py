@@ -1551,36 +1551,25 @@ def run_morning_scan(config: Config) -> None:
 
     proposals = llm.rank_setups(filtered_features, context=context)
 
-    # Shadow scoring (Sprint 4 troncone 1): se abilitato, ri-scora lo STESSO
-    # universo a temp 0.2 e logga score reale (temp 1.0) vs shadow su
-    # monitoring_events, SENZA agire. Serve a misurare in produzione se la
-    # temperatura bassa cambia quali candidati superano la soglia. Best-effort:
-    # un errore qui non deve mai impattare lo scan reale.
+    # Shadow scoring (Sprint 4 troncone 1): se abilitato, cattura lo scoring
+    # GREZZO reale (temp 1.0) e calcola lo shadow (temp 0.2) sullo STESSO
+    # universo. Il logging vero avviene DOPO i guardrail (piu' sotto), per
+    # registrare sia il grezzo sia il post-guardrail di entrambi i regimi.
+    # Best-effort: un errore qui non deve mai impattare lo scan reale.
+    shadow_raw = None
+    real_raw_snapshot = None
     if getattr(config, "scoring_shadow_enabled", False):
         try:
-            shadow_proposals = llm.rank_setups(
+            real_raw_snapshot = [
+                {"asset": p.asset, "direction": p.direction, "score": p.score}
+                for p in proposals
+            ]
+            shadow_raw = llm.rank_setups(
                 filtered_features, context=context, temperature=0.2
             )
-            db.insert_monitoring_event(
-                {
-                    "trade_id": None,
-                    "event_type": "scoring_shadow",
-                    "reason": "shadow temp0.2 vs reale temp1.0",
-                    "details": {
-                        "real": [
-                            {"asset": p.asset, "direction": p.direction, "score": p.score}
-                            for p in proposals
-                        ],
-                        "shadow": [
-                            {"asset": p.asset, "direction": p.direction, "score": p.score}
-                            for p in shadow_proposals
-                        ],
-                        "min_score": config.min_score_threshold,
-                    },
-                }
-            )
         except Exception:
-            log.exception("Shadow scoring fallito (ignoro, scan reale intatto)")
+            log.exception("Shadow rank_setups fallito (ignoro, scan reale intatto)")
+            shadow_raw = None
 
     # Guardrail deterministici: il prompt chiede al LLM di applicare
     # le regole macro, ma a volte le ignora quando il setup tecnico
@@ -1604,6 +1593,47 @@ def run_morning_scan(config: Config) -> None:
     )
     for gl in guardrail_logs:
         log.info("Guardrail %s [%s]: %s", gl.action, gl.asset, gl.details)
+
+    # Shadow logging (Sprint 4 t1): applica gli STESSI guardrail allo shadow,
+    # con lo stato del MOMENTO (open_position_assets, critical_events,
+    # economic_calendar appena usati per il reale), e logga grezzo +
+    # post-guardrail per entrambi i regimi. Risponde a "temp cambia lo score?"
+    # (grezzo) e "temp cambia i trade reali?" (post-guardrail). Solo logging.
+    if getattr(config, "scoring_shadow_enabled", False) and shadow_raw is not None:
+        try:
+            shadow_raw_snapshot = [
+                {"asset": p.asset, "direction": p.direction, "score": p.score}
+                for p in shadow_raw
+            ]
+            shadow_post, _shadow_glogs = apply_macro_guardrails(
+                list(shadow_raw),
+                critical_events=critical_events,
+                economic_calendar=economic_calendar,
+                open_position_assets=open_position_assets,
+            )
+            db.insert_monitoring_event(
+                {
+                    "trade_id": None,
+                    "event_type": "scoring_shadow",
+                    "reason": "shadow temp0.2 vs reale temp1.0 (grezzo + post-guardrail)",
+                    "details": {
+                        "real_raw": real_raw_snapshot,
+                        "real_post": [
+                            {"asset": p.asset, "direction": p.direction, "score": p.score}
+                            for p in proposals
+                        ],
+                        "shadow_raw": shadow_raw_snapshot,
+                        "shadow_post": [
+                            {"asset": p.asset, "direction": p.direction, "score": p.score}
+                            for p in shadow_post
+                        ],
+                        "open_positions": open_position_assets,
+                        "min_score": config.min_score_threshold,
+                    },
+                }
+            )
+        except Exception:
+            log.exception("Shadow logging fallito (ignoro, scan reale intatto)")
 
     eligible = [p for p in proposals if p.direction in ("long", "short")]
     eligible.sort(key=lambda p: p.score, reverse=True)
