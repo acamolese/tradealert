@@ -33,7 +33,8 @@ from src.telegram_client import TelegramClient
 
 log = logging.getLogger(__name__)
 
-SOGLIA_CAMPIONE = 15
+SOGLIA_CAMPIONE = 15  # borderline COL NETTO-GUARDRAIL prima del verdetto
+SAFETY_DAYS = 12  # giorni di raccolta netto oltre i quali si riporta comunque
 BL_LO, BL_HI = 6.5, 7.5
 
 
@@ -66,6 +67,11 @@ def _views(details: dict):
 def _is_borderline(details: dict) -> bool:
     rr, sr, _rp, _sp = _views(details)
     return any(BL_LO <= s <= BL_HI for s in rr + sr)
+
+
+def _has_net(details: dict) -> bool:
+    """True se l'evento ha i dati post-guardrail (formato arricchito)."""
+    return "real_raw" in details
 
 
 def _open(scores: list[float] | None, ms: float):
@@ -122,22 +128,30 @@ def _fmt_level(titolo: str, m: dict) -> str:
     )
 
 
-def _build_report(events) -> str:
+def _build_report(events, mode: str, n_net_bl: int, n_days: int) -> str:
     raw = _tally(events, "raw")
     post = _tally(events, "post")
-    n_bl = sum(1 for e in events if _is_borderline(e.get("details") or {}))
 
-    # Raccomandazione basata sul NETTO (la domanda comportamentale). Se il
-    # netto non ha ancora dati, fallback prudente su no-deploy.
-    if post["n"] >= SOGLIA_CAMPIONE and post["agree_pct"] >= 90 and abs(post["net"]) <= 1:
-        reco = "✅ <b>DEPLOY</b>: a livello di trade reali (netto guardrail) temp0.2 apre lo stesso set, scoring piu' stabile."
-    elif post["n"] < SOGLIA_CAMPIONE:
-        reco = "🟡 <b>NO-DEPLOY (per ora)</b>: il netto-guardrail non ha ancora abbastanza dati (forward-only dall'arricchimento)."
+    if mode == "safety":
+        testata = (
+            f"⏳ <b>Shadow scoring — campione netto INSUFFICIENTE dopo {n_days} giorni</b>\n"
+            f"Borderline col netto: {n_net_bl}/{SOGLIA_CAMPIONE}. Decidi tu se "
+            f"aspettare ancora o concludere col campione disponibile."
+        )
+        reco = (
+            "🟡 <b>NO-DEPLOY</b>: campione netto sotto soglia. Dati sotto, "
+            "ma non bastano per un verdetto solido."
+        )
     else:
-        reco = "🟡 <b>NO-DEPLOY / capire prima</b>: a livello di trade reali temp0.2 cambia il set aperto."
+        testata = f"📊 <b>Shadow scoring — REPORT</b> ({n_net_bl} borderline col netto)"
+        if post["agree_pct"] >= 90 and abs(post["net"]) <= 1:
+            reco = "✅ <b>DEPLOY</b>: a livello di trade reali (netto guardrail) temp0.2 apre lo stesso set, scoring piu' stabile."
+        else:
+            reco = "🟡 <b>NO-DEPLOY / capire prima</b>: a livello di trade reali temp0.2 cambia il set aperto."
 
     return (
-        f"📊 <b>Shadow scoring — report</b> ({len(events)} eventi, {n_bl} borderline)\n\n"
+        f"{testata}\n"
+        f"({len(events)} eventi totali, {post['n']} col netto-guardrail)\n\n"
         f"{_fmt_level('GREZZO (temp cambia lo score?)', raw)}\n\n"
         f"{_fmt_level('NETTO GUARDRAIL (temp cambia i trade reali?)', post)}\n\n"
         f"{reco}\n\n"
@@ -165,20 +179,33 @@ def main() -> int:
         .execute()
         .data
     )
-    n_bl = sum(1 for e in events if _is_borderline(e.get("details") or {}))
-    n_post = sum(
-        1 for e in events
-        if "real_raw" in (e.get("details") or {})
-    )
+    # Trigger sul NETTO: borderline che hanno anche i dati post-guardrail.
+    net_events = [e for e in events if _has_net(e.get("details") or {})]
+    net_borderline = [e for e in net_events if _is_borderline(e.get("details") or {})]
+    n_net_bl = len(net_borderline)
+    # Giorni di raccolta netto = date distinte con eventi in formato arricchito.
+    net_days = sorted({(e.get("created_at") or "")[:10] for e in net_events if e.get("created_at")})
+    n_days = len(net_days)
+    raw_bl = sum(1 for e in events if _is_borderline(e.get("details") or {}))
     log.info(
-        "shadow: %d/%d borderline (%d eventi totali, %d col netto-guardrail)",
-        n_bl, SOGLIA_CAMPIONE, len(events), n_post,
+        "shadow: netto-borderline %d/%d (%d giorni netto, %d eventi totali, %d grezzo-borderline)",
+        n_net_bl, SOGLIA_CAMPIONE, n_days, len(events), raw_bl,
     )
-    if n_bl < SOGLIA_CAMPIONE:
-        log.info("Campione insufficiente, niente report. Riprovo al prossimo run.")
+
+    if n_net_bl >= SOGLIA_CAMPIONE:
+        mode = "verdict"
+    elif n_days >= SAFETY_DAYS:
+        mode = "safety"
+        log.info("Safety net: %d giorni di raccolta netto, riporto comunque.", n_days)
+    else:
+        log.info(
+            "Campione netto insufficiente (%d/%d borderline, %d/%d giorni). "
+            "Niente report, riprovo al prossimo run.",
+            n_net_bl, SOGLIA_CAMPIONE, n_days, SAFETY_DAYS,
+        )
         return 0
 
-    report = _build_report(events)
+    report = _build_report(events, mode=mode, n_net_bl=n_net_bl, n_days=n_days)
     try:
         TelegramClient(config).send_message(report)
     except Exception:
