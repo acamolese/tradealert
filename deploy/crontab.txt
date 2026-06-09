@@ -27,8 +27,8 @@ TRADEALERT_HOME=/home/ubuntu/tradealert
 # ---------- Logging high/low intra-trade: ogni 30 min H24 (Sprint 3, read+append) ----------
 */30 * * * *         cd $TRADEALERT_HOME && python -m jobs.intra_trade_log >> logs/intra_trade.log 2>&1
 
-# ---------- Shadow check scoring: 1x/giorno 22:30, report Telegram a campione pronto (Sprint 4 t1) ----------
-30 22 * * *          cd $TRADEALERT_HOME && python -m jobs.shadow_check >> logs/shadow_check.log 2>&1
+# ---------- Shadow check scoring: RIMOSSO il 2026-06-09 (verdetto DEPLOY dato, shadow concluso). ----------
+# jobs/shadow_check.py resta nel repo per riferimento ma non e' piu' schedulato.
 
 # ---------- Open-rate check: 1x/giorno 22:35, alert Telegram se il tasso apertura cala post-deploy (Sprint 4 t1) ----------
 35 22 * * *          cd $TRADEALERT_HOME && python -m jobs.open_rate_check >> logs/open_rate.log 2>&1
