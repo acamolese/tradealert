@@ -85,6 +85,7 @@ class Config:
     trailing_step_r: float  # step in unita' di R per il trailing stop (1.0 conservativo, 0.5 aggressivo)
     max_loss_per_trade_eur: float  # cap perdita massima per singolo trade (EUR)
     scoring_shadow_enabled: bool  # se true, logga score shadow temp0.2 accanto al reale (Sprint 4 troncone 1)
+    scoring_two_call: bool  # se true, scoring (Call1 temp0.2, no thesis) + thesis (Call2) separati
 
     @property
     def capital_base_url(self) -> str:
@@ -167,6 +168,10 @@ def load_config() -> Config:
         ),
         scoring_shadow_enabled=os.environ.get(
             "SCORING_SHADOW", "false"
+        ).strip().lower()
+        == "true",
+        scoring_two_call=os.environ.get(
+            "SCORING_TWO_CALL", "false"
         ).strip().lower()
         == "true",
     )

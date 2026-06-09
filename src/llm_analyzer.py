@@ -300,6 +300,33 @@ short, a parita' di standard di qualita'):
 Niente testo prima o dopo il JSON."""
 
 
+# Sprint 4 troncone 1: pipeline a due chiamate. Call 1 = scoring (temp bassa,
+# niente thesis discorsiva): si appende questo suffisso al system prompt, che
+# NON nomina la soglia (l'anchoring alla soglia muoveva lo score) e lascia
+# byte-identiche le regole di scoring sopra.
+_SCORING_ONLY_SUFFIX = """
+
+MODALITA' SCORING (solo questa richiesta): NON produrre i campi "thesis" ne'
+"risks". Per ogni proposta dai SOLO: asset, direction, score, key_factors,
+suggested_stop_pct, suggested_target_pct. Direzione e score si decidono con le
+regole sopra, invariati: questa modalita' cambia solo COSA scrivi, non come valuti."""
+
+
+# Call 2 = generazione della sola thesis discorsiva per il setup gia' scelto.
+THESIS_SYSTEM_PROMPT = """Sei l'analista di swing trading. Ricevi un setup GIA'
+DECISO (asset, direzione, score, key_factors) con le sue feature tecniche.
+Scrivi SOLO la motivazione, senza cambiare direzione ne' score:
+- thesis: massimo 2 righe asciutte in italiano (dinamica tecnica principale e
+  cosa la invaliderebbe).
+- risks: 1-2 bullet brevi coi rischi principali.
+VINCOLO: non citare medie mobili, bande di Bollinger, livelli numerici di
+supporto/resistenza, volume o open interest (non sono nelle feature). Esprimi i
+concetti con trend_slope_pct, trend_slope_short_pct, rsi_14, bb_width_pct,
+atr_pct_of_price, pct_from_high_20, daily_pct_change, news.
+Rispondi SOLO con JSON valido: {"thesis": "...", "risks": ["...", "..."]}.
+Niente testo prima o dopo il JSON."""
+
+
 class LLMAnalyzer:
     def __init__(self, config: Config) -> None:
         # Beta header per il TTL esteso a 1h sulla prompt cache: il system
@@ -319,6 +346,7 @@ class LLMAnalyzer:
         market_features: dict[str, dict[str, Any]],
         context: dict[str, Any] | None = None,
         temperature: float | None = None,
+        scoring_only: bool = False,
     ) -> list[SetupProposal]:
         """market_features: {asset_name: {feature_name: value, ...}}
 
@@ -337,13 +365,16 @@ class LLMAnalyzer:
         # La logica del modello e' invariata: il caching e' trasparente
         # alla generazione, riduce solo il costo input dell'~90% sul
         # cached portion (system prompt) dopo la prima scrittura.
+        system_text = (
+            SYSTEM_PROMPT + _SCORING_ONLY_SUFFIX if scoring_only else SYSTEM_PROMPT
+        )
         create_kwargs: dict[str, Any] = dict(
             model=self._model,
             max_tokens=2000,
             system=[
                 {
                     "type": "text",
-                    "text": SYSTEM_PROMPT,
+                    "text": system_text,
                     "cache_control": {"type": "ephemeral", "ttl": "1h"},
                 }
             ],
@@ -411,3 +442,52 @@ class LLMAnalyzer:
                 )
             )
         return out
+
+    def generate_thesis(
+        self,
+        proposal: SetupProposal,
+        asset_features: dict[str, Any],
+        context: dict[str, Any] | None = None,
+    ) -> tuple[str, list[str]]:
+        """Call 2 (Sprint 4 t1): genera SOLO thesis + risks per un setup gia'
+        scelto, a temperatura alta (default) per la prosa. Non cambia score ne'
+        direzione. Ritorna (thesis, risks); ("", []) se il parsing fallisce."""
+        payload: dict[str, Any] = {
+            "setup": {
+                "asset": proposal.asset,
+                "direction": proposal.direction,
+                "score": proposal.score,
+                "key_factors": proposal.key_factors or [],
+            },
+            "features": _compress_features(
+                {proposal.asset: asset_features}
+            ).get(proposal.asset, {}),
+        }
+        if context:
+            payload["context"] = context
+        user_message = json.dumps(payload, default=str, separators=(",", ":"))
+        response = self._client.messages.create(
+            model=self._model,
+            max_tokens=400,
+            system=THESIS_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_message}],
+        )
+        log_usage(self._config, "scanner_thesis", response)
+        raw = response.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.strip("`")
+            if raw.startswith("json"):
+                raw = raw[4:].strip()
+        try:
+            parsed = json.JSONDecoder().raw_decode(raw)[0]
+        except Exception:
+            try:
+                parsed = json.loads(raw)
+            except Exception:
+                log.error("Call2 thesis parse fail: raw=%r", raw[:200])
+                return "", []
+        thesis = str(parsed.get("thesis", "") or "")
+        risks = parsed.get("risks") or []
+        if not isinstance(risks, list):
+            risks = [str(risks)]
+        return thesis, [str(r) for r in risks]

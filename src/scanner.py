@@ -1549,7 +1549,14 @@ def run_morning_scan(config: Config) -> None:
         ", ".join(f"{k}={v}" for k, v in filter_counts.items() if v),
     )
 
-    proposals = llm.rank_setups(filtered_features, context=context)
+    if getattr(config, "scoring_two_call", False):
+        # Sprint 4 t1: Call 1 = scoring a temp 0.2, senza thesis (generata poi
+        # dalla Call 2 solo per il setup scelto). Reversibile col flag.
+        proposals = llm.rank_setups(
+            filtered_features, context=context, temperature=0.2, scoring_only=True
+        )
+    else:
+        proposals = llm.rank_setups(filtered_features, context=context)
 
     # Shadow scoring (Sprint 4 troncone 1): se abilitato, cattura lo scoring
     # GREZZO reale (temp 1.0) e calcola lo shadow (temp 0.2) sullo STESSO
@@ -1701,6 +1708,21 @@ def run_morning_scan(config: Config) -> None:
         open_count = 0
 
     asset_features = features.get(top.asset, {})
+
+    # Sprint 4 t1: Call 2 — genera la thesis discorsiva SOLO ora che il setup
+    # e' stato scelto (non sul 91% di scan no_setup). Best-effort: se fallisce,
+    # si procede con thesis vuota (il signal si crea comunque).
+    if getattr(config, "scoring_two_call", False) and not top.thesis:
+        try:
+            top.thesis, top.risks = llm.generate_thesis(
+                top, asset_features, context
+            )
+            log.info(
+                "Call2 thesis generata per %s (%d char)", top.asset, len(top.thesis)
+            )
+        except Exception:
+            log.exception("Call2 thesis fallita; procedo senza thesis discorsiva")
+
     # Sprint 1 (Fix 1.4): persistiamo le feature al momento della decisione
     # in JSONB per analisi retrospettive (correlazione score/pnl, debug
     # confabulazioni LLM, backtest delle regole). Le news vengono
