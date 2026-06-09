@@ -30,6 +30,9 @@ TRADEALERT_HOME=/home/ubuntu/tradealert
 # ---------- Shadow check scoring: 1x/giorno 22:30, report Telegram a campione pronto (Sprint 4 t1) ----------
 30 22 * * *          cd $TRADEALERT_HOME && python -m jobs.shadow_check >> logs/shadow_check.log 2>&1
 
+# ---------- Open-rate check: 1x/giorno 22:35, alert Telegram se il tasso apertura cala post-deploy (Sprint 4 t1) ----------
+35 22 * * *          cd $TRADEALERT_HOME && python -m jobs.open_rate_check >> logs/open_rate.log 2>&1
+
 # ---------- Briefing: DISABILITATI (2026-04-24) per taglio costi API (~€6/mese).
 # Doppio gate: crontab commentato qui + guard BRIEFING_ENABLED in jobs/briefing.py.
 # Per riabilitare: scommenta le 3 righe sotto, imposta BRIEFING_ENABLED=true nel
