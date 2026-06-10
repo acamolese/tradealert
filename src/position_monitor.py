@@ -134,6 +134,18 @@ def _trail_offset_granular(profit_r: float, step: float = _TRAIL_A_STEP_R) -> fl
     return math.floor((profit_r - 1.0) / step) * step
 
 
+def _trail_offset_v1_lowband(profit_r: float) -> float:
+    """Rampa V1 'fascia bassa pulita' SOLO per 0.5<=profit_r<1.0 (deploy gated).
+    Anticipa il lock rispetto a D nella fascia 0.5-1.0R, e a 1.0R riaggancia
+    esattamente il breakeven di D (delta-trend zero per costruzione):
+    0.5R->-0.25, 0.75R->-0.10, 1.0R->BE (=D). Vedi
+    docs/sprint4-trailing-v1-clean.md. Definita solo nella fascia bassa: i
+    chiamanti la usano solo se 0.5<=profit_r<1.0, fuori resta la curva D."""
+    if profit_r < 0.75:
+        return -0.25 + (profit_r - 0.5) / 0.25 * 0.15  # -0.25 -> -0.10
+    return -0.10 + (profit_r - 0.75) / 0.25 * 0.10      # -0.10 -> 0.0 (BE)
+
+
 def _trail_offset_tp_lock(frac_tp: float | None, rr: float | None) -> float | None:
     """Lock TP-aware tardivo, in unita' di R. None se sotto la soglia di
     attivazione o se TP/rr non disponibili."""
@@ -146,10 +158,19 @@ def _trail_offset_tp_lock(frac_tp: float | None, rr: float | None) -> float | No
 
 
 def _trailing_offset_r(profit_r: float, frac_tp: float | None,
-                       rr: float | None) -> float:
+                       rr: float | None, v1_lowband: bool = False) -> float:
     """Offset SL in unita' di R per l'opzione D: il piu' protettivo tra la
-    granularita' A e il lock TP-aware tardivo."""
-    off = _trail_offset_granular(profit_r)
+    granularita' A e il lock TP-aware tardivo.
+
+    ``v1_lowband`` (deploy gated, default OFF = bit-identico a D): se True,
+    nella SOLA fascia 0.5<=profit_r<1.0 usa la rampa V1 al posto della
+    granularita' A. Fuori da quella fascia (incluso >=1.0R) e il lock TP-aware
+    restano byte-identici a D, quindi a 1.0R V1 riaggancia il breakeven di D e
+    il delta-trend resta zero. Vedi docs/sprint4-trailing-v1-clean.md."""
+    if v1_lowband and 0.5 <= profit_r < 1.0:
+        off = _trail_offset_v1_lowband(profit_r)
+    else:
+        off = _trail_offset_granular(profit_r)
     tp_off = _trail_offset_tp_lock(frac_tp, rr)
     if tp_off is not None and tp_off > off:
         off = tp_off
@@ -162,6 +183,7 @@ def _apply_trailing_stop(
     telegram: TelegramClient,
     position: dict[str, Any],
     step_r: float = 0.5,
+    v1_lowband: bool = False,
 ) -> None:
     """Trailing stop opzione D (Sprint 3), vedi docs/sprint3-trailing-design.md.
     L'offset dello SL in unita' di R e' il piu' protettivo tra:
@@ -515,7 +537,11 @@ def _apply_trailing_stop(
     else:
         rr = None
         frac_tp = None
-    offset_r = _trailing_offset_r(profit_r, frac_tp, rr)
+    offset_r = _trailing_offset_r(profit_r, frac_tp, rr, v1_lowband=v1_lowband)
+    # Guardrail 3: controfattuale D loggato in parallelo per la metrica forward.
+    # Con v1_lowband OFF coincide con offset_r; con V1 ON e' l'offset che D
+    # avrebbe applicato a questo profit_r (serve a calcolare exit_R D vs V1).
+    offset_r_d = _trailing_offset_r(profit_r, frac_tp, rr, v1_lowband=False)
 
     if direction == "BUY":
         new_sl_raw = entry + offset_r * r_distance
@@ -599,6 +625,8 @@ def _apply_trailing_stop(
                     "r_distance": r_distance,
                     "profit_r": profit_r,
                     "offset_r": offset_r,
+                    "offset_r_d": offset_r_d,
+                    "trail_variant": "v1_lowband" if v1_lowband else "D",
                 },
             }
         )
@@ -936,7 +964,9 @@ def run_trailing_stops(config: Config) -> None:
     for position in positions:
         try:
             _apply_trailing_stop(
-                capital, db, telegram, position, step_r=config.trailing_step_r
+                capital, db, telegram, position,
+                step_r=config.trailing_step_r,
+                v1_lowband=config.trail_v1_lowband,
             )
         except Exception:
             log.exception("Trailing SL fallito")
@@ -990,7 +1020,9 @@ def monitor_positions(config: Config) -> None:
         # 1. Trailing stop (server-side) prima della valutazione LLM
         try:
             _apply_trailing_stop(
-                capital, db, telegram, position, step_r=config.trailing_step_r
+                capital, db, telegram, position,
+                step_r=config.trailing_step_r,
+                v1_lowband=config.trail_v1_lowband,
             )
         except Exception:
             log.exception("Trailing SL fallito")
