@@ -2,8 +2,9 @@
 
 Utility TEMPORANEA (scelta tariffa entro fine luglio 2026), indipendente dal
 trading: legge https://octopusenergy.it/le-nostre-tariffe, estrae la materia
-prima €/kWh della tariffa "Octopus Fissa 12M" (Luce monoraria) e avvisa su
-Telegram (bot tradealert) quando scende a <= soglia. Riusa TelegramClient.
+prima €/kWh della tariffa "Octopus Fissa 12M" (Luce monoraria) e manda OGNI
+giorno il prezzo su Telegram (bot tradealert), con celebrazione quando <=
+soglia e alert se non riesce a leggerlo. Riusa TelegramClient.
 
     python -m jobs.octopus_check            # check + Telegram + stato
     python -m jobs.octopus_check --dry-run  # fetch+parse, stampa, niente invio
@@ -30,8 +31,6 @@ THRESHOLD = 0.1232          # soglia: la tariffa attuale dell'utente
 TARIFF = "Octopus Fissa 12M (Luce monoraria)"
 STATE = os.path.expanduser("~/tradealert/data/octopus_state.json")
 PLAUSIBLE = (0.05, 0.40)    # range di sanita' del prezzo €/kWh
-HEARTBEAT_DAYS = 7
-ERR_SUPPRESS_DAYS = 3
 
 
 def _to_float(s: str) -> float | None:
@@ -95,70 +94,45 @@ def _save_state(s: dict) -> None:
 
 
 def main() -> int:
+    """Invia OGNI giorno il prezzo della Luce Fissa: un messaggio per run.
+    Celebrazione speciale quando <= soglia, alert se non legge il prezzo."""
     dry = "--dry-run" in sys.argv
     today = datetime.now(timezone.utc).date().isoformat()
     price, note = fetch_price()
     st = _load_state()
-    msgs: list[str] = []
 
     if price is None:
-        # parse-fail: avvisa al massimo ogni ERR_SUPPRESS_DAYS giorni
-        last_err = st.get("last_error_date")
-        days = 999
-        if last_err:
-            days = (datetime.fromisoformat(today) - datetime.fromisoformat(last_err)).days
-        if days >= ERR_SUPPRESS_DAYS:
-            msgs.append(
-                f"⚠️ <b>Octopus monitor</b>: non riesco a leggere il prezzo "
-                f"della {TARIFF} ({note}). Controlla a mano:\n{URL}"
-            )
-            st["last_error_date"] = today
-        _emit(dry, msgs, st)
+        msg = (
+            f"⚠️ <b>Luce Fissa Octopus</b>: oggi non riesco a leggere il prezzo "
+            f"({note}). Controlla a mano:\n{URL}"
+        )
+        st["last_check"] = today
+        st["last_error_date"] = today
+        _emit(dry, [msg], st, None, note)
         return 0
 
     lowest = st.get("lowest_seen")
-    alerted = st.get("alerted_below", False)
+    is_new_low = lowest is None or price < lowest - 1e-9
+    if is_new_low:
+        st["lowest_seen"] = price
+    seen_low = st["lowest_seen"]
+    dist = price - THRESHOLD
 
-    # 1) soglia raggiunta (alert una sola volta finche' resta sotto)
-    if price <= THRESHOLD and not alerted:
-        msgs.append(
-            f"🎉 <b>Luce Fissa Octopus a {price:.4f} €/kWh</b> (≤ soglia {THRESHOLD:.4f}).\n"
+    if price <= THRESHOLD:
+        msg = (
+            f"🎉 <b>Luce Fissa oggi {price:.4f} €/kWh</b> — ≤ soglia {THRESHOLD:.4f}!\n"
             f"È il momento buono per bloccarla: replichi/superi la tua tariffa attuale.\n{URL}"
         )
-        st["alerted_below"] = True
-    elif price > THRESHOLD and alerted:
-        msgs.append(
-            f"↗️ Luce Fissa risalita a {price:.4f} €/kWh (sopra {THRESHOLD:.4f}). "
-            f"Monitor riarmato."
+    else:
+        nl = " 📉 <b>nuovo minimo!</b>" if (is_new_low and lowest is not None) else ""
+        msg = (
+            f"🐙 <b>Luce Fissa oggi {price:.4f} €/kWh</b> "
+            f"(soglia {THRESHOLD:.4f}, manca {dist:+.4f}; minimo visto {seen_low:.4f}).{nl}"
         )
-        st["alerted_below"] = False
-
-    # 2) nuovo minimo significativo (heads-up mentre si avvicina), step 0.003
-    if lowest is None or price < lowest - 0.003:
-        if lowest is not None and price > THRESHOLD:
-            msgs.append(
-                f"📉 Nuovo minimo Luce Fissa: {price:.4f} €/kWh "
-                f"(soglia {THRESHOLD:.4f}, mancano {price-THRESHOLD:+.4f})."
-            )
-        st["lowest_seen"] = price
-
-    # 3) heartbeat settimanale (conferma che il monitor e' vivo)
-    last_hb = st.get("last_heartbeat")
-    hb_days = 999
-    if last_hb:
-        hb_days = (datetime.fromisoformat(today) - datetime.fromisoformat(last_hb)).days
-    if not msgs and hb_days >= HEARTBEAT_DAYS:
-        msgs.append(
-            f"🐙 Monitor Luce Fissa attivo. Oggi {price:.4f} €/kWh "
-            f"(soglia {THRESHOLD:.4f}, minimo visto {st.get('lowest_seen', price):.4f})."
-        )
-        st["last_heartbeat"] = today
-    elif msgs and hb_days >= HEARTBEAT_DAYS:
-        st["last_heartbeat"] = today
 
     st["last_price"] = price
     st["last_check"] = today
-    _emit(dry, msgs, st, price, note)
+    _emit(dry, [msg], st, price, note)
     return 0
 
 
