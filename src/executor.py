@@ -440,6 +440,16 @@ def execute_signal(
 
     _link_safe(db.link_attempt_persisted, signal_id)
     db.update_signal_status(signal_id, "executed")
+
+    # Sprint 5 — regola dinamica SHADOW (logging-only): registra cosa la regola
+    # "no doppione su tesi che fallisce" avrebbe fatto, senza bloccare nulla.
+    # Best-effort assoluto: qualunque errore qui NON deve toccare l'apertura.
+    try:
+        from .concentration_shadow import log_shadow
+
+        log_shadow(config, db, trade_row)
+    except Exception:
+        log.debug("shadow concentration logging fallito", exc_info=True)
     db.insert_monitoring_event(
         {
             "trade_id": trade_row["id"],
