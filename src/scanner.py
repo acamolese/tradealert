@@ -1702,12 +1702,68 @@ def run_morning_scan(config: Config) -> None:
     # rotation scatta (nuovo score - peggiore aperta >= ROTATION_DELTA).
     # Altrimenti silenzio: eviteremmo comunque l'apertura all'executor.
     try:
-        open_count = len(capital.get_open_positions())
+        open_positions = capital.get_open_positions()
     except Exception:
         log.exception("Fetch posizioni aperte fallito")
-        open_count = 0
+        open_positions = []
+    open_count = len(open_positions)
 
     asset_features = features.get(top.asset, {})
+
+    # Sprint 5 — Tetto di concentrazione statico (gated). Agisce SOLO
+    # all'apertura: non tocca V1/trailing. B2 (cap globale) resta gestito da
+    # MAX_OPEN_POSITIONS a valle. Vedi docs/sprint5-basket-concentration.md.
+    top_epic = asset_features.get("epic")
+    top_dir_api = "BUY" if top.direction == "long" else "SELL"
+
+    def _pos_dir(p: dict[str, Any]) -> str:
+        return ((p.get("position") or {}).get("direction") or "").upper()
+
+    def _pos_epic(p: dict[str, Any]) -> str:
+        return (p.get("market") or {}).get("epic") or ""
+
+    # B1 — anti-duplicato: non aprire su (asset, direzione) gia' aperto,
+    # indipendentemente dalla finestra dedup 24h (caso #69/#71: stesso BTC long).
+    if getattr(config, "concentration_block_dup", False) and top_epic:
+        dup = next(
+            (
+                p for p in open_positions
+                if _pos_epic(p) == top_epic and _pos_dir(p) == top_dir_api
+            ),
+            None,
+        )
+        if dup is not None:
+            deal = (dup.get("position") or {}).get("dealId")
+            log.info(
+                "Tetto B1: blocco %s %s, posizione gia' aperta (deal %s)",
+                top.asset, top.direction, deal,
+            )
+            _log_run(
+                db, "concentration_blocked_dup",
+                top_asset=top.asset, top_score=top.score,
+                open_positions_count=open_count,
+                notes={"block": "dup_asset_direction", "epic": top_epic,
+                       "direction": top.direction, "blocking_deal": deal},
+            )
+            return
+
+    # B3 — cap per direzione (default OFF, MAX_OPEN_PER_DIRECTION=0).
+    max_dir = getattr(config, "max_open_per_direction", 0) or 0
+    if max_dir > 0:
+        same_dir = sum(1 for p in open_positions if _pos_dir(p) == top_dir_api)
+        if same_dir >= max_dir:
+            log.info(
+                "Tetto B3: blocco %s %s, gia' %d posizioni %s (cap %d)",
+                top.asset, top.direction, same_dir, top_dir_api, max_dir,
+            )
+            _log_run(
+                db, "concentration_blocked_direction",
+                top_asset=top.asset, top_score=top.score,
+                open_positions_count=open_count,
+                notes={"block": "per_direction", "direction": top.direction,
+                       "open_same_dir": same_dir, "cap": max_dir},
+            )
+            return
 
     # Sprint 4 t1: Call 2 — genera la thesis discorsiva SOLO ora che il setup
     # e' stato scelto (non sul 91% di scan no_setup). Best-effort: se fallisce,
