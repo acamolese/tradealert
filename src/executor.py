@@ -180,6 +180,26 @@ def execute_signal(
             False, reason="Margine disponibile zero o non leggibile"
         )
 
+    # Conversione valuta quotata -> riferimento sizing (USD). Flag OFF (default)
+    # -> fattore 1.0 = comportamento storico bit-identico (tutti gli asset
+    # quote=USD). Flag ON -> converte; se il tasso non e' determinabile su un
+    # quote non-USD, RIFIUTA il trade (mai aprire mal dimensionato). Vedi
+    # docs/sprint5-sizing-fix.md.
+    quote_to_ref = 1.0
+    if getattr(config, "sizing_currency_aware", False):
+        from .risk import quote_to_ref_factor
+
+        quote_ccy = (market.get("instrument", {}) or {}).get("currency")
+        quote_to_ref = quote_to_ref_factor(quote_ccy, capital)
+        if quote_to_ref is None:
+            return ExecutionResult(
+                False,
+                reason=(
+                    f"Sizing rifiutato: tasso {quote_ccy}->USD non disponibile "
+                    f"(currency-aware ON, no fallback al calcolo rotto)"
+                ),
+            )
+
     effective_budget = exposure_override or config.exposure_budget_eur
     sizing = calculate_size(
         margin_budget=effective_budget,
@@ -190,6 +210,7 @@ def execute_signal(
         stop_pct=stop_pct,
         available_margin=available_margin,
         max_loss_per_trade_eur=config.max_loss_per_trade_eur,
+        quote_to_ref=quote_to_ref,
     )
     if sizing.size is None:
         return ExecutionResult(False, reason=f"Sizing rifiutato: {sizing.reason}")

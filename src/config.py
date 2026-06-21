@@ -87,6 +87,7 @@ class Config:
     scoring_shadow_enabled: bool  # se true, logga score shadow temp0.2 accanto al reale (Sprint 4 troncone 1)
     scoring_two_call: bool  # se true, scoring (Call1 temp0.2, no thesis) + thesis (Call2) separati
     trail_v1_lowband: bool  # se true, rampa V1 nella fascia 0.5-1.0R del trailing (deploy gated, docs/sprint4-trailing-v1-clean.md)
+    sizing_currency_aware: bool  # se true, converte il rischio quote->USD nel sizing (bugfix FX, docs/sprint5-sizing-fix.md); OFF = bit-identico
 
     @property
     def capital_base_url(self) -> str:
@@ -177,6 +178,10 @@ def load_config() -> Config:
         == "true",
         trail_v1_lowband=os.environ.get(
             "TRAIL_V1_LOWBAND", "false"
+        ).strip().lower()
+        == "true",
+        sizing_currency_aware=os.environ.get(
+            "SIZING_CURRENCY_AWARE", "false"
         ).strip().lower()
         == "true",
     )

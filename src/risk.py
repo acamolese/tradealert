@@ -60,6 +60,58 @@ def effective_margin_factor(
         return 0.05
 
 
+# --- Conversione valuta quotata -> valuta di riferimento del sizing -----------
+#
+# Valuta di riferimento de-facto: USD. Tutti gli asset storici (Gold, Brent,
+# US500, Nasdaq, Bitcoin) sono quote=USD e sono sempre stati trattati 1:1 col
+# cap in EUR; tenere USD come riferimento lascia il loro sizing BIT-IDENTICO e
+# mantiene R coerente con l'intera storia (baseline V1 -0.42R, gate, figure €).
+# Solo i quote NON-USD (es. JPY, CHF) vanno convertiti, perche' li' il mismatch
+# e' grossolano (USD/JPY: fattore ~175 -> trade sempre rifiutato). Vedi
+# docs/sprint5-sizing-fix.md.
+SIZING_REF_CCY = "USD"
+
+# Mappa valuta quotata -> (epic da cui leggere il tasso vs USD, se invertire).
+# "USD/{X}" (USD base): prezzo = X per 1 USD  -> 1 X = 1/prezzo USD (invert).
+# "{X}/USD" (USD quote): prezzo = USD per 1 X  -> 1 X = prezzo USD (diretto).
+_QUOTE_TO_USD_EPIC: dict[str, tuple[str, bool]] = {
+    "JPY": ("USDJPY", True),
+    "CHF": ("USDCHF", True),
+    "GBP": ("GBPUSD", False),
+    "EUR": ("EURUSD", False),
+    "AUD": ("AUDUSD", False),
+}
+
+
+def quote_to_ref_factor(quote_ccy: str | None, capital: Any) -> float | None:
+    """Quanti USD (valuta di riferimento) vale 1 unita' della valuta quotata.
+
+    Ritorna 1.0 se quote == USD (nessuna conversione, path bit-identico ai 5
+    asset esistenti). Ritorna ``None`` se il tasso NON e' determinabile (valuta
+    non mappata, fetch fallito, prezzo nullo): in quel caso il chiamante DEVE
+    rifiutare il trade, mai ripiegare sul fattore 1 (che sarebbe il calcolo
+    rotto). Meglio non aprire che aprire mal dimensionato.
+    """
+    if not quote_ccy or quote_ccy == SIZING_REF_CCY:
+        return 1.0
+    info = _QUOTE_TO_USD_EPIC.get(quote_ccy)
+    if not info:
+        return None
+    epic, invert = info
+    try:
+        market = capital.get_market(epic) or {}
+        snap = market.get("snapshot", {}) or {}
+        bid, offer = snap.get("bid"), snap.get("offer")
+        if not bid or not offer:
+            return None
+        rate = (float(bid) + float(offer)) / 2.0
+        if rate <= 0:
+            return None
+        return (1.0 / rate) if invert else rate
+    except Exception:
+        return None
+
+
 def _floor_to_step(value: float, step: float) -> float:
     """Arrotonda verso il basso al multiplo di ``step`` piu' vicino.
     Floor (non round-half) garantisce che il sizing non oltrepassi mai
@@ -81,6 +133,7 @@ def calculate_size(
     available_margin: float | None = None,
     tolerance: float = 1.5,
     max_loss_per_trade_eur: float | None = None,
+    quote_to_ref: float = 1.0,
 ) -> SizingResult:
     """``margin_budget``: EUR che vogliamo (al massimo) bloccare come
     margine su questo trade.
@@ -89,6 +142,14 @@ def calculate_size(
     in modo che ``size * entry * stop_pct/100 <= max_loss``. Se anche
     ``min_size`` del broker comporta una perdita potenziale superiore al
     cap, il setup viene scartato.
+
+    ``quote_to_ref``: fattore di conversione dalla valuta quotata alla valuta
+    di riferimento del sizing (USD). Default 1.0 = nessuna conversione, path
+    bit-identico al comportamento storico (tutti gli asset quote=USD). Per i
+    quote non-USD (JPY, CHF) il chiamante passa il fattore reale; ``entry`` e
+    le grandezze da esso derivate (rischio, notional, margine) vengono portate
+    in valuta di riferimento prima del confronto coi cap. Vedi
+    ``quote_to_ref_factor`` e docs/sprint5-sizing-fix.md.
     """
     if entry_price <= 0 or margin_factor <= 0:
         return SizingResult(
@@ -99,11 +160,15 @@ def calculate_size(
             None, 0, 0, 0, reason="Stop loss % non valido"
         )
 
+    # Prezzo equivalente in valuta di riferimento: con quote_to_ref=1.0 (USD)
+    # coincide con entry_price -> sizing bit-identico agli asset esistenti.
+    entry_ref = entry_price * quote_to_ref
+
     step = size_step or min_size
     target_notional = margin_budget / margin_factor
-    raw_size_budget = target_notional / entry_price
+    raw_size_budget = target_notional / entry_ref
 
-    risk_per_unit = entry_price * stop_pct / 100.0
+    risk_per_unit = entry_ref * stop_pct / 100.0
     if max_loss_per_trade_eur is not None and risk_per_unit > 0:
         raw_size_loss = max_loss_per_trade_eur / risk_per_unit
         raw_size = min(raw_size_budget, raw_size_loss)
@@ -114,7 +179,7 @@ def calculate_size(
     if sized < min_size:
         sized = min_size
 
-    notional = sized * entry_price
+    notional = sized * entry_ref
     margin_est = notional * margin_factor
     risk_est = sized * risk_per_unit
 
