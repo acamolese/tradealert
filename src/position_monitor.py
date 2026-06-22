@@ -146,6 +146,17 @@ def _trail_offset_v1_lowband(profit_r: float) -> float:
     return -0.10 + (profit_r - 0.75) / 0.25 * 0.10      # -0.10 -> 0.0 (BE)
 
 
+def _trail_offset_v2_highband(profit_r: float) -> float:
+    """Rampa V2 SOLO per 1.0<=profit_r<1.25 (deploy gated). Colma il buco di D
+    che, in questa fascia, tiene lo SL a breakeven fino a 1.25R lasciando
+    restituire il picco (casi #76, #79: Brent short picco ~1.1-1.24R -> BE ->
+    give-back). V2 anticipa il lock salendo da BE a +0.25R:
+    1.0R->0.0 (=D), 1.25R->+0.25 (=D). A 1.25R riaggancia D. Definita solo
+    nella fascia 1.0-1.25R; fuori resta la curva D. Vedi
+    docs/sprint5-trailing-v2-highband.md."""
+    return 0.0 + (profit_r - 1.0) / 0.25 * 0.25  # 0.0 -> +0.25
+
+
 def _trail_offset_tp_lock(frac_tp: float | None, rr: float | None) -> float | None:
     """Lock TP-aware tardivo, in unita' di R. None se sotto la soglia di
     attivazione o se TP/rr non disponibili."""
@@ -158,7 +169,8 @@ def _trail_offset_tp_lock(frac_tp: float | None, rr: float | None) -> float | No
 
 
 def _trailing_offset_r(profit_r: float, frac_tp: float | None,
-                       rr: float | None, v1_lowband: bool = False) -> float:
+                       rr: float | None, v1_lowband: bool = False,
+                       v2_highband: bool = False) -> float:
     """Offset SL in unita' di R per l'opzione D: il piu' protettivo tra la
     granularita' A e il lock TP-aware tardivo.
 
@@ -166,9 +178,18 @@ def _trailing_offset_r(profit_r: float, frac_tp: float | None,
     nella SOLA fascia 0.5<=profit_r<1.0 usa la rampa V1 al posto della
     granularita' A. Fuori da quella fascia (incluso >=1.0R) e il lock TP-aware
     restano byte-identici a D, quindi a 1.0R V1 riaggancia il breakeven di D e
-    il delta-trend resta zero. Vedi docs/sprint4-trailing-v1-clean.md."""
+    il delta-trend resta zero. Vedi docs/sprint4-trailing-v1-clean.md.
+
+    ``v2_highband`` (deploy gated, default OFF = bit-identico a D): se True,
+    nella SOLA fascia 1.0<=profit_r<1.25 usa la rampa V2 (BE->+0.25R) al posto
+    del piatto a BE di D, per proteggere il give-back del picco (casi #76/#79).
+    A 1.0R e a 1.25R coincide con D (rampa agganciata): nessun salto. V1 e V2
+    agiscono su fasce DISGIUNTE -> il gate fascia-bassa di V1 (peak 0.5-1.0R)
+    non e' toccato da V2. Vedi docs/sprint5-trailing-v2-highband.md."""
     if v1_lowband and 0.5 <= profit_r < 1.0:
         off = _trail_offset_v1_lowband(profit_r)
+    elif v2_highband and 1.0 <= profit_r < 1.25:
+        off = _trail_offset_v2_highband(profit_r)
     else:
         off = _trail_offset_granular(profit_r)
     tp_off = _trail_offset_tp_lock(frac_tp, rr)
@@ -184,6 +205,7 @@ def _apply_trailing_stop(
     position: dict[str, Any],
     step_r: float = 0.5,
     v1_lowband: bool = False,
+    v2_highband: bool = False,
 ) -> None:
     """Trailing stop opzione D (Sprint 3), vedi docs/sprint3-trailing-design.md.
     L'offset dello SL in unita' di R e' il piu' protettivo tra:
@@ -537,11 +559,15 @@ def _apply_trailing_stop(
     else:
         rr = None
         frac_tp = None
-    offset_r = _trailing_offset_r(profit_r, frac_tp, rr, v1_lowband=v1_lowband)
-    # Guardrail 3: controfattuale D loggato in parallelo per la metrica forward.
-    # Con v1_lowband OFF coincide con offset_r; con V1 ON e' l'offset che D
-    # avrebbe applicato a questo profit_r (serve a calcolare exit_R D vs V1).
-    offset_r_d = _trailing_offset_r(profit_r, frac_tp, rr, v1_lowband=False)
+    offset_r = _trailing_offset_r(
+        profit_r, frac_tp, rr, v1_lowband=v1_lowband, v2_highband=v2_highband
+    )
+    # Controfattuale D PURO (V1 e V2 OFF) loggato in parallelo: baseline per le
+    # metriche forward. Resta puro D anche con V1/V2 ON, cosi' il gate
+    # fascia-bassa di V1 (exit_R vs D) non e' toccato dall'aggiunta di V2.
+    offset_r_d = _trailing_offset_r(
+        profit_r, frac_tp, rr, v1_lowband=False, v2_highband=False
+    )
 
     if direction == "BUY":
         new_sl_raw = entry + offset_r * r_distance
@@ -626,7 +652,11 @@ def _apply_trailing_stop(
                     "profit_r": profit_r,
                     "offset_r": offset_r,
                     "offset_r_d": offset_r_d,
-                    "trail_variant": "v1_lowband" if v1_lowband else "D",
+                    "trail_variant": (
+                        "v1_lowband" if (v1_lowband and 0.5 <= profit_r < 1.0)
+                        else "v2_highband" if (v2_highband and 1.0 <= profit_r < 1.25)
+                        else "D"
+                    ),
                 },
             }
         )
@@ -967,6 +997,7 @@ def run_trailing_stops(config: Config) -> None:
                 capital, db, telegram, position,
                 step_r=config.trailing_step_r,
                 v1_lowband=config.trail_v1_lowband,
+                v2_highband=config.trail_v2_highband,
             )
         except Exception:
             log.exception("Trailing SL fallito")
@@ -1023,6 +1054,7 @@ def monitor_positions(config: Config) -> None:
                 capital, db, telegram, position,
                 step_r=config.trailing_step_r,
                 v1_lowband=config.trail_v1_lowband,
+                v2_highband=config.trail_v2_highband,
             )
         except Exception:
             log.exception("Trailing SL fallito")

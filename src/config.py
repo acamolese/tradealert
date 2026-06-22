@@ -87,6 +87,7 @@ class Config:
     scoring_shadow_enabled: bool  # se true, logga score shadow temp0.2 accanto al reale (Sprint 4 troncone 1)
     scoring_two_call: bool  # se true, scoring (Call1 temp0.2, no thesis) + thesis (Call2) separati
     trail_v1_lowband: bool  # se true, rampa V1 nella fascia 0.5-1.0R del trailing (deploy gated, docs/sprint4-trailing-v1-clean.md)
+    trail_v2_highband: bool  # se true, rampa V2 nella fascia 1.0-1.25R del trailing (deploy gated, docs/sprint5-trailing-v2-highband.md)
     sizing_currency_aware: bool  # se true, converte il rischio quote->USD nel sizing (bugfix FX, docs/sprint5-sizing-fix.md); OFF = bit-identico
     concentration_block_dup: bool  # se true, NON apre su (asset, direzione) gia' aperto (Sprint 5 tetto B1)
     max_open_per_direction: int  # cap su short/long simultanei; 0 = OFF (Sprint 5 tetto B3)
@@ -182,6 +183,10 @@ def load_config() -> Config:
         == "true",
         trail_v1_lowband=os.environ.get(
             "TRAIL_V1_LOWBAND", "false"
+        ).strip().lower()
+        == "true",
+        trail_v2_highband=os.environ.get(
+            "TRAIL_V2_HIGHBAND", "false"
         ).strip().lower()
         == "true",
         sizing_currency_aware=os.environ.get(
