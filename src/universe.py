@@ -30,3 +30,16 @@ UNIVERSE: list[Asset] = [
     Asset("Nasdaq 100", "US100", "index"),
     Asset("Bitcoin", "BTCUSD", "crypto", notes="weekend-friendly"),
 ]
+
+# Sprint 5 — primo blocco FX (diversificatori veri: driver valutari/tassi,
+# scorrelati da commodity/equity/crypto). Tutti quote=USD -> sizing corretto
+# anche con SIZING_CURRENCY_AWARE OFF (fattore 1.0). Spread in sessione ottimi
+# (EUR/USD 0.006%, AUD/USD 0.009%, GBP/USD 0.010%, piu' stretti di Brent/Gold).
+# Appesi all'universo SOLO se BASKET_FX_ENABLED. USD/JPY escluso (sizing
+# non-currency-aware, vedi docs/sprint5-sizing-fix.md). Vedi
+# docs/sprint5-basket-concentration.md.
+FX_BLOCK_1: list[Asset] = [
+    Asset("EUR/USD", "EURUSD", "fx"),
+    Asset("AUD/USD", "AUDUSD", "fx"),
+    Asset("GBP/USD", "GBPUSD", "fx"),
+]

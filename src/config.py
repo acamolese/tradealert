@@ -91,6 +91,7 @@ class Config:
     concentration_block_dup: bool  # se true, NON apre su (asset, direzione) gia' aperto (Sprint 5 tetto B1)
     max_open_per_direction: int  # cap su short/long simultanei; 0 = OFF (Sprint 5 tetto B3)
     concentration_shadow: bool  # se true, logga la regola dinamica "no doppione su tesi che fallisce" (Sprint 5 shadow, LOGGING-ONLY)
+    basket_fx_enabled: bool  # se true, aggiunge il primo blocco FX (EUR/USD, AUD/USD, GBP/USD) all'universo di scan (Sprint 5)
 
     @property
     def capital_base_url(self) -> str:
@@ -196,6 +197,10 @@ def load_config() -> Config:
         ),
         concentration_shadow=os.environ.get(
             "CONCENTRATION_SHADOW", "true"
+        ).strip().lower()
+        == "true",
+        basket_fx_enabled=os.environ.get(
+            "BASKET_FX_ENABLED", "false"
         ).strip().lower()
         == "true",
     )
