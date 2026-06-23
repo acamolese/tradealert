@@ -1010,7 +1010,8 @@ def close_position_by_deal_id(
             f"✅ <b>Posizione chiusa</b>\n"
             f"Asset: <b>{_esc(asset_name)}</b>\n"
             f"Prezzo chiusura: <code>{close_level}</code>\n"
-            f"P&amp;L: <code>{pnl}</code>"
+            f"P&amp;L: <code>{pnl}</code>\n"
+            f"Motivo: <i>{_esc(reason)}</i>"
         )
         if message_id:
             telegram.edit_message_text(message_id, text)
