@@ -82,6 +82,19 @@ def _handle_monitor_callback(
     message_id = (cb.get("message") or {}).get("message_id")
 
     if action == "mhold":
+        # Registra il veto: l'auto-close (se attivo) poll-a questo evento per
+        # annullare la chiusura entro la finestra. Harmless se auto-close OFF.
+        try:
+            trade = db.get_trade_by_deal_id(deal_id)
+            if trade and trade.get("id"):
+                db.insert_monitoring_event({
+                    "trade_id": trade["id"],
+                    "event_type": "close_vetoed",
+                    "reason": "utente: lascia aperta (veto auto-close)",
+                    "details": {"deal_id": deal_id},
+                })
+        except Exception:
+            pass
         if message_id:
             telegram.edit_message_text(
                 message_id, "⏸ <b>Posizione lasciata aperta</b>"

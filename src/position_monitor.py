@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import time
 from typing import Any
 
 from anthropic import Anthropic
@@ -851,6 +852,62 @@ def _resolve_close_price_from_market(
         return None
 
 
+def _auto_close_with_veto(
+    config: Config,
+    capital: CapitalClient,
+    db: Database,
+    telegram: TelegramClient,
+    deal_id: str,
+    decision: dict[str, Any],
+) -> None:
+    """Auto-chiusura con finestra di veto (simmetrica all'auto-confirm
+    apertura). Invia la proposta col solo bottone "Lascia aperta", poll del
+    veto per ``auto_close_window_sec``; se l'utente clicca (il listener scrive
+    un evento ``close_vetoed``) si annulla, altrimenti si chiude da soli.
+    Best-effort: qualunque errore non deve lasciare la posizione in stato
+    ambiguo -> in caso di eccezione NON chiude (fail-safe verso il non-agire)."""
+    window = getattr(config, "auto_close_window_sec", 30) or 30
+    trade = db.get_trade_by_deal_id(deal_id)
+    trade_id = trade.get("id") if trade else None
+
+    # marker pre-finestra: ultimo veto registrato per questo trade (per
+    # rilevare un veto NUOVO arrivato durante la finestra).
+    pre_veto = (
+        db.get_last_monitoring_event(trade_id, "close_vetoed")
+        if trade_id else None
+    )
+    pre_veto_id = pre_veto.get("id") if pre_veto else None
+
+    buttons = [[{"text": "⏸ Lascia aperta", "callback_data": f"mhold:{deal_id}"}]]
+    telegram.send_message_with_buttons(
+        _format_close_proposal(decision)
+        + f"\n\n⏳ <i>Auto-chiusura tra {window}s salvo veto.</i>",
+        buttons,
+    )
+
+    deadline = time.monotonic() + window
+    while time.monotonic() < deadline:
+        time.sleep(min(5, window))
+        if trade_id is None:
+            continue
+        latest = db.get_last_monitoring_event(trade_id, "close_vetoed")
+        if latest and latest.get("id") != pre_veto_id:
+            log.info("Auto-close VETATO da utente su %s (deal %s)",
+                     decision.get("asset"), deal_id)
+            telegram.send_message(
+                f"⏸ <b>{_esc(decision.get('asset'))}</b>: auto-chiusura annullata (veto)."
+            )
+            return
+
+    # nessun veto: chiude
+    log.info("Auto-close: finestra scaduta, chiudo %s (deal %s)",
+             decision.get("asset"), deal_id)
+    close_position_by_deal_id(
+        capital, db, telegram, deal_id,
+        reason="auto-close LLM monitor",
+    )
+
+
 def close_position_by_deal_id(
     capital: CapitalClient,
     db: Database,
@@ -1094,6 +1151,14 @@ def monitor_positions(config: Config) -> None:
                 decision.get("asset"),
                 market_status,
             )
+            continue
+
+        # AUTO-CLOSE (gated): simmetrico all'auto-confirm dell'apertura.
+        # Se acceso, invia la proposta con solo il veto "Lascia aperta",
+        # attende la finestra e auto-chiude se nessuno veta. Se spento,
+        # comportamento storico: bottoni mclose/mhold, attesa click manuale.
+        if getattr(config, "auto_close_enabled", False):
+            _auto_close_with_veto(config, capital, db, telegram, deal_id, decision)
             continue
 
         # Invia proposta con bottoni mclose/mhold e ritorna.
