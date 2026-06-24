@@ -12,6 +12,8 @@ import time
 from typing import Any
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from .config import Config
 
@@ -44,6 +46,24 @@ class CapitalClient:
     def __init__(self, config: Config) -> None:
         self._cfg = config
         self._session = requests.Session()
+        # Retry automatico sui blip transitori di Capital (host dietro Imperva
+        # WAF, read timeout intermittenti). SOLO metodi idempotenti (GET): i
+        # POST di trading (create/update/close_position, login) NON vengono mai
+        # ritentati a questo livello -> nessun rischio di doppia operazione.
+        # login() ha il suo retry dedicato. Vedi alert "Trailing stop errore".
+        retry = Retry(
+            total=2,
+            connect=2,
+            read=2,
+            status=2,
+            backoff_factor=1.5,
+            status_forcelist=(429, 502, 503, 504),
+            allowed_methods=frozenset(["GET"]),
+            raise_on_status=False,
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        self._session.mount("https://", adapter)
+        self._session.mount("http://", adapter)
         self._cst: str | None = None
         self._security_token: str | None = None
         self._preferences_cache: dict[str, Any] | None = None
