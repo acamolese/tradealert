@@ -32,13 +32,13 @@ from typing import Any
 from .capital_client import CapitalClient
 from .config import Config
 from .db import Database
-from .universe import UNIVERSE
+from .universe import ALL_KNOWN
 
 log = logging.getLogger(__name__)
 
 
 def _epic_for(asset_name: str) -> str | None:
-    for a in UNIVERSE:
+    for a in ALL_KNOWN:
         if a.name == asset_name:
             return a.epic
     return None

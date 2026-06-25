@@ -29,7 +29,7 @@ from .features import compute_features
 from .llm_usage import log_usage
 from .quiet_hours import is_quiet_now, quiet_reason
 from .telegram_client import TelegramClient
-from .universe import UNIVERSE
+from .universe import ALL_KNOWN, UNIVERSE
 
 log = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ def _esc(text: object) -> str:
 
 
 def _resolve_epic(asset_name: str) -> str | None:
-    for asset in UNIVERSE:
+    for asset in ALL_KNOWN:
         if asset.name == asset_name:
             return asset.epic
     return None

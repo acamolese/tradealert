@@ -1433,6 +1433,10 @@ def run_morning_scan(config: Config) -> None:
         from .universe import FX_BLOCK_1
 
         scan_set.extend(FX_BLOCK_1)
+    if getattr(config, "basket_trend_enabled", False):
+        from .universe import TREND_BLOCK_1
+
+        scan_set.extend(TREND_BLOCK_1)
     seen_epics = {a.epic for a in scan_set}
     for a in movers:
         if a.epic not in seen_epics:

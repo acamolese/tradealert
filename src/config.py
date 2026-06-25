@@ -93,6 +93,7 @@ class Config:
     max_open_per_direction: int  # cap su short/long simultanei; 0 = OFF (Sprint 5 tetto B3)
     concentration_shadow: bool  # se true, logga la regola dinamica "no doppione su tesi che fallisce" (Sprint 5 shadow, LOGGING-ONLY)
     basket_fx_enabled: bool  # se true, aggiunge il primo blocco FX (EUR/USD, AUD/USD, GBP/USD) all'universo di scan (Sprint 5)
+    basket_trend_enabled: bool  # se true, aggiunge il blocco trending (Copper, Hang Seng, Nikkei) all'universo di scan (Sprint 5)
     auto_close_enabled: bool  # se true, su CLOSE del monitor auto-chiude dopo finestra di veto (simmetrico all'auto-confirm apertura)
     auto_close_window_sec: int  # finestra di veto prima dell'auto-chiusura (default 30s)
 
@@ -208,6 +209,10 @@ def load_config() -> Config:
         == "true",
         basket_fx_enabled=os.environ.get(
             "BASKET_FX_ENABLED", "false"
+        ).strip().lower()
+        == "true",
+        basket_trend_enabled=os.environ.get(
+            "BASKET_TREND_ENABLED", "false"
         ).strip().lower()
         == "true",
         auto_close_enabled=os.environ.get(

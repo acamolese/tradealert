@@ -25,7 +25,7 @@ import logging
 from typing import Any
 
 from .db import Database
-from .universe import UNIVERSE
+from .universe import ALL_KNOWN
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ _BROAD_CLASS = {
     "crypto": "crypto",
     "fx": "fx",
 }
-_ASSET_BROAD = {a.name: _BROAD_CLASS.get(a.asset_class, a.asset_class) for a in UNIVERSE}
+_ASSET_BROAD = {a.name: _BROAD_CLASS.get(a.asset_class, a.asset_class) for a in ALL_KNOWN}
 
 
 def _current_r(db: Database, trade: dict[str, Any]) -> float | None:

@@ -43,3 +43,23 @@ FX_BLOCK_1: list[Asset] = [
     Asset("AUD/USD", "AUDUSD", "fx"),
     Asset("GBP/USD", "GBPUSD", "fx"),
 ]
+
+# Sprint 5 — blocco "trending diversifiers" (al posto degli FX, che non hanno
+# mai prodotto setup >=7: range-bound). Criterio: trenda + volatile (ATR% nel
+# range produttivo, non FX-basso) + driver diverso dal trio Brent/Nasdaq/Gold.
+# Copper: metalli industriali/Cina (USD). Hang Seng: equity Cina/HK (HKD).
+# Nikkei: equity Giappone (JPY). HKD/JPY richiedono SIZING_CURRENCY_AWARE=ON.
+# Appesi all'universo SOLO se BASKET_TREND_ENABLED. Vedi
+# docs/sprint5-basket-concentration.md.
+TREND_BLOCK_1: list[Asset] = [
+    Asset("Copper", "COPPER", "metal"),
+    Asset("Hang Seng", "HK50", "index"),
+    Asset("Nikkei", "J225", "index"),
+]
+
+# Tutti gli asset CONOSCIUTI dal sistema (universo base + blocchi opzionali).
+# Usato per risolvere epic e classe (monitor, intra_trade, concentration_shadow)
+# a PRESCINDERE da quali blocchi sono abilitati per lo scan: una posizione su un
+# asset di un blocco deve essere risolvibile anche se lo scan di quel blocco e'
+# poi spento. Lo scanning resta gated nei flag.
+ALL_KNOWN: list[Asset] = UNIVERSE + FX_BLOCK_1 + TREND_BLOCK_1

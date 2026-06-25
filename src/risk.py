@@ -77,6 +77,7 @@ SIZING_REF_CCY = "USD"
 _QUOTE_TO_USD_EPIC: dict[str, tuple[str, bool]] = {
     "JPY": ("USDJPY", True),
     "CHF": ("USDCHF", True),
+    "HKD": ("USDHKD", True),  # Hang Seng (HK50) quotato in HKD (Sprint 5 trend block)
     "GBP": ("GBPUSD", False),
     "EUR": ("EURUSD", False),
     "AUD": ("AUDUSD", False),
