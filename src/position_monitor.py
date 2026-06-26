@@ -961,13 +961,36 @@ def close_position_by_deal_id(
             else ("market" if market_level else "confirm")
         )
 
-        # Se Capital non ha popolato pnl, ricavalo da (close-entry)*size
-        # con segno per direzione. Currency-blind come il resto del sistema.
+        # Se Capital non ha popolato pnl, ricavalo da (close-entry)*size con
+        # segno per direzione. Il prodotto e' in VALUTA QUOTATA: lo convertiamo
+        # al riferimento USD (stesso del sizing) cosi' P&L, R e cap drawdown
+        # sono nella stessa unita' di tutti gli altri asset. USD/sconosciuto ->
+        # fattore 1.0 (bit-identico); HKD/JPY -> convertito (fix #84 Hang Seng:
+        # 37.99 HKD veniva salvato come 37.99 EUR). Se il tasso non e'
+        # disponibile NON blocchiamo la registrazione del close: meglio un pnl
+        # non convertito che un close non registrato.
         if pnl is None and close_level and entry and size:
             delta = close_level - entry
             if direction_word == "short":
                 delta = -delta
-            pnl = round(delta * size, 4)
+            pnl_quote = delta * size
+            fac = 1.0
+            try:
+                from .risk import quote_to_ref_factor
+
+                mkt = capital.get_market(epic) if epic else {}
+                quote_ccy = (mkt.get("instrument") or {}).get("currency")
+                f = quote_to_ref_factor(quote_ccy, capital)
+                if f is not None:
+                    fac = f
+                elif quote_ccy and quote_ccy != "USD":
+                    log.warning(
+                        "pnl: tasso %s->USD non disponibile per %s, valore NON "
+                        "convertito (in valuta quotata)", quote_ccy, epic,
+                    )
+            except Exception:
+                log.warning("pnl: conversione quote->USD fallita per %s", epic)
+            pnl = round(pnl_quote * fac, 4)
 
         asset_name = trade.get("asset") if trade else deal_id
         if trade:
