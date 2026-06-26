@@ -938,22 +938,23 @@ def _pick_top_setup(
     proposals: list[SetupProposal],
     features: dict[str, dict[str, Any]],
     min_score: float,
-    exclude_assets: set[str] | None = None,
+    exclude_pairs: set[tuple[str, str]] | None = None,
     max_affordable_eur: float | None = None,
     skipped_reasons: list[str] | None = None,
 ) -> SetupProposal | None:
     """Ritorna il primo setup sopra soglia con mercato aperto e tradeable.
-    Scarta asset gia' proposti di recente (``exclude_assets``), e scarta
+    Scarta le coppie (asset, direzione) gia' proposte di recente
+    (``exclude_pairs``), e scarta
     i setup con ``min_entry`` broker sopra ``max_affordable_eur`` (se
     fornito) per non proporre strumenti troppo cari rispetto ai budget
     preset. Le motivazioni dei setup scartati per accessibilita' vengono
     accodate a ``skipped_reasons`` (se passato) per essere mostrate
     all'utente nel messaggio 'no setup'."""
-    exclude_assets = exclude_assets or set()
+    exclude_pairs = exclude_pairs or set()
     for p in proposals:
         if p.score < min_score:
             continue
-        if p.asset in exclude_assets:
+        if (p.asset, p.direction) in exclude_pairs:
             continue
         af = features.get(p.asset)
         if not af or not af.get("last_price"):
@@ -1655,12 +1656,27 @@ def run_morning_scan(config: Config) -> None:
     eligible = [p for p in proposals if p.direction in ("long", "short")]
     eligible.sort(key=lambda p: p.score, reverse=True)
 
-    # Dedup giornaliero: non riproporre asset gia' segnalati nelle ultime 24h
+    # Dedup giornaliero. Direction-aware (default): non riproporre la stessa
+    # (asset, direzione) gia' segnalata nelle 24h, ma consenti la direzione
+    # opposta (un Nikkei long dopo uno short chiuso NON e' un doppione). Con
+    # DEDUP_DIRECTION_AWARE=false torna al vecchio comportamento asset-level
+    # (blocca entrambe le direzioni). Vedi docs/sprint5-dedup-analysis.md.
     try:
-        recent_assets = db.recent_signal_assets(hours=24)
+        recent = db.recent_signals(hours=24)
+        if getattr(config, "dedup_direction_aware", True):
+            exclude_pairs = {
+                (r["asset"], r["direction"])
+                for r in recent
+                if r.get("asset") and r.get("direction")
+            }
+        else:
+            recent_assets = {r["asset"] for r in recent if r.get("asset")}
+            exclude_pairs = {
+                (a, d) for a in recent_assets for d in ("long", "short")
+            }
     except Exception:
         log.exception("Lookup signal recenti fallito, skip dedup")
-        recent_assets = set()
+        exclude_pairs = set()
 
     max_affordable = (
         max(config.budget_options) if config.budget_options else None
@@ -1670,7 +1686,7 @@ def run_morning_scan(config: Config) -> None:
         eligible,
         features,
         min_score=config.min_score_threshold,
-        exclude_assets=recent_assets,
+        exclude_pairs=exclude_pairs,
         max_affordable_eur=max_affordable,
         skipped_reasons=skipped_reasons,
     )
@@ -1678,9 +1694,9 @@ def run_morning_scan(config: Config) -> None:
     if not top:
         # Silenzio: nessuna opportunita' nuova sopra soglia.
         log.info(
-            "Scan: nessun top nuovo (recent_assets=%d, eligible=%d, "
+            "Scan: nessun top nuovo (dedup_pairs=%d, eligible=%d, "
             "scartati_per_budget=%d)",
-            len(recent_assets),
+            len(exclude_pairs),
             len(eligible),
             len(skipped_reasons),
         )
@@ -1694,7 +1710,7 @@ def run_morning_scan(config: Config) -> None:
             top_score=best.score if best else None,
             candidates_count=len(eligible),
             notes={
-                "recent_dedup_count": len(recent_assets),
+                "recent_dedup_count": len(exclude_pairs),
                 "min_score_threshold": config.min_score_threshold,
                 "scan_set": len(scan_set),
                 "proposals": _proposals_summary(proposals),
