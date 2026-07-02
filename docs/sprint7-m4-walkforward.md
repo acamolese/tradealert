@@ -57,3 +57,35 @@ trend-following (i CTA reali girano su 50+ mercati). Richiede download
 deterministico trend-following su questo broker/orizzonte" si archivia come
 NEGATIVA, e restano le opzioni C (finestra 50 trade del sistema attuale) e
 D (spegnere) del documento strategico. Non si fanno round 3 di data mining.
+
+## Round 2 — ESEGUITO 2026-07-02: VERDETTO FINALE NEGATIVO
+
+**2a (DAY 2015-2026, IS 2015-2022 / OOS 2023-2026):** config IS-positive
+esistono (migliori: donchian N=20 +0.110R su 737 trade in 8 anni, tsmom K=20
++0.092R), ma TUTTE decadono OOS: donchian -0.003R, emacross +0.035R (non
+robusto: senza top2 -0.003R), tsmom +0.052R (1/3 terzi positivi). Nessuna
+passa. Costo overnight sul daily doppio dell'orario (~0.09R/trade). Pattern
+ricorrente OOS: long +0.14/+0.18R, short -0.12/-0.25R (il 2023-2026 premia
+solo il lato long dei trend).
+
+**2b (HOUR 2020-2026, 29 mercati: metalli, energy, indici US/EU/Asia, FX
+major, crypto):** la diversificazione PEGGIORA il quadro. Tutte le 28
+configurazioni negative in-sample su tutte le famiglie (da -0.05 a -0.14R;
+tsmom su FX il peggiore, fino a -3148R totali su 22k trade). Col vincolo
+pre-registrato IS>0, nessuna config è nemmeno eleggibile al giudizio OOS.
+La lettura: ai costi retail CFD (spread + overnight) e su orizzonte
+orario/swing, il trend-following classico non sopravvive; sui mercati FX
+lo spread mangia tutto in rapporto all'ATR.
+
+## Verdetto M4 complessivo: ARCHIVIATO NEGATIVO
+
+Tre famiglie × due timeframe × 29 mercati × walk-forward onesto = nessuna
+candidata. Come da pre-registrazione: **niente round 3**. L'opzione A del
+documento strategico (motore deterministico) è FALSIFICATA nel perimetro
+testato. Restano: opzione C (gate 50 trade del sistema live, già in corso,
+agenda attiva) e opzione D (spegnere/ridurre).
+
+Nota metodologica finale: questo risultato, ottenuto in poche ore di calcolo,
+avrebbe richiesto anni di forward test. Il valore dell'harness resta: ogni
+futura idea di strategia si può falsificare in minuti prima di toccare
+produzione (`jobs/backtest_run.py`, dati in `data/candles/`, 29 mercati).
