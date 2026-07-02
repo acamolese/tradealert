@@ -1,0 +1,52 @@
+id,asset,dir,group,opened,res,rule,real_r,real_src,cf_r,cf_exit,delta_r,pnl_real,delta_eur_approx
+16,Nasdaq 100,long,proposta,2026-04-24T06:06,MINUTE_5,D,1.205,price,0.5,sl,-0.705,0.3246,-0.19
+19,Brent Oil,long,proposta,2026-04-27T14:05,MINUTE_5,D,1.271,price,0.9,sl,-0.371,6.1218,-1.79
+22,Gold,long,proposta,2026-05-01T14:06,MINUTE_5,D,-0.688,price,-1.0,sl,-0.312,-2.3,-1.04
+23,Bitcoin,long,proposta,2026-05-04T08:06,MINUTE_5,D,0.394,price,0.0,sl,-0.394,0.329,-0.33
+24,Brent Oil,long,proposta,2026-05-04T11:06,MINUTE_5,D,-0.187,price,-0.25,sl,-0.063,-0.9296,-0.31
+26,US500,long,proposta,2026-05-05T15:06,MINUTE_5,D,1.054,price,2.333,tp,1.28,1.836,2.23
+27,Gold,long,proposta,2026-05-06T05:06,MINUTE_5,D,0.619,price,0.25,sl,-0.369,2.0724,-1.24
+28,Brent Oil,long,proposta,2026-05-06T16:06,MINUTE_5,D,-0.224,price,-1.0,sl,-0.776,-1.11,-3.85
+29,Gold,long,proposta,2026-05-08T12:06,MINUTE_5,D,-0.458,price,-0.5,sl,-0.042,-1.95,-0.18
+30,Brent Oil,long,proposta,2026-05-12T13:06,MINUTE_5,D,-0.719,price,-1.0,sl,-0.281,-3.4073,-1.33
+31,Nasdaq 100,long,proposta,2026-05-13T17:06,MINUTE_5,D,-0.114,price,-0.5,sl,-0.386,-0.55,-1.87
+34,Brent Oil,long,proposta,2026-05-15T12:06,MINUTE_5,D,1.311,price,0.96,sl,-0.351,5.83,-1.56
+36,Gold,long,proposta,2026-05-18T12:06,MINUTE_5,D,-0.224,price,-1.0,sl,-0.776,-0.92,-3.18
+37,Brent Oil,long,proposta,2026-05-19T11:06,MINUTE_5,D,-0.569,price,-1.0,sl,-0.431,-2.76,-2.09
+38,Brent Oil,short,proposta,2026-05-20T16:06,MINUTE_5,D,-0.177,price,-1.0,sl,-0.823,-0.88,-4.1
+39,Nasdaq 100,long,proposta,2026-05-20T19:06,MINUTE_5,D,-0.211,price,1.49,tp,1.701,-0.79,6.34
+40,Nasdaq 100,long,proposta,2026-05-22T06:06,MINUTE_5,D,1.047,price,1.407,tp,0.361,4.16,1.44
+41,Gold,long,proposta,2026-05-22T07:06,MINUTE_5,D,-0.071,price,0.0,sl,0.071,-0.19,0.19
+46,Brent Oil,short,proposta,2026-05-27T09:06,MINUTE_5,D,-0.512,price,-0.25,sl,0.262,-2.52,1.29
+48,Nasdaq 100,long,proposta,2026-05-28T16:07,MINUTE_5,D,1.298,price,0.25,sl,-1.048,2.82,-2.28
+50,Brent Oil,short,proposta,2026-05-29T20:06,MINUTE_5,D,-0.603,price,-1.0,sl,-0.397,-2.9835,-1.96
+53,Gold,long,proposta,2026-06-02T07:06,MINUTE_5,D,-0.355,price,-1.0,sl,-0.645,-1.59,-2.9
+56,Brent Oil,long,proposta,2026-06-03T19:06,MINUTE_5,D,-0.681,price,-1.0,sl,-0.319,-3.31,-1.55
+60,Nasdaq 100,long,proposta,2026-06-08T13:06,MINUTE_5,D,-0.43,price,-0.5,sl,-0.07,-1.9,-0.31
+61,Brent Oil,long,proposta,2026-06-08T14:07,MINUTE_5,D,-0.095,price,-1.0,sl,-0.905,-0.46,-4.42
+62,Brent Oil,short,proposta,2026-06-09T15:07,MINUTE_5,D,-0.07,price,-0.5,sl,-0.43,-0.3383,-2.08
+64,US500,short,proposta,2026-06-10T05:06,MINUTE_5,D+V1,-0.088,price,-0.085,sl,0.003,-0.44,0.02
+67,US500,short,proposta,2026-06-11T07:06,MINUTE_30,D+V1,-0.216,price,-0.239,sl,-0.023,-0.82,-0.09
+69,Bitcoin,long,proposta,2026-06-11T11:06,MINUTE_5,D+V1,0.687,price,2.167,tp,1.48,0.5201,1.12
+70,Nasdaq 100,long,proposta,2026-06-12T10:06,MINUTE_5,D+V1,-0.069,price,1.389,tp,1.458,-0.33,7.0
+71,Bitcoin,long,proposta,2026-06-13T18:06,MINUTE_5,D+V1,0.163,price,0.25,sl,0.087,0.15,0.08
+72,Brent Oil,short,proposta,2026-06-15T05:06,MINUTE_5,D+V1,0.172,price,2.0,tp,1.828,0.85,9.07
+73,Brent Oil,short,proposta,2026-06-16T12:06,MINUTE_5,D+V1,0.22,price,0.0,sl,-0.22,1.1,-1.1
+74,Nasdaq 100,short,proposta,2026-06-16T20:06,MINUTE_5,D+V1,-0.421,price,-0.186,sl,0.236,-1.642,0.92
+77,Nasdaq 100,long,proposta,2026-06-18T16:06,MINUTE_5,D+V1,-0.001,price,-0.075,sl,-0.074,-0.0036,-0.24
+80,Nasdaq 100,long,proposta,2026-06-22T13:06,MINUTE_5,D+V1+V2,-0.772,price,-1.0,sl,-0.228,-2.1195,-0.63
+82,Nasdaq 100,short,auto,2026-06-23T14:06,MINUTE_5,D+V1+V2,0.312,price,0.969,sl,0.657,1.2,2.53
+83,Brent Oil,short,auto,2026-06-24T14:07,MINUTE_5,D+V1+V2,-0.13,price,-1.0,sl,-0.87,-0.64,-4.29
+84,Hang Seng,short,auto,2026-06-25T12:06,MINUTE_5,D+V1+V2,1.098,price,0.5,sl,-0.598,4.8448,-20.69
+85,Brent Oil,short,auto,2026-06-25T15:06,MINUTE_5,D+V1+V2,-0.308,price,-1.0,sl,-0.692,-1.53,-3.44
+86,Gold,long,auto,2026-06-25T16:06,MINUTE_5,D+V1+V2,-0.04,price,-1.0,sl,-0.96,-0.15,-3.53
+87,Nasdaq 100,short,auto,2026-06-26T06:06,MINUTE_5,D+V1+V2,-0.437,price,-1.0,sl,-0.563,-1.9,-2.45
+90,Gold,long,auto,2026-06-26T20:06,MINUTE_5,D+V1+V2,-0.579,price,-1.0,sl,-0.421,-1.98,-1.44
+91,Copper,long,auto,2026-06-29T05:06,MINUTE_5,D+V1+V2,-0.095,price,-0.233,sl,-0.138,-0.4,-0.58
+92,US500,long,auto,2026-06-29T16:06,MINUTE_5,D+V1+V2,0.377,price,0.805,horizon,0.429,1.676,1.91
+93,GBP/USD,long,auto,2026-06-29T18:06,MINUTE_5,D+V1+V2,-0.972,price,-1.0,sl,-0.028,-1.044,-0.03
+94,Nasdaq 100,long,auto,2026-06-29T19:06,MINUTE_5,D+V1+V2,0.256,price,-0.075,sl,-0.332,1.13,-1.46
+95,AUD/USD,short,auto,2026-06-30T05:06,MINUTE_5,D+V1+V2,-0.254,price,-1.0,sl,-0.746,-0.58,-1.69
+97,Gold,short,auto,2026-07-01T05:06,MINUTE_5,D+V1+V2,-0.117,price,-1.0,sl,-0.883,-0.52,-3.95
+99,Brent Oil,short,auto,2026-07-01T11:06,MINUTE_5,D+V1+V2,0.811,price,0.811,horizon,0.0,3.95,0.0
+100,Gold,long,auto,2026-07-01T14:06,MINUTE_5,D+V1+V2,-0.12,price,0.212,horizon,0.332,-0.53,1.47
