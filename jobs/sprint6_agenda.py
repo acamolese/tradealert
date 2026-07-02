@@ -31,6 +31,17 @@ log = logging.getLogger(__name__)
 
 STATE_FILE = Path(__file__).resolve().parent.parent / "logs" / "sprint6_agenda_state.json"
 
+# Fase A (Sprint 7): shadow del selettore deterministico d'entrata.
+# Fine fase: 20 signal LLM con evento entry_shadow nello stesso scan,
+# oppure 2026-07-31. Guida pre-registrata alla lettura (concordanza
+# asset+direzione sui signal confrontati): >=60% switch diretto Fase B;
+# 30-60% switch con gate forward stretto (open-rate + expectancy 20 trade);
+# <30% analizzare le divergenze prima dello switch.
+A5_SHADOW_START = "2026-07-02T22:00:00+00:00"
+A5_TARGET_SIGNALS = 20
+A5_DEADLINE = date(2026, 7, 31)
+A5_MATCH_WINDOW_MIN = 20
+
 A2_CUTOFF = "2026-05-20"
 A2_TARGET_LONGS = 45
 A3_NEW_ASSETS = {"EUR/USD", "AUD/USD", "GBP/USD", "Copper", "Hang Seng", "Nikkei"}
@@ -143,11 +154,70 @@ def main() -> int:
         state["a4_sent"] = True
         log.info("A4 alert inviato (n=%d exp=%.3f pf=%.2f)", n_win, exp_r, pf)
 
+    # --- Fase A: shadow selettore deterministico (20 signal confrontati o deadline) ---
+    n_matched, n_conc_dir, n_conc_asset = 0, 0, 0
+    if not state.get("fase_a_sent"):
+        from datetime import datetime, timedelta
+
+        sigs = (
+            db._client.table("signals")
+            .select("asset,direction,created_at")
+            .gte("created_at", A5_SHADOW_START)
+            .execute()
+            .data
+        )
+        shadows = (
+            db._client.table("monitoring_events")
+            .select("created_at,details")
+            .eq("event_type", "entry_shadow")
+            .gte("created_at", A5_SHADOW_START)
+            .execute()
+            .data
+        )
+        win = timedelta(minutes=A5_MATCH_WINDOW_MIN)
+        sh_parsed = [
+            (datetime.fromisoformat(s["created_at"]), (s.get("details") or {}).get("pick"))
+            for s in shadows
+        ]
+        for sig in sigs:
+            st = datetime.fromisoformat(sig["created_at"])
+            near = [p for t, p in sh_parsed if abs(t - st) <= win]
+            if not near:
+                continue
+            n_matched += 1
+            pick = near[0]
+            if pick and pick.get("asset") == sig["asset"]:
+                n_conc_asset += 1
+                if pick.get("direction") == sig["direction"]:
+                    n_conc_dir += 1
+        if n_matched >= A5_TARGET_SIGNALS or date.today() >= A5_DEADLINE:
+            pct_dir = (n_conc_dir / n_matched * 100) if n_matched else 0.0
+            pct_asset = (n_conc_asset / n_matched * 100) if n_matched else 0.0
+            if pct_dir >= 60:
+                guide = ("Concordanza alta: da guida pre-registrata si puo' passare "
+                         "alla Fase B (switch selettore deterministico, LLM solo monitor).")
+            elif pct_dir >= 30:
+                guide = ("Concordanza media: Fase B possibile ma con gate forward "
+                         "stretto (open-rate + expectancy sui primi 20 trade).")
+            else:
+                guide = ("Concordanza bassa: analizzare le divergenze prima dello "
+                         "switch (i due selettori aprono stream diversi).")
+            telegram.send_message(
+                "📋 <b>Agenda — FINE FASE A (shadow selettore d'entrata)</b>\n"
+                f"Signal LLM confrontati: <b>{n_matched}</b> (target {A5_TARGET_SIGNALS}).\n"
+                f"Concordanza asset: <b>{pct_asset:.0f}%</b> | "
+                f"asset+direzione: <b>{pct_dir:.0f}%</b>\n"
+                f"{guide}\nRif: docs/sprint7-fase-a-entry-shadow.md"
+            )
+            state["fase_a_sent"] = True
+            log.info("Fase A alert inviato (n=%d, dir=%.0f%%)", n_matched, pct_dir)
+
     _save_state(state)
     log.info(
-        "agenda: long %d/%d | nuovi asset %d/%d (deadline %s) | finestra scaling %d/%d",
+        "agenda: long %d/%d | nuovi asset %d/%d (deadline %s) | finestra scaling %d/%d | "
+        "faseA %d/%d signal confrontati",
         n_long, A2_TARGET_LONGS, n_new, A3_TARGET_TRADES, A3_DEADLINE,
-        n_win, A4_TARGET_TRADES,
+        n_win, A4_TARGET_TRADES, n_matched, A5_TARGET_SIGNALS,
     )
     return 0
 

@@ -1560,6 +1560,16 @@ def run_morning_scan(config: Config) -> None:
         ", ".join(f"{k}={v}" for k, v in filter_counts.items() if v),
     )
 
+    # Sprint 7 Fase A — selettore deterministico in SHADOW (logging-only):
+    # registra cosa un picker senza LLM avrebbe aperto sugli stessi candidati.
+    # Best-effort assoluto: nessun errore qui deve toccare lo scan reale.
+    try:
+        from .entry_shadow import log_entry_shadow
+
+        log_entry_shadow(db, filtered_features)
+    except Exception:
+        log.debug("entry shadow logging fallito", exc_info=True)
+
     if getattr(config, "scoring_two_call", False):
         # Sprint 4 t1: Call 1 = scoring a temp 0.2, senza thesis (generata poi
         # dalla Call 2 solo per il setup scelto). Reversibile col flag.
