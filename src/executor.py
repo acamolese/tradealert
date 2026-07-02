@@ -416,20 +416,28 @@ def execute_signal(
         _link_safe(db.link_attempt_capital_open, signal_id, deal_id)
 
     # 8. Persistenza trade + signal status
-    try:
-        trade_row = db.insert_trade(
-            {
-                "signal_id": signal_id,
-                "capital_deal_id": deal_id,
-                "asset": signal_row["asset"],
-                "direction": signal_row["direction"],
-                "size": sizing.size,
-                "entry_price": fill_level,
-                "current_sl": round(stop_level, 5),
-                "current_tp": round(profit_level, 5) if profit_level else None,
-                "status": "open",
-            }
+    trade_payload = {
+        "signal_id": signal_id,
+        "capital_deal_id": deal_id,
+        "asset": signal_row["asset"],
+        "direction": signal_row["direction"],
+        "size": sizing.size,
+        "entry_price": fill_level,
+        "current_sl": round(stop_level, 5),
+        "current_tp": round(profit_level, 5) if profit_level else None,
+        "status": "open",
+    }
+    # Sprint 6 A4.1: rischio a SL iniziale persistito sul trade (per exit_r
+    # alla chiusura). Calcolato su fill e SL effettivi (non sui valori
+    # pre-sizing: min-distance e fill possono averli spostati), convertito
+    # nella valuta di riferimento come il max_loss cap. Scritto solo se la
+    # migration risk_r e' applicata.
+    if db.trades_risk_columns_available():
+        trade_payload["risk_at_open_eur"] = round(
+            sizing.size * abs(fill_level - stop_level) * quote_to_ref, 4
         )
+    try:
+        trade_row = db.insert_trade(trade_payload)
     except Exception as exc:
         # Lasciamo il link in 'capital_open': il monitor sapra' come
         # ricucirlo. Marchiamo failed con l'errore concreto per audit.

@@ -8,13 +8,25 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-# Cap settimanale di drawdown realizzato (valore assoluto in EUR).
+# Sprint 6 A4.2: capitale di rischio e cap espressi in percentuale, con i
+# valori EUR derivati. Ai default (capitale 100, 20%, 5%) i cap calcolati
+# sono bit-identici ai vecchi valori assoluti (20 EUR settimanale, 5 EUR
+# per trade). Alzare ACCOUNT_RISK_CAPITAL_EUR scala tutti i cap insieme:
+# e' l'unica leva da toccare a ogni step della scala 100->300->1000
+# (gate pre-registrato in docs/sprint6-piano-scalata.md, A4.3).
+ACCOUNT_RISK_CAPITAL_EUR: float = float(
+    os.environ.get("ACCOUNT_RISK_CAPITAL_EUR", "100")
+)
+WEEKLY_DRAWDOWN_CAP_PCT: float = float(
+    os.environ.get("WEEKLY_DRAWDOWN_CAP_PCT", "20")
+)
+
+# Cap settimanale di drawdown realizzato (valore assoluto in EUR, derivato).
 # Se la somma del pnl dei trade chiusi negli ultimi 7 giorni rolling
 # scende a -WEEKLY_DRAWDOWN_CAP_EUR o sotto, lo scanner si auto-stoppa.
-# Costante modulo (no env var) come da vincolo Sprint 1.
-# Capitale rischio totale 100 EUR; cap 20 EUR e' il 20% di drawdown
-# settimanale come soglia di pausa.
-WEEKLY_DRAWDOWN_CAP_EUR: float = 20.0
+WEEKLY_DRAWDOWN_CAP_EUR: float = (
+    ACCOUNT_RISK_CAPITAL_EUR * WEEKLY_DRAWDOWN_CAP_PCT / 100.0
+)
 
 
 # Sprint 2 Fase 3: kill switch direzionale.
@@ -133,6 +145,23 @@ def _parse_budget_options(raw: str) -> list[float]:
     return sorted(set(values)) or [10.0, 15.0, 20.0, 25.0, 30.0]
 
 
+def _max_loss_per_trade_eur() -> float:
+    """Cap perdita per trade: percentuale del capitale (Sprint 6 A4.2),
+    con override legacy in EUR assoluti se MAX_LOSS_PER_TRADE_EUR e' settata
+    (deprecata: non scala con ACCOUNT_RISK_CAPITAL_EUR)."""
+    legacy = os.environ.get("MAX_LOSS_PER_TRADE_EUR")
+    if legacy is not None and legacy.strip():
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "MAX_LOSS_PER_TRADE_EUR e' deprecata: usa MAX_LOSS_PER_TRADE_PCT "
+            "(il valore assoluto non scala con ACCOUNT_RISK_CAPITAL_EUR)"
+        )
+        return float(legacy)
+    pct = float(os.environ.get("MAX_LOSS_PER_TRADE_PCT", "5"))
+    return ACCOUNT_RISK_CAPITAL_EUR * pct / 100.0
+
+
 def load_config() -> Config:
     owner_chat_id = _required("TELEGRAM_CHAT_ID")
     raw_chat_ids = os.environ.get("TELEGRAM_CHAT_IDS", "").strip()
@@ -174,9 +203,7 @@ def load_config() -> Config:
             os.environ.get("BUDGET_OPTIONS", "10,15,20,25,30")
         ),
         trailing_step_r=float(os.environ.get("TRAILING_STEP_R", "0.5")),
-        max_loss_per_trade_eur=float(
-            os.environ.get("MAX_LOSS_PER_TRADE_EUR", "5")
-        ),
+        max_loss_per_trade_eur=_max_loss_per_trade_eur(),
         scoring_shadow_enabled=os.environ.get(
             "SCORING_SHADOW", "false"
         ).strip().lower()

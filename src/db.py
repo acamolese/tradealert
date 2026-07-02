@@ -61,6 +61,23 @@ class Database:
         response = self._client.table("trades").insert(trade).execute()
         return response.data[0]
 
+    def trades_risk_columns_available(self) -> bool:
+        """True se la migration 20260702150000 (risk_at_open_eur/exit_r) e'
+        applicata. Rilevamento runtime con cache per processo: il codice che
+        scrive le nuove colonne resta inerte finche' lo schema non le ha,
+        cosi' l'ordine deploy codice / migration e' libero (Sprint 6 A4.1)."""
+        cached = getattr(self, "_risk_cols_available", None)
+        if cached is None:
+            try:
+                self._client.table("trades").select(
+                    "risk_at_open_eur"
+                ).limit(1).execute()
+                cached = True
+            except Exception:
+                cached = False
+            self._risk_cols_available = cached
+        return cached
+
     # ---------- signal_to_trade_link (bug #6 Tier 2) ----------
     #
     # Le scritture qui sono best-effort: una loro failure non deve mai
@@ -181,16 +198,34 @@ class Database:
     ) -> None:
         from datetime import datetime, timezone
 
-        self._client.table("trades").update(
-            {
-                "status": "closed",
-                "closed_at": datetime.now(timezone.utc).isoformat(),
-                "close_price": close_price,
-                "pnl": pnl,
-                "pnl_pct": pnl_pct,
-                "exit_reason": exit_reason,
-            }
-        ).eq("capital_deal_id", deal_id).execute()
+        update = {
+            "status": "closed",
+            "closed_at": datetime.now(timezone.utc).isoformat(),
+            "close_price": close_price,
+            "pnl": pnl,
+            "pnl_pct": pnl_pct,
+            "exit_reason": exit_reason,
+        }
+        # Sprint 6 A4.1: exit_r = pnl / rischio all'apertura. Best-effort:
+        # nessuna failure qui deve impedire la chiusura del trade a DB.
+        if pnl is not None and self.trades_risk_columns_available():
+            try:
+                row = (
+                    self._client.table("trades")
+                    .select("risk_at_open_eur")
+                    .eq("capital_deal_id", deal_id)
+                    .limit(1)
+                    .execute()
+                    .data
+                )
+                risk = row[0].get("risk_at_open_eur") if row else None
+                if risk and float(risk) > 0:
+                    update["exit_r"] = round(float(pnl) / float(risk), 4)
+            except Exception:
+                pass
+        self._client.table("trades").update(update).eq(
+            "capital_deal_id", deal_id
+        ).execute()
 
     def insert_account_snapshot(self, snapshot: dict[str, Any]) -> None:
         self._client.table("account_snapshots").insert(snapshot).execute()
