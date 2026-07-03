@@ -541,6 +541,34 @@ def _apply_trailing_stop(
         profit = entry - current_price
 
     profit_r = profit / r_distance
+
+    # Sprint 7 — avviso "soglia di non-ritorno" (docs/sprint7-mae-analysis.md):
+    # sullo storico, dei trade arrivati a -0.5R solo 1/36 ha chiuso sopra zero
+    # e 0/36 oltre +0.5R. SOLO notifica una-tantum per trade (event_type
+    # mae_alert come dedup), nessuna azione automatica: la policy hard-exit
+    # non ha superato il gate (delta +0.035R < +0.15R richiesto).
+    if profit_r <= -0.5 and trade and not is_quiet_now():
+        try:
+            if not db.get_last_monitoring_event(trade["id"], "mae_alert"):
+                db.insert_monitoring_event(
+                    {
+                        "trade_id": trade["id"],
+                        "event_type": "mae_alert",
+                        "reason": "toccato -0.5R (soglia di non-ritorno storica)",
+                        "details": {"profit_r": round(profit_r, 3)},
+                    }
+                )
+                telegram.send_message(
+                    f"⚠️ <b>{asset_name}</b> ha toccato <b>{profit_r:+.2f}R</b> "
+                    f"(metà strada verso lo SL).\n"
+                    f"Storico TradeAlert: dei 36 trade arrivati a -0.5R, "
+                    f"1 ha chiuso sopra zero e nessuno oltre +0.5R.\n"
+                    f"Valuta l'uscita manuale; il monitor può proporla "
+                    f"al prossimo giro."
+                )
+        except Exception:
+            log.debug("mae_alert fallito (ignoro)", exc_info=True)
+
     if profit_r < 0.5:
         return
 
