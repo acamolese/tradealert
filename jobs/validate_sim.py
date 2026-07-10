@@ -46,6 +46,7 @@ def load_candles(epic: str) -> list[dict]:
             try:
                 out.append({
                     "ts": row["ts"],
+                    "open_bid": float(row["open_bid"]), "open_ask": float(row["open_ask"]),
                     "high_bid": float(row["high_bid"]), "high_ask": float(row["high_ask"]),
                     "low_bid": float(row["low_bid"]), "low_ask": float(row["low_ask"]),
                     "close_bid": float(row["close_bid"]), "close_ask": float(row["close_ask"]),

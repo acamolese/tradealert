@@ -39,6 +39,25 @@ bassa NON significa che il deterministico sia peggiore; significa che lo
 switch cambia la distribuzione dei trade e va validato forward, non assunto
 equivalente.
 
+## Replay controfattuale a fine fase (PRE-REGISTRATO 2026-07-10)
+
+Oltre alla concordanza, alla chiusura della fase si esegue
+`jobs/entry_shadow_replay.py`: confronto PAIRED dei due stream sugli scan
+in cui esistono entrambi (signal LLM + pick shadow, ±20 min), stessa
+simulazione validata M3 (entry = open prima candela HOUR post-scan,
+bracket TP + trailing live, SL-first, orizzonte 15gg). Ogni stream usa i
+propri stop/target. Criterio, deciso PRIMA di guardare l'aggregato:
+
+- n minimo 15 pair validi, sotto è solo descrittivo;
+- un vincitore c'è solo se |delta expectancy| ≥ 0.15R E il delta senza i
+  2 pair più favorevoli resta ≥ 0.10R nello stesso segno (anti-outlier);
+- altrimenti NON CONCLUSIVO: decide la sola guida di concordanza sopra.
+
+Il replay risponde a "chi apre meglio?", complementare alla concordanza
+("quanto spesso scelgono la stessa cosa?"). Verdetto aggregato da NON
+calcolare prima dell'avviso di fine fase; consentito il replay di singoli
+casi con `--only` (es. divergenza Brent 2026-07-07, richiesta utente).
+
 ## Contesto (Fasi B e C del piano "aggressivo ma razionale")
 
 - **Fase B**: flag `SCORING_LLM_OFF` (da costruire): il pick deterministico
