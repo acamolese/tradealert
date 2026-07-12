@@ -43,7 +43,7 @@ A5_DEADLINE = date(2026, 7, 31)
 A5_MATCH_WINDOW_MIN = 20
 
 A2_CUTOFF = "2026-05-20"
-A2_TARGET_LONGS = 45
+A2_TARGET_LONGS = 60  # round 3 (round 2 a 45: NON CONCLUSIVO, docs/sprint6-long-gate.md)
 A3_NEW_ASSETS = {"EUR/USD", "AUD/USD", "GBP/USD", "Copper", "Hang Seng", "Nikkei"}
 A3_TARGET_TRADES = 15
 A3_DEADLINE = date(2026, 8, 15)

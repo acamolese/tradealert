@@ -50,3 +50,50 @@ Nessuna modifica a produzione. `LONG_RISK_FACTOR` NON viene introdotto.
 **Trigger di ripetizione: +15 long chiusi** (oggi n=30 → ripetere a n≥45,
 stesso script, stesse soglie). Alla ripetizione, aggiungere il breakdown
 pre-registrato ora: exp_R di Gold+Brent long vs resto dei long.
+
+---
+
+# ROUND 2 — 2026-07-12 (trigger agenda: n=45 long chiusi)
+
+Controfattuale A1 rigenerato lo stesso giorno (66 chiusure monitor simulate,
+4 scartate, verdetto A1 sempre NEUTRO; riapertura formale A1 resta a n≥81).
+
+## Verdetto: NON CONCLUSIVO → nessuna azione, ripetere a n≥60 long
+
+| Condizione LONG DA BLOCCARE | Soglia | Osservato | Esito |
+|---|---|---|---|
+| exp_R long reale | ≤ -0.10R | **-0.065R** | **no** |
+| exp_R long controfattuale | ≤ -0.10R | **-0.052R** | **no** |
+| n | ≥ 30 | 45 | sì |
+
+Il gate fallisce già sulla condizione principale: il bleed medio si è più che
+dimezzato rispetto al round 1 (-0.134R → -0.065R) e senza i 2 peggiori è
+-0.022R. Nessun ramo della matrice scatta.
+
+## Numeri (trade chiusi dal 2026-05-20, n=81, 0 esclusi)
+
+| Taglio | n | exp_R reale | exp_R controfattuale |
+|---|---|---|---|
+| LONG | 45 | -0.065 | -0.052 |
+| SHORT | 36 | +0.233 | +0.116 |
+| LONG senza i 2 peggiori | 43 | -0.022 | -0.008 |
+| LONG solo core | 37 | -0.042 | -0.026 |
+| **Gold+Brent long (breakdown pre-reg.)** | 18 | **-0.138** | -0.311 |
+| **resto dei long** | 27 | **-0.017** | +0.121 |
+
+Per asset (long, reale): Gold -0.244 (n=10), Copper -0.234 (n=4),
+GBP/USD -0.601 (n=2), Brent -0.006 (n=8), Nasdaq -0.003 (n=11),
+Bitcoin +0.122 (n=5), US500 +0.118 (n=3), Hang Seng +0.375 (n=2).
+
+## Lettura
+
+1. La tendenza è verso la normalizzazione: i 15 long di luglio hanno smesso
+   di sanguinare e Brent long è rientrato da -0.313R a -0.006R.
+2. Il residuo negativo è concentrato in **Gold long** (n=10, -0.244R), ma
+   n=10 non regge un gate per-asset: resta l'ipotesi da guardare al round 3.
+3. Lo short conferma l'edge (+0.233R reale, +0.116R controfattuale).
+
+## Azione (da matrice pre-registrata)
+
+Nessuna modifica. Round 3 a **n≥60 long chiusi** (agenda aggiornata,
+`A2_TARGET_LONGS=60`), con lo stesso breakdown e attenzione a Gold long.

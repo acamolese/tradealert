@@ -4,7 +4,7 @@ Data: 2026-07-02. Stato: **IN ESECUZIONE** (gate pre-registrati, non modificati)
 
 > **Stato di esecuzione al 2026-07-02:**
 > - **A1 ESEGUITA** → verdetto **NEUTRO** (sostanza: il monitor NON distrugge valore, la mediana dice che ne aggiunge). Nessuna modifica a produzione. Esito in `docs/sprint6-monitor-replay.md`, script `jobs/monitor_close_replay.py`. Riapertura solo a n≥81 chiusure monitor.
-> - **A2 ESEGUITA** → verdetto **NON CONCLUSIVO** (bleed long -0.134R reale/-0.124R cf, ma non robusto: senza 2 trade risale a -0.073R). Nessuna modifica. Ripetere a **n≥45 long chiusi** con breakdown Gold+Brent long. Esito in `docs/sprint6-long-gate.md`, script `jobs/long_gate_analysis.py`.
+> - **A2 ESEGUITA, round 2 il 2026-07-12 (n=45)** → verdetto **NON CONCLUSIVO** anche al round 2: bleed long dimezzato (-0.134R → -0.065R reale, -0.052R cf), residuo concentrato in Gold long (n=10, -0.244R). Nessuna modifica. Round 3 a **n≥60 long chiusi** (agenda riarmata). Esito in `docs/sprint6-long-gate.md`, script `jobs/long_gate_analysis.py`.
 > - **A3 ATTIVA**: freeze paniere in vigore; gate nuovi asset a 15 trade chiusi o **2026-08-15**.
 > - **A4.1/A4.2 IMPLEMENTATE**: cap in percentuale (bit-identici ai default), colonne `risk_at_open_eur`/`exit_r` con rilevamento runtime dello schema. **Passo manuale richiesto: applicare la migration `20260702150000_trades_risk_r.sql`** (supabase db push o SQL editor), poi eseguire `jobs/backfill_risk_r.py` sulla VM.
 > - **A4.3**: gate di scaling documentato sotto; il check automatico di retrocessione (uncle point) è un **prerequisito da implementare prima di entrare nello step 1**, non serve allo step 0.
