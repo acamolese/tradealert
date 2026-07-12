@@ -58,6 +58,16 @@ Il replay risponde a "chi apre meglio?", complementare alla concordanza
 calcolare prima dell'avviso di fine fase; consentito il replay di singoli
 casi con `--only` (es. divergenza Brent 2026-07-07, richiesta utente).
 
+> **Deviazione dichiarata (2026-07-12):** su richiesta esplicita dell'utente
+> ("i dati dicono che potremmo fare lo switch?") il replay aggregato è stato
+> eseguito a 18/20 confronti (17 pair simulati, 1 scartato, n≥15 ok).
+> Esito PROVVISORIO: LLM -0.114R vs shadow -0.199R, delta -0.085R che si
+> ROVESCIA a +0.137R senza i 2 pair migliori dell'LLM → NON CONCLUSIVO,
+> nessuno dei due apre meglio in modo robusto. Caveat: i 5 pair del 10/07
+> sono troncati a ~1.5 giorni di candele (weekend). I criteri NON vengono
+> modificati; il verdetto vincolante resta quello a fase chiusa (20 confronti
+> o 2026-07-31), stesso script, stesse soglie.
+
 ## Contesto (Fasi B e C del piano "aggressivo ma razionale")
 
 - **Fase B**: flag `SCORING_LLM_OFF` (da costruire): il pick deterministico
