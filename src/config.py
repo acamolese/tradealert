@@ -98,6 +98,7 @@ class Config:
     max_loss_per_trade_eur: float  # cap perdita massima per singolo trade (EUR)
     scoring_shadow_enabled: bool  # se true, logga score shadow temp0.2 accanto al reale (Sprint 4 troncone 1)
     scoring_two_call: bool  # se true, scoring (Call1 temp0.2, no thesis) + thesis (Call2) separati
+    scoring_llm_off: bool  # Sprint 7 Fase B: entrata dal selettore deterministico v1-momentum (zero LLM allo scan), LLM solo sul monitor. Rollback: SCORING_LLM_OFF=false
     trail_v1_lowband: bool  # se true, rampa V1 nella fascia 0.5-1.0R del trailing (deploy gated, docs/sprint4-trailing-v1-clean.md)
     trail_v2_highband: bool  # se true, rampa V2 nella fascia 1.0-1.25R del trailing (deploy gated, docs/sprint5-trailing-v2-highband.md)
     sizing_currency_aware: bool  # se true, converte il rischio quote->USD nel sizing (bugfix FX, docs/sprint5-sizing-fix.md); OFF = bit-identico
@@ -210,6 +211,10 @@ def load_config() -> Config:
         == "true",
         scoring_two_call=os.environ.get(
             "SCORING_TWO_CALL", "false"
+        ).strip().lower()
+        == "true",
+        scoring_llm_off=os.environ.get(
+            "SCORING_LLM_OFF", "false"
         ).strip().lower()
         == "true",
         trail_v1_lowband=os.environ.get(

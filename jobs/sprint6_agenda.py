@@ -42,6 +42,15 @@ A5_TARGET_SIGNALS = 20
 A5_DEADLINE = date(2026, 7, 31)
 A5_MATCH_WINDOW_MIN = 20
 
+# Fase B (Sprint 7): entrata deterministica LIVE dal 2026-07-14 (flag
+# SCORING_LLM_OFF). Gate forward pre-registrato (docs/sprint7-fase-b.md):
+# a 20 trade chiusi nati da signal "[v1-momentum]", confronto expectancy_R
+# con i 20 trade LLM precedenti lo switch. PROSEGUI se det >= llm - 0.05R;
+# ROLLBACK flag se det <= llm - 0.15R; in mezzo: proseguire fino a 40.
+B_START = "2026-07-14"
+B_TARGET_TRADES = 20
+B_THESIS_MARKER = "[v1-momentum]"
+
 A2_CUTOFF = "2026-05-20"
 A2_TARGET_LONGS = 60  # round 3 (round 2 a 45: NON CONCLUSIVO, docs/sprint6-long-gate.md)
 A3_NEW_ASSETS = {"EUR/USD", "AUD/USD", "GBP/USD", "Copper", "Hang Seng", "Nikkei"}
@@ -212,12 +221,72 @@ def main() -> int:
             state["fase_a_sent"] = True
             log.info("Fase A alert inviato (n=%d, dir=%.0f%%)", n_matched, pct_dir)
 
+    # --- Fase B: gate forward selettore deterministico (20 trade chiusi) ---
+    n_det = 0
+    if not state.get("fase_b_gate_sent"):
+        det_sigs = (
+            db._client.table("signals")
+            .select("id")
+            .gte("created_at", B_START)
+            .like("thesis", B_THESIS_MARKER + "%")
+            .execute()
+            .data
+        )
+        det_ids = {s["id"] for s in det_sigs}
+        det_closed = (
+            db._client.table("trades")
+            .select("id,signal_id,exit_r,pnl,closed_at")
+            .eq("status", "closed")
+            .not_.is_("pnl", "null")
+            .gte("closed_at", B_START)
+            .execute()
+            .data
+        )
+        det_trades = [t for t in det_closed if t.get("signal_id") in det_ids]
+        n_det = len(det_trades)
+        if n_det >= B_TARGET_TRADES:
+            llm_base = (
+                db._client.table("trades")
+                .select("exit_r,pnl,closed_at,signal_id")
+                .eq("status", "closed")
+                .not_.is_("pnl", "null")
+                .not_.is_("signal_id", "null")
+                .lt("closed_at", B_START)
+                .order("closed_at", desc=True)
+                .limit(B_TARGET_TRADES)
+                .execute()
+                .data
+            )
+
+            def _exp(rows):
+                vals = [float(t["exit_r"]) for t in rows if t.get("exit_r") is not None]
+                return statistics.mean(vals) if vals else float("nan")
+
+            exp_det, exp_llm = _exp(det_trades), _exp(llm_base)
+            delta = exp_det - exp_llm
+            if delta >= -0.05:
+                guide = "✅ PROSEGUI: il deterministico regge il confronto (gate pre-registrato)."
+            elif delta <= -0.15:
+                guide = ("❌ ROLLBACK pre-registrato: SCORING_LLM_OFF=false nel .env VM "
+                         "(il deterministico apre peggio).")
+            else:
+                guide = "⚠️ Zona grigia: proseguire fino a 40 trade, nessuna azione."
+            telegram.send_message(
+                "📋 <b>Agenda — GATE FASE B (selettore deterministico)</b>\n"
+                f"Trade chiusi dal selettore v1-momentum: <b>{n_det}</b>.\n"
+                f"Expectancy: det <b>{exp_det:+.3f}R</b> vs LLM (ultimi {B_TARGET_TRADES} "
+                f"pre-switch) <b>{exp_llm:+.3f}R</b> | delta {delta:+.3f}R\n"
+                f"{guide}\nRif: docs/sprint7-fase-b.md"
+            )
+            state["fase_b_gate_sent"] = True
+            log.info("Fase B gate alert inviato (n=%d, delta=%.3f)", n_det, delta)
+
     _save_state(state)
     log.info(
         "agenda: long %d/%d | nuovi asset %d/%d (deadline %s) | finestra scaling %d/%d | "
-        "faseA %d/%d signal confrontati",
+        "faseA %d/%d signal confrontati | faseB %d/%d trade det chiusi",
         n_long, A2_TARGET_LONGS, n_new, A3_TARGET_TRADES, A3_DEADLINE,
-        n_win, A4_TARGET_TRADES, n_matched, A5_TARGET_SIGNALS,
+        n_win, A4_TARGET_TRADES, n_matched, A5_TARGET_SIGNALS, n_det, B_TARGET_TRADES,
     )
     return 0
 

@@ -61,6 +61,56 @@ def deterministic_pick(features: dict[str, dict[str, Any]]) -> dict[str, Any] | 
     return best
 
 
+def deterministic_proposals(features: dict[str, dict[str, Any]]) -> list:
+    """Sprint 7 Fase B: la regola v1-momentum come lista di SetupProposal.
+
+    Estensione DICHIARATA della regola di Fase A (docs/sprint7-fase-b.md):
+    non solo il pick n.1 ma la lista dei candidati validi ordinata per |dpc|
+    decrescente, cosi' dedup 24h / budget / cap a valle possono far scendere
+    ai successivi, esattamente come con le proposte LLM. Il primo della
+    lista e' identico al pick di Fase A.
+
+    Score sintetico 7.0 + min(|dpc|/10, 0.9): monotono in |dpc| (preserva il
+    ranking), nella banda tipica LLM (7.0-7.5), sopra MIN_SCORE_THRESHOLD=7
+    e azzerabile dalla penalita' -2 dei guardrail macro (che restano attivi).
+    La thesis inizia con "[v1-momentum]": marker usato dall'agenda per il
+    gate forward dei primi 20 trade.
+    """
+    from .llm_analyzer import SetupProposal
+
+    out: list = []
+    for asset, f in features.items():
+        try:
+            dpc = float(f["daily_pct_change"])
+            spread = float(f.get("spread_pct") or 0.0)
+            atrp = float(f.get("atr_pct_of_price") or 0.0)
+        except (KeyError, TypeError, ValueError):
+            continue
+        if f.get("market_status") not in ("TRADEABLE", "EDITS_ONLY"):
+            continue
+        if spread > MAX_SPREAD_PCT or abs(dpc) < MIN_ABS_DAILY_PCT:
+            continue
+        stop = max(STOP_ATR_MULT * atrp, MIN_STOP_PCT)
+        direction = "long" if dpc > 0 else "short"
+        out.append(
+            SetupProposal(
+                asset=asset,
+                direction=direction,
+                score=round(7.0 + min(abs(dpc) / 10.0, 0.9), 2),
+                thesis=(
+                    f"[v1-momentum] Mover piu' forte del giorno: {dpc:+.2f}% "
+                    f"(spread {spread:.2f}%). Continuazione {direction}, "
+                    f"stop 1.5xATR ({stop:.2f}%), target 2x. "
+                    "Selettore deterministico Fase B, nessuno scoring LLM."
+                ),
+                suggested_stop_pct=round(stop, 3),
+                suggested_target_pct=round(TARGET_RR * stop, 3),
+            )
+        )
+    out.sort(key=lambda p: p.score, reverse=True)
+    return out
+
+
 def log_entry_shadow(db: Database, filtered_features: dict[str, dict[str, Any]]) -> None:
     """Scrive il pick shadow per questo scan. Best-effort: mai sollevare."""
     if os.environ.get("ENTRY_SHADOW", "true").strip().lower() != "true":

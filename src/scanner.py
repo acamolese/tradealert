@@ -1560,17 +1560,33 @@ def run_morning_scan(config: Config) -> None:
         ", ".join(f"{k}={v}" for k, v in filter_counts.items() if v),
     )
 
+    scoring_llm_off = getattr(config, "scoring_llm_off", False)
+
     # Sprint 7 Fase A — selettore deterministico in SHADOW (logging-only):
     # registra cosa un picker senza LLM avrebbe aperto sugli stessi candidati.
     # Best-effort assoluto: nessun errore qui deve toccare lo scan reale.
-    try:
-        from .entry_shadow import log_entry_shadow
+    # In Fase B (scoring_llm_off) si salta: il selettore E' il flusso live.
+    if not scoring_llm_off:
+        try:
+            from .entry_shadow import log_entry_shadow
 
-        log_entry_shadow(db, filtered_features)
-    except Exception:
-        log.debug("entry shadow logging fallito", exc_info=True)
+            log_entry_shadow(db, filtered_features)
+        except Exception:
+            log.debug("entry shadow logging fallito", exc_info=True)
 
-    if getattr(config, "scoring_two_call", False):
+    if scoring_llm_off:
+        # Sprint 7 Fase B: entrata deterministica v1-momentum, zero chiamate
+        # LLM allo scan. Stessa pipeline a valle (guardrail, dedup, soglie,
+        # cap, sizing, conferma); LLM resta solo sul monitor posizioni.
+        # Pre-registrazione e gate forward: docs/sprint7-fase-b.md.
+        from .entry_shadow import deterministic_proposals
+
+        proposals = deterministic_proposals(filtered_features)
+        log.info(
+            "Fase B: selettore deterministico v1-momentum, %d proposte "
+            "(LLM entrata OFF)", len(proposals),
+        )
+    elif getattr(config, "scoring_two_call", False):
         # Sprint 4 t1: Call 1 = scoring a temp 0.2, senza thesis (generata poi
         # dalla Call 2 solo per il setup scelto). Reversibile col flag.
         proposals = llm.rank_setups(
@@ -1586,7 +1602,7 @@ def run_morning_scan(config: Config) -> None:
     # Best-effort: un errore qui non deve mai impattare lo scan reale.
     shadow_raw = None
     real_raw_snapshot = None
-    if getattr(config, "scoring_shadow_enabled", False):
+    if getattr(config, "scoring_shadow_enabled", False) and not scoring_llm_off:
         try:
             real_raw_snapshot = [
                 {"asset": p.asset, "direction": p.direction, "score": p.score}
