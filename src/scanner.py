@@ -1517,7 +1517,12 @@ def run_morning_scan(config: Config) -> None:
             for n in per_asset[:3]
         ]
 
-    log.info("Ranking LLM su %d asset", len(features))
+    log.info(
+        "Ranking su %d asset (%s)",
+        len(features),
+        "deterministico v1-momentum" if getattr(config, "scoring_llm_off", False)
+        else "LLM",
+    )
     from datetime import datetime, timezone
 
     now = datetime.now(timezone.utc)
