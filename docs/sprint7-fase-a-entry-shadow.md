@@ -68,6 +68,21 @@ casi con `--only` (es. divergenza Brent 2026-07-07, richiesta utente).
 > modificati; il verdetto vincolante resta quello a fase chiusa (20 confronti
 > o 2026-07-31), stesso script, stesse soglie.
 
+## ESITO FINALE (2026-07-14, fase chiusa a 20 confronti)
+
+- **Concordanza asset+direzione: 25%** (5/20 asset) → fascia bassa: i due
+  selettori aprono stream diversi.
+- **Replay controfattuale vincolante** (18 pair simulati, 2 scartati per
+  candele mancanti): LLM -0.391R vs shadow -0.381R, delta +0.010R (senza
+  top2 -0.107R) → **NON CONCLUSIVO: pareggio pieno**. Finestra difficile
+  (l'escalation USA-Iran del weekend ha stoppato a -1R quasi tutti i pick
+  di entrambi, 10/18 pair).
+- Lettura combinata con corr score/esiti ≈ 0 (giugno): l'LLM in entrata non
+  apre meglio di una regola momentum gratuita. Lo switch (Fase B) non è
+  sostenuto dalla performance ma dai costi (83% bolletta API); da fare
+  dietro flag con gate forward sui primi 20 trade, come da guida 30-60%
+  (la fascia <30% richiedeva l'analisi divergenze: è questo replay).
+
 ## Contesto (Fasi B e C del piano "aggressivo ma razionale")
 
 - **Fase B**: flag `SCORING_LLM_OFF` (da costruire): il pick deterministico
