@@ -3,7 +3,7 @@
 Tre trigger (docs/sprint6-piano-scalata.md), ognuno notificato UNA volta sola
 (stato persistito in logs/sprint6_agenda_state.json):
 
-  A2  - 45 long chiusi dal 2026-05-20 -> rieseguire jobs/long_gate_analysis.py
+  A2  - CHIUSA 2026-07-16 (3 round NON CONCLUSIVO, bleed normalizzato) -> trigger disattivato
   A3  - 15 trade chiusi sui 6 asset nuovi OPPURE 2026-08-15 -> gate paniere
   A4  - 50 trade chiusi dal 2026-07-02 -> gate di scaling del capitale
         (calcola gia' expectancy da trades.exit_r e profit factor dal pnl)
@@ -52,7 +52,7 @@ B_TARGET_TRADES = 20
 B_THESIS_MARKER = "[v1-momentum]"
 
 A2_CUTOFF = "2026-05-20"
-A2_TARGET_LONGS = 60  # round 3 (round 2 a 45: NON CONCLUSIVO, docs/sprint6-long-gate.md)
+A2_TARGET_LONGS = 60  # tappa CHIUSA il 2026-07-16 (vedi blocco A2), tenuto solo per il log
 A3_NEW_ASSETS = {"EUR/USD", "AUD/USD", "GBP/USD", "Copper", "Hang Seng", "Nikkei"}
 A3_TARGET_TRADES = 15
 A3_DEADLINE = date(2026, 8, 15)
@@ -92,22 +92,15 @@ def main() -> int:
         .data
     )
 
-    # --- A2: gate long, trigger a 45 long chiusi dal fix bidirezionale ---
+    # --- A2: CHIUSA il 2026-07-16 (docs/sprint6-long-gate.md, round 3 n=61) ---
+    # 3 round consecutivi NON CONCLUSIVO, bleed long normalizzato in modo monotono
+    # (-0.134R -> -0.065R -> -0.040R). Tappa chiusa su decisione utente: long
+    # tenuto a rischio pieno, nessun riarmo. Trigger disattivato (niente send);
+    # n_long resta solo per il contatore di log finale.
     n_long = sum(
         1 for t in closed
         if t["direction"] == "long" and (t["closed_at"] or "") >= A2_CUTOFF
     )
-    if n_long >= A2_TARGET_LONGS and not state.get("a2_sent"):
-        telegram.send_message(
-            "📋 <b>Agenda Sprint 6 — tappa A2 matura</b>\n"
-            f"Long chiusi dal fix bidirezionale: <b>{n_long}</b> (soglia {A2_TARGET_LONGS}).\n"
-            "Rieseguire il gate direzionale (stesse soglie pre-registrate, "
-            "in piu' breakdown Gold+Brent long vs resto):\n"
-            "<code>PYTHONPATH=$PWD .venv/bin/python jobs/long_gate_analysis.py</code>\n"
-            "Rif: docs/sprint6-long-gate.md"
-        )
-        state["a2_sent"] = True
-        log.info("A2 alert inviato (n_long=%d)", n_long)
 
     # --- A3: gate paniere nuovi asset (15 trade o deadline 2026-08-15) ---
     n_new = sum(1 for t in closed if t["asset"] in A3_NEW_ASSETS)

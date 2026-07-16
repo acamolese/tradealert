@@ -150,14 +150,19 @@ US500 +0.045 (n=4), AUD/USD +0.548 (n=2).
    l'unica ipotesi ancora viva ma non regge da sola un gate.
 4. Lo short conferma l'edge (+0.185R reale, +0.074R controfattuale).
 
-## Azione (da matrice pre-registrata)
+## Azione — A2 CHIUSA il 2026-07-16 (decisione utente)
 
-Nessuna modifica. Per la regola NON CONCLUSIVO il prossimo trigger è **+15 long
-chiusi → n≥76** (agenda da riarmare a `A2_TARGET_LONGS=76`), stesso script e
-stesso breakdown.
+Invece di riarmare a n≥76, la tappa si chiude qui su decisione esplicita
+dell'utente. Motivo: tre round consecutivi NON CONCLUSIVO con bleed long che si
+normalizza in modo monotòno (-0.134R → -0.065R → -0.040R); il gate si allontana
+dal fuoco, non ci si avvicina, e ripetere ogni +15 ha rendimenti decrescenti.
 
-Nota di metodo per l'utente (fuori matrice): il bleed long si è normalizzato su
-tre round e il gate si allontana dal fuoco. Ripetere a oltranza ogni +15 ha
-rendimenti decrescenti; è ragionevole valutare la chiusura di A2 con esito
-"nessun bleed long robusto, normalizzato" invece di un quarto round. Decisione
-dell'utente, non automatica.
+Esito registrato: **nessun bleed long robusto, il lato long si è normalizzato.**
+Il long resta a **rischio pieno** (nessun `LONG_RISK_FACTOR`). Gold long
+(n=11, -0.266R) resta l'unica sonda residua ma non azionabile a questo n. Se in
+futuro la si volesse riaprire, basta rieseguire `jobs/long_gate_analysis.py`
+(read-only) senza vincolo di trigger.
+
+Agenda: trigger A2 disattivato in `jobs/sprint6_agenda.py` (non riarmato), così
+non riparte neppure se lo stato in `logs/sprint6_agenda_state.json` venisse
+resettato.
