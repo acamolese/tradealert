@@ -90,6 +90,11 @@ def main() -> int:
         er, n = exp(sub, "real_r")
         print(f"  {a:<14} n={n:>2} exp_R reale {er:+.3f}")
 
+    print("\n=== Breakdown pre-registrato Gold+Brent long vs resto ===")
+    gb = {"Gold", "Brent Oil"}
+    report("Gold+Brent long", [r for r in longs if r["asset"] in gb])
+    report("resto dei long", [r for r in longs if r["asset"] not in gb])
+
     block = (er_l <= -0.10 and ec_l <= -0.10 and n_l >= 30
              and er_l_rob <= -0.10 and ec_l_rob <= -0.10
              and er_l_core <= -0.10 and ec_l_core <= -0.10)

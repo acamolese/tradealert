@@ -97,3 +97,67 @@ Bitcoin +0.122 (n=5), US500 +0.118 (n=3), Hang Seng +0.375 (n=2).
 
 Nessuna modifica. Round 3 a **n≥60 long chiusi** (agenda aggiornata,
 `A2_TARGET_LONGS=60`), con lo stesso breakdown e attenzione a Gold long.
+
+---
+
+# ROUND 3 — 2026-07-16 (trigger agenda: n=61 long chiusi)
+
+Controfattuale A1 NON rigenerato: `docs/sprint6-monitor-replay.csv` è fermo al
+2026-07-12 (66 chiusure monitor). Le 18 chiusure nuove (di cui 14
+`manual:auto-close LLM monitor`, 12 long) non hanno il bracket-only e usano
+cf=reale. Nota di rigore, non incide sul verdetto: il gate cade già sul ramo
+reale (soglia sul reale non raggiunta), e il ramo controfattuale/gestione non è
+raggiungibile con reale > −0.10R.
+
+## Verdetto: NON CONCLUSIVO → nessuna azione, ripetere a n≥76 long
+
+| Condizione LONG DA BLOCCARE | Soglia | Osservato | Esito |
+|---|---|---|---|
+| exp_R long reale | ≤ -0.10R | **-0.040R** | **no** |
+| exp_R long controfattuale | ≤ -0.10R | **-0.031R** | **no** |
+| n | ≥ 30 | 61 | sì |
+
+Terzo round consecutivo NON CONCLUSIVO. Il bleed medio continua a normalizzarsi
+in modo monotòno round su round (-0.134R → -0.065R → **-0.040R**) e senza i 2
+peggiori è a -0.008R: il gate si allontana dal fuoco, non ci si avvicina.
+
+## Numeri (trade chiusi dal 2026-05-20, n=99, 0 scartati)
+
+| Taglio | n | exp_R reale | exp_R controfattuale |
+|---|---|---|---|
+| LONG | 61 | -0.040 | -0.031 |
+| SHORT | 38 | +0.185 | +0.074 |
+| LONG senza i 2 peggiori | 59 | -0.008 | +0.002 |
+| LONG solo core | 44 | -0.032 | -0.018 |
+| **Gold+Brent long (breakdown pre-reg.)** | 21 | **-0.102** | -0.250 |
+| **resto dei long** | 40 | **-0.008** | +0.085 |
+
+Per asset (long, reale): Gold -0.266 (n=11), Copper -0.246 (n=6),
+GBP/USD -0.368 (n=3), EUR/USD -0.550 (n=1), Brent +0.079 (n=10),
+Nasdaq -0.011 (n=12), Bitcoin +0.099 (n=7), Hang Seng +0.192 (n=5),
+US500 +0.045 (n=4), AUD/USD +0.548 (n=2).
+
+## Lettura
+
+1. Nessun ramo della matrice scatta. Il long non blocca e non è problema di
+   gestione: semplicemente non sanguina più in aggregato.
+2. Brent long ha invertito segno (round 1 -0.313R → round 3 +0.079R). Il
+   breakdown Gold+Brent long è a -0.102R (n=21) solo perché tenuto giù da Gold;
+   è la sonda pre-registrata, non un gate, e n resta piccolo per un blocco
+   per-asset.
+3. Il residuo negativo resta concentrato in **Gold long** (n=11, -0.266R) e in
+   Copper long (n=6, -0.246R, nuovo asset di giugno, materia di A3). Gold è
+   l'unica ipotesi ancora viva ma non regge da sola un gate.
+4. Lo short conferma l'edge (+0.185R reale, +0.074R controfattuale).
+
+## Azione (da matrice pre-registrata)
+
+Nessuna modifica. Per la regola NON CONCLUSIVO il prossimo trigger è **+15 long
+chiusi → n≥76** (agenda da riarmare a `A2_TARGET_LONGS=76`), stesso script e
+stesso breakdown.
+
+Nota di metodo per l'utente (fuori matrice): il bleed long si è normalizzato su
+tre round e il gate si allontana dal fuoco. Ripetere a oltranza ogni +15 ha
+rendimenti decrescenti; è ragionevole valutare la chiusura di A2 con esito
+"nessun bleed long robusto, normalizzato" invece di un quarto round. Decisione
+dell'utente, non automatica.
