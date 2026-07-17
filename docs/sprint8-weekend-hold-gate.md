@@ -103,6 +103,54 @@ ricostruibili, la Parte B copre i recenti. n gap-prone piccolo (~7 recuperabili)
 → Parte B indicativa, non significativa. Gap misurati sui mid, senza spread.
 `r_dist` da stop% del signal. Direzioni e ordini di grandezza, non test statistici.
 
+## ESEGUITO 2026-07-17 — Verdetto: SOLO RISCHIO-CODA (nessun edge)
+
+Script `jobs/weekend_hold_backtest.py` (Parte B). 11 trade gap-prone held-weekend
+analizzati; 3 Hang Seng (#89/#103/#118) scartati perché le candele HOUR di HK50
+non erano ricostruibili nella finestra API (limite dichiarato; Hang Seng ha
+comunque coda piccola nella Parte A, 0.50R).
+
+| Metrica | Valore | Lettura |
+|---|---|---|
+| E_tieni (M2, tenere dopo venerdì) | **−0.097R** | ma **+0.061R senza il singolo peggiore** → non robusto |
+| M1 gap direzionale medio | **+0.026R** | i gap NON sono sistematicamente contro: neutri in direzione |
+| Coda \|M1\|p90 (Parte B) | **1.474R** | min −1.653R (#119 Brent), max +1.474R (#42 Brent) |
+| Tail_p90 Parte A (struttura) | **Brent 1.50R** | coerente con la Parte B |
+
+Per asset (E_tieni | M1 medio | \|M1\|p90):
+- **Brent** n=4: −0.012 | −0.110 | **1.653** → expectancy neutra, **coda estrema**.
+- **Gold** n=5: −0.573 | +0.012 | 0.384 → E_tieni negativo MA gap ≈ 0: il danno è
+  nella **traiettoria di lunedì+**, non nel gap. Per la nota di coerenza pre-reg,
+  NON è un problema di gap-weekend; non si cura chiudendo il venerdì.
+- **Nasdaq** n=2: +0.921 | +0.337 | 0.512 → tenere ha aiutato (n piccolo).
+
+**Applicazione del gate pre-registrato:** E_tieni neutro e non robusto (−0.097 →
++0.061 togliendo 1 trade, per la regola #42/#49 non è un verdetto negativo) e M1
+medio ≈ 0 → il ramo REGOLA SU EXPECTANCY **non scatta**. Ma \|M1\|p90 ≥ 0.5R su
+Brent (1.47–1.65R) → ramo **SOLO RISCHIO-CODA**.
+
+**Conclusione.** Tenere attraverso il weekend non costa rendimento atteso in modo
+robusto: il gap è una **lotteria bidirezionale senza edge**, concentrata su Brent
+(può fare ±1.5R in un colpo). Chiudere il venerdì **non migliora l'expectancy**,
+riduce solo la varianza di coda. È una scelta legittima di risk-management, da
+prendere esplicitamente e **limitata al Brent** (l'unico con coda estrema: Gold ha
+coda piccola e un problema diverso, di traiettoria; Nasdaq regge). Non è un edge.
+
+## Azione
+
+- **Nessun "sistema del venerdì" per i rendimenti**: non c'è expectancy da
+  recuperare, costruirlo sarebbe over-engineering.
+- **Fase 2 (opzionale, solo se l'utente vuole meno varianza)**: regola
+  deterministica minimale che riduce/chiude l'esposizione **Brent** attraverso la
+  chiusura settimanale. Zero LLM, zero geopolitica. Eventuale mini-gate forward.
+- **Fase 3 (LLM geopolitico): ARCHIVIATA come non giustificata.** Non c'è edge di
+  expectancy da catturare e la coda si gestisce con una riga deterministica sul
+  Brent; un valutatore che legge news non aggiunge nulla di misurabile sopra "il
+  Brent gappa molto nel weekend", e reintrodurrebbe costo/opacità appena tolti
+  dall'ingresso (corr ≈ 0, `docs/sprint7-fase-b.md`).
+- **Brent #146 di oggi**: chiuderlo pre-weekend è coerente con questa lettura
+  (riduci la coda su Brent), consapevoli che è riduzione-varianza, non edge.
+
 ## Perché NON si parte dall'LLM geopolitico
 
 L'idea di un valutatore geopolitico del venerdì è la Fase 3, subordinata a due
