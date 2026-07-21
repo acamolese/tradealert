@@ -49,6 +49,7 @@ def _link_safe(call, *args, **kwargs) -> None:
 def _market_meta(
     market: dict[str, Any],
     leverages_map: dict[str, int] | None = None,
+    use_real_leverage: bool = False,
 ) -> dict[str, float]:
     """Estrae min size, step, margin factor e regole di stop/profit distance.
 
@@ -68,7 +69,16 @@ def _market_meta(
 
     from .risk import effective_margin_factor
 
-    margin_factor = effective_margin_factor(market, leverages_map)
+    epic_leverage = None
+    if use_real_leverage:
+        from .leverage import real_leverage
+
+        epic_leverage = real_leverage(
+            (market.get("instrument", {}) or {}).get("epic")
+        )
+    margin_factor = effective_margin_factor(
+        market, leverages_map, epic_leverage=epic_leverage
+    )
 
     bid = snapshot.get("bid")
     offer = snapshot.get("offer")
@@ -156,7 +166,11 @@ def execute_signal(
     # 2. Snapshot mercato per regole di sizing e prezzo aggiornato
     market = capital.get_market(epic)
     leverages_map = capital.get_leverages_map()
-    meta = _market_meta(market, leverages_map=leverages_map)
+    meta = _market_meta(
+        market,
+        leverages_map=leverages_map,
+        use_real_leverage=getattr(config, "real_leverage_sizing", False),
+    )
     entry_price = meta["mid_price"] or asset_features.get("last_price")
     if not entry_price:
         return ExecutionResult(False, reason="Prezzo di mercato non disponibile")
@@ -397,6 +411,15 @@ def execute_signal(
 
     if matched_position:
         pos = matched_position.get("position", {}) or {}
+        # Auto-calibrazione leva reale: Capital espone position.leverage solo
+        # dopo l'apertura. Se diverge dalla mappa in uso, la aggiorna per i
+        # sizing futuri (best-effort, non tocca il flusso). Vedi src/leverage.py.
+        try:
+            from .leverage import record_real_leverage
+
+            record_real_leverage(epic, pos.get("leverage"))
+        except Exception:
+            log.exception("Auto-calibrazione leva fallita (ignorata)")
         if pos.get("dealId"):
             deal_id = pos["dealId"]
         # Aggiorna fill_level/stop/tp con i valori effettivi del broker.

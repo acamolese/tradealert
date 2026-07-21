@@ -270,7 +270,11 @@ def _recompute_sizing_for_signal(
         log.exception("Recompute sizing: fetch market fallito")
         return None
     leverages_map = capital.get_leverages_map()
-    meta = _market_meta(market, leverages_map=leverages_map)
+    meta = _market_meta(
+        market,
+        leverages_map=leverages_map,
+        use_real_leverage=getattr(config, "real_leverage_sizing", False),
+    )
     entry = meta["mid_price"] or signal_row.get("entry_price") or 0
     stop_pct = float(signal_row.get("stop_loss") or 1.5)
     return calculate_size(

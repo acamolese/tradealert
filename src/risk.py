@@ -36,18 +36,23 @@ class SizingResult:
 
 
 def effective_margin_factor(
-    market: dict[str, Any], leverages_map: dict[str, int] | None = None
+    market: dict[str, Any],
+    leverages_map: dict[str, int] | None = None,
+    epic_leverage: int | None = None,
 ) -> float:
     """Margin factor effettivo per questo strumento sull'account corrente.
 
-    Prima fonte: leverage settata in ``/accounts/preferences`` per il tipo
-    instrument (``COMMODITIES``, ``INDICES``, ``CURRENCIES``,
-    ``CRYPTOCURRENCIES``, ``SHARES``, ``BONDS``, ``INTEREST_RATES``).
-    Fallback: ``instrument.marginFactor`` da ``/markets/{epic}``, che su
-    questo broker e' un valore statico di prodotto (100%) e va usato solo
-    se le preferences non sono disponibili.
+    Prima fonte (se fornita): ``epic_leverage``, la leva REALE per-strumento
+    (cap ESMA / auto-calibrata da ``position.leverage``, vedi ``src/leverage.py``).
+    E' quella che Capital applica davvero e da cui dipende il margine bloccato;
+    le preferences per-tipo la sovrastimano per gli strumenti a cap ridotto
+    (Brent 10 vs COMMODITIES 20), facendo sforare il budget.
+    Seconda fonte: leverage per il tipo instrument da ``/accounts/preferences``.
+    Fallback: ``instrument.marginFactor`` da ``/markets/{epic}`` (statico 100%).
     """
     instrument = market.get("instrument", {}) or {}
+    if epic_leverage and epic_leverage > 0:
+        return 1.0 / float(epic_leverage)
     instr_type = instrument.get("type")
     if leverages_map and instr_type and leverages_map.get(instr_type):
         leverage = leverages_map[instr_type]

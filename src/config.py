@@ -102,6 +102,7 @@ class Config:
     trail_v1_lowband: bool  # se true, rampa V1 nella fascia 0.5-1.0R del trailing (deploy gated, docs/sprint4-trailing-v1-clean.md)
     trail_v2_highband: bool  # se true, rampa V2 nella fascia 1.0-1.25R del trailing (deploy gated, docs/sprint5-trailing-v2-highband.md)
     sizing_currency_aware: bool  # se true, converte il rischio quote->USD nel sizing (bugfix FX, docs/sprint5-sizing-fix.md); OFF = bit-identico
+    real_leverage_sizing: bool  # se true, il sizing usa la leva REALE per-strumento (cap ESMA + auto-calibrazione da position.leverage) invece della leva di categoria; fix margine reale ~= budget (src/leverage.py)
     concentration_block_dup: bool  # se true, NON apre su (asset, direzione) gia' aperto (Sprint 5 tetto B1)
     max_open_per_direction: int  # cap su short/long simultanei; 0 = OFF (Sprint 5 tetto B3)
     concentration_shadow: bool  # se true, logga la regola dinamica "no doppione su tesi che fallisce" (Sprint 5 shadow, LOGGING-ONLY)
@@ -227,6 +228,10 @@ def load_config() -> Config:
         == "true",
         sizing_currency_aware=os.environ.get(
             "SIZING_CURRENCY_AWARE", "false"
+        ).strip().lower()
+        == "true",
+        real_leverage_sizing=os.environ.get(
+            "REAL_LEVERAGE_SIZING", "false"
         ).strip().lower()
         == "true",
         concentration_block_dup=os.environ.get(
