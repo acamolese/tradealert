@@ -38,7 +38,7 @@ from .news import (
     news_for_asset,
 )
 from .quiet_hours import is_quiet_now, quiet_reason
-from .risk import SizingResult, calculate_size
+from .risk import SizingResult, calculate_size, quote_to_ref_factor
 from .telegram_client import TelegramClient
 from .universe import UNIVERSE, Asset
 
@@ -430,6 +430,12 @@ def _collect_features(
             )
             features[asset.name]["asset_class"] = asset.asset_class
             features[asset.name]["epic"] = asset.epic
+            # Fattore valuta quotata -> riferimento (USD): serve al pre-filtro
+            # budget per convertire il margine minimo di asset non-USD (es.
+            # Nikkei in JPY), altrimenti sovrastimato ~175x e scartato a torto.
+            ccy = (snapshot.get("instrument", {}) or {}).get("currency")
+            q2r = quote_to_ref_factor(ccy, capital)
+            features[asset.name]["quote_to_ref"] = q2r if q2r else 1.0
         except Exception as exc:  # rete, epic invalido, rate limit
             log.warning(
                 "Skip %s (%s): %s", asset.name, asset.epic, exc
@@ -560,15 +566,19 @@ def _format_telegram_message(
 def _min_entry_eur(asset_features: dict[str, Any]) -> float | None:
     """Margine minimo (EUR) per aprire la size minima del broker su questo asset.
 
-    Calcolo: min_size * entry_price * margin_factor.
+    Calcolo: min_size * entry_price * margin_factor * quote_to_ref.
+    Il fattore quote_to_ref porta il prezzo (in valuta quotata) alla valuta di
+    riferimento del budget (USD ~ EUR): per gli asset USD e' 1.0 (invariato),
+    per JPY/HKD converte, evitando di scartare a torto il Nikkei & co.
     Restituisce None se i dati di mercato non sono disponibili.
     """
     last = asset_features.get("last_price")
     min_size = asset_features.get("min_size")
     margin_factor = asset_features.get("margin_factor")
+    quote_to_ref = asset_features.get("quote_to_ref", 1.0) or 1.0
     if not (last and min_size and margin_factor):
         return None
-    return float(min_size) * float(last) * float(margin_factor)
+    return float(min_size) * float(last) * float(margin_factor) * float(quote_to_ref)
 
 
 def _format_reasoning_block(
