@@ -21,6 +21,7 @@ from typing import Any
 from .capital_client import CapitalAPIError, CapitalClient
 from .config import Config
 from .db import Database
+from .risk import quote_to_ref_factor
 from .telegram_client import TelegramClient
 
 log = logging.getLogger(__name__)
@@ -98,7 +99,9 @@ def _find_close_activity(
 
 
 def _extract_close_info(
-    activity: dict[str, Any], db_trade: dict[str, Any]
+    activity: dict[str, Any],
+    db_trade: dict[str, Any],
+    quote_to_ref: float = 1.0,
 ) -> tuple[float | None, float | None, float | None, str]:
     """Ritorna (close_price, pnl, pnl_pct, exit_reason_tag).
 
@@ -106,6 +109,13 @@ def _extract_close_info(
     (vecchio tier), details.level (nuovo tier counter-trade),
     details.closeLevel. Se pnl non e' fornito da Capital, lo deriva da
     (close-entry)*size con segno per direzione.
+
+    ``quote_to_ref``: fattore valuta quotata -> riferimento (USD~EUR). Serve
+    SOLO nel fallback ricostruito: (close-entry)*size e' nella valuta quotata
+    dello strumento, che per Nikkei (JPY) o Hang Seng (HKD) NON e' EUR. Senza
+    conversione il pnl finisce nel DB in yen/dollari-HK (es. Nikkei -1635 JPY
+    invece di -8.85 EUR), gonfiando drawdown cap e report. Quando invece Capital
+    fornisce ``amount``, quello e' gia' nella valuta del conto (EUR): NON si tocca.
     Tag e' derivato da ``source`` se presente (SL/TP/USER), altrimenti
     dalla description.
     """
@@ -124,7 +134,7 @@ def _extract_close_info(
         delta = (float(close_price) - float(entry))
         if direction == "short":
             delta = -delta
-        pnl = delta * float(size)
+        pnl = delta * float(size) * float(quote_to_ref or 1.0)
     pnl_pct = None
     if close_price and entry and direction:
         delta = (float(close_price) - float(entry)) / float(entry) * 100
@@ -273,8 +283,33 @@ def reconcile_open_trades(
         deal_id = trade["capital_deal_id"]
         activity = _find_close_activity(activities, deal_id, db_trade=trade)
         if activity:
+            # Fattore valuta quotata -> EUR per il fallback ricostruito (solo se
+            # Capital non fornisce l'amount reale). Best-effort: se non
+            # determinabile resta 1.0 = comportamento storico.
+            quote_to_ref = 1.0
+            epic = activity.get("epic") or (activity.get("details") or {}).get("epic")
+            if epic:
+                try:
+                    ccy = (
+                        (capital.get_market(epic).get("instrument", {}) or {})
+                        .get("currency")
+                    )
+                    q2r = quote_to_ref_factor(ccy, capital)
+                    if q2r:
+                        quote_to_ref = q2r
+                    elif ccy and ccy != "USD":
+                        log.warning(
+                            "Reconcile %s (%s): conversione %s non determinabile, "
+                            "pnl fallback resta in valuta quotata",
+                            trade.get("asset"), deal_id, ccy,
+                        )
+                except Exception:
+                    log.warning(
+                        "Reconcile %s: fetch currency fallito, quote_to_ref=1.0",
+                        trade.get("asset"),
+                    )
             close_price, pnl, pnl_pct, tag = _extract_close_info(
-                activity, trade
+                activity, trade, quote_to_ref=quote_to_ref
             )
             if pnl is not None:
                 counters["closed_with_pnl"] += 1
