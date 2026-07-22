@@ -53,3 +53,35 @@ Sia `exp(K)` l'expectancy_R netta con aggiornamento trailing ogni K barre.
 Nota: expectancy attesa negativa in assoluto (l'ingresso v1-momentum e' a edge<0,
 Fase 1). Qui conta il DELTA tra le K, non il livello: si misura se la gestione piu'
 fine recupera R, non se la strategia e' profittevole.
+
+## ESEGUITO 2026-07-22 — FREQUENZA IRRILEVANTE (Fase 2 NON attivata)
+
+Script `jobs/exit_frequency_backtest.py`, 6274 entry (stessi per tutti i K).
+
+| trailing ogni | n | exp_R netta | win | mediana |
+|---|---|---|---|---|
+| K=1 (1h) | 6274 | -0.1031 | 34% | -0.184 |
+| K=2 (2h) | 6274 | -0.1006 | 34% | -0.191 |
+| K=4 (4h) | 6274 | **-0.0887** | 34% | -0.209 |
+
+`exp(K=1) − exp(K=4) = -0.0144R`: aggiornare il trailing piu' spesso NON migliora,
+anzi il segno (non significativo, sotto soglia) e' a favore del MENO frequente.
+`|diff| < 0.05R` → **FREQUENZA IRRILEVANTE.** I 5 min live bastano gia'; scendere
+sotto non aiuta. Fase 2 (candle fini) NON attivata.
+
+**Lettura.** Il micro-segno pro-K4 e' coerente con la storia del trailing: un
+trailing piu' reattivo stringe lo stop su rumore (whipsaw) e taglia i runner prima
+che il movimento maturi (cfr. trailing troppo stretto, `docs/sprint4-trailing-*`).
+Non e' un effetto da sfruttare (sotto soglia), ma esclude che "piu' frequente"
+aiuti.
+
+**Cosa NON copre:** solo il trailing DETERMINISTICO. Il monitor LLM (30 min) non e'
+backtestabile (non riproducibile). Ma il ragionamento lo sconsiglia: costa il
+doppio di token a 15 min, e su trade che durano ore/giorni cogliere un'inversione
+15 min prima ha beneficio marginale piccolo; il timing d'uscita fine e' gia' piatto
+qui. Nessuna prova che valga il costo.
+
+**Azione: nessuna.** Trailing resta a 5 min, monitor a 30 min. Chiarimento chiave:
+"la leva e' la gestione uscite" significa il COME (calibrazione del trailing:
+`docs/sprint4-trailing-calibration.md`; decisioni del monitor: A1), NON il QUANTO
+SPESSO. La frequenza non e' una leva, ne' in ingresso ne' in uscita.
