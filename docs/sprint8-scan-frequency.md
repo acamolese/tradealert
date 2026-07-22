@@ -72,7 +72,37 @@ ha gia' trovato che l'ESTENSIONE del movimento all'entry non predice l'esito. Il
 ritardo temporale e' correlato ma non identico; se anche qui esce piatto, e' una
 seconda conferma indipendente che l'ingresso non ha leva di timing.
 
-## FASE 2 — Effetto segnali nuovi (SOLO se Fase 1 = TIMING CONTA)
+## ESEGUITO 2026-07-22 — FASE 1: TIMING IRRILEVANTE (Fase 2 NON attivata)
+
+Script `jobs/scan_frequency_backtest.py`, 11 asset, storico orario 2020→2026-07.
+
+| ritardo D | n | exp_R netta | win | mediana |
+|---|---|---|---|---|
+| D=1 (1h) | 6274 | **-0.1031** | 34% | -0.184 |
+| D=2 (2h) | 6154 | -0.0898 | 34% | -0.177 |
+| D=3 (3h) | 6063 | -0.1065 | 34% | -0.179 |
+| D=4 (4h) | 5994 | -0.0856 | 33% | -0.177 |
+
+`exp(D=1) − exp(D=3) = +0.0034R` (soglia edge +0.10R non raggiunta), curve piatte
+(< soglia flat 0.05R), non monotòne. **Verdetto: TIMING IRRILEVANTE.** Entrare
+prima o dopo (1→4h) non cambia l'esito. Fase 2 NON attivata: il cron resta orario,
+niente scaricamento dati fini. E2 (segnali nuovi intra-ora) resta non testato per
+pre-registrazione, ma vedi la nota decisiva sotto.
+
+**Nota decisiva (oltre il gate).** Il v1-momentum su tutto lo storico ha
+expectancy **negativa** (-0.10R, n=6274), non ~0. Il live recente appariva ~0
+(+0.006R su 40 trade) perche' ha in piu' il monitor LLM sull'USCITA (A1: taglia i
+loser), che il backtest bracket-only non include: la discrepanza e' di gestione,
+non di selezione. Conseguenza per la frequenza: aumentare gli scan aprirebbe PIU'
+trade su un ingresso a expectancy negativa, amplificando perdita + spread. Il
+canale E2 non solo e' improbabile che aiuti, ma su edge<0 farebbe danno.
+Doppia conferma con il "chasing" (NEGATIVO): l'ingresso non ha leva di timing.
+
+**Azione:** nessuna modifica. La frequenza di scan resta oraria. Se si vuole
+migliorare, la leva NON e' l'ingresso (piu' spesso / prima) ma la GESTIONE delle
+uscite, coerente con tutta la storia del progetto (trailing calibration, monitor).
+
+## FASE 2 — Effetto segnali nuovi (SOLO se Fase 1 = TIMING CONTA — NON attivata)
 
 Scarica candle MINUTE_15 del paniere per il periodo recente disponibile, simula
 scan a 15/30/60 min con lo stesso motore, confronta expectancy_R netta E numero
