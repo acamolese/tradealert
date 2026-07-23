@@ -62,3 +62,64 @@ in fascia bassa; diluito su tutti i trade il segnale e' piccolo per costruzione.
 Il breakdown fascia-bassa mostra l'effetto non diluito (atteso piu' grande).
 
 Sola lettura. Uso: `PYTHONPATH=$PWD .venv/bin/python jobs/trailing_variant_backtest.py`
+
+## ESEGUITO 2026-07-23 — il vantaggio dei gap stretti e' ARTEFATTO di granularita'
+
+Script `jobs/trailing_variant_backtest.py`, 6274 entry, 2020-2026.
+
+| variante | exp_R | vs D | fascia bassa vs D | trend vs D |
+|---|---|---|---|---|
+| D | -0.1042 | +0.0000 | +0.000 | +0.000 |
+| V1 | -0.1035 | +0.0008 | +0.262 | **-0.144** |
+| V1+V2 (live) | -0.1031 | +0.0012 | +0.262 | -0.168 |
+| gap0.50 | -0.0761 | +0.028 | +0.587 | -0.349 |
+| gap0.25 | -0.0300 | +0.074 | +0.815 | -0.360 |
+| gap0.15 | +0.0002 | +0.104 | — | — |
+| **gap0.10** | **+0.0204** | **+0.125** | — | — |
+
+**Il gate pre-registrato sparava "gap0.25 SUPERIORE".** Ma il check diagnostico
+(gap piu' stretti) lo falsifica: exp_R **monotòna col restringersi dello stop**,
+fino a gap0.10 (+0.02R, il migliore). Uno stop a 0.10R sopra il picco e'
+irrealizzabile (colpito dal bid-ask bounce e dal rumore tick all'istante): che la
+sim ORARIA lo premi come ottimo dimostra che non cattura il rumore che punisce gli
+stop stretti. "Piu' stretto = sempre meglio, senza ottimo interno" e' la firma
+dell'over-optimism da granularita' — esattamente il caveat #1 pre-registrato a
+giugno, qui amplificato dalle candele orarie (piu' grosse delle 5m di allora).
+**Il vantaggio di gap0.25 e' in gran parte, forse tutto, artefatto. NON deployabile.**
+
+**Su V1 (la variante LIVE) la predizione era sbagliata due volte:**
+1. V1 su 6274 trade e' ≈ D (+0.0008R): il vantaggio visto a giugno su 27 trade NON
+   si conferma su larga scala.
+2. V1 TAGLIA i trend (-0.144R sui 1668 peak≥1.25R), non "delta-trend zero" come
+   sul sample 27. Meccanismo emerso solo su larga scala: un trade che diventera'
+   trend forte passa prima per la fascia 0.5-1.0R; li' lo stop piu' stretto di V1
+   lo puo' stoppare su un ritraccio temporaneo PRIMA che il trend parta. V1 sposta
+   valore dalla fascia bassa (+0.262R) ai trend (-0.144R), somma ≈ 0.
+
+## Verdetto reale
+
+- **Nessuna variante batte D in modo AFFIDABILE.** V1 ≈ D (vantaggio giugno non
+  confermato, e taglia trend nascenti che il sample piccolo nascondeva). I gap
+  stretti "vincono" solo per artefatto di granularita'.
+- Il backtest ORARIO e' strutturalmente inadatto a giudicare stop stretti: li
+  sovrastima. La domanda "un trail piu' stretto ha edge reale?" richiede dati
+  TICK/fini che catturino il rumore — non risolvibile con candle orarie/5m.
+
+## Azione
+
+- **NON deployare gap0.25** (artefatto).
+- **V1 live**: non fa danno (≈D) ma non aggiunge valore su larga scala e taglia
+  qualche trend nascente. Decisione utente: tenerlo (innocuo, ottimizzato per
+  campioni choppy) o tornare a D (`TRAIL_V1_LOWBAND=false`, piu' semplice, non
+  taglia i trend). Nessuna urgenza: l'impatto netto e' ~0.
+- **Fase 2 (se si vuole chiudere la domanda):** validare gap-stretto vs D su
+  candle TICK/fini su periodo recente, dove il rumore che colpisce gli stop stretti
+  e' modellato. Aspettativa BASSA visto il pattern monotono. Pre-registrare a parte.
+
+## Lezione di metodo
+
+Il gate formale (exp_R oraria) ha dato un falso positivo ("gap0.25 superiore"). Il
+check di robustezza fuori-gate (gap 0.10/0.15) lo ha smascherato in un colpo. Senza
+quel check si sarebbe "riaperto" e forse deployato un artefatto. I gate
+pre-registrati non bastano se la MISURA che li alimenta e' viziata: qui la
+granularita' oraria vizia sistematicamente la famiglia stop-stretto.
