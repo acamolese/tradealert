@@ -222,15 +222,24 @@ def compute_weekly_summary(
 # --- Suggerimenti automatici a partire dai bucket ---
 
 def suggest_from_score_buckets(
-    buckets: list[BucketStats], min_sample: int = 3
+    buckets: list[BucketStats],
+    min_sample: int = 3,
+    deterministic_scoring: bool = False,
 ) -> list[str]:
     """Genera suggerimenti testuali leggendo i bucket. Usa min_sample
-    per evitare conclusioni da 1-2 trade. Ritorna lista di stringhe."""
+    per evitare conclusioni da 1-2 trade. Ritorna lista di stringhe.
+
+    ``deterministic_scoring``: con l'ingresso deterministico (SCORING_LLM_OFF)
+    lo score NON e' un giudizio di qualita' ma una funzione monotona del dpc
+    (7.0 + |dpc|/10, compresso in 7.0-7.9). Il ~98% dei trade cade nel bucket
+    7.0-7.5 e un hit rate ~30% e' fisiologico per un sistema a expectancy ~0;
+    inoltre alzare la soglia a 7.5 richiederebbe |dpc|>=5% (apre ~2% degli scan)
+    e "entrare solo sui movimenti piu' estesi" e' proprio cio' che il test
+    chasing ha falsificato. Quindi il suggerimento sulla soglia va SOPPRESSO."""
     out: list[str] = []
-    # Se il bucket 7.0-7.5 ha >= min_sample trade e hit rate < 40%, suggerisci
-    # di alzare MIN_SCORE_THRESHOLD a 7.5.
+    # Suggerimento soglia: valido solo con scoring LLM (score = qualita').
     low = next((b for b in buckets if b.label == "7.0-7.5"), None)
-    if low and low.n >= min_sample and low.hit_rate < 0.40:
+    if (not deterministic_scoring) and low and low.n >= min_sample and low.hit_rate < 0.40:
         out.append(
             f"Alza MIN_SCORE_THRESHOLD a 7.5: bucket 7.0-7.5 ha "
             f"hit rate {low.hit_rate:.0%} su {low.n} trade."

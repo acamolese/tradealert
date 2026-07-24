@@ -123,7 +123,7 @@ def _count_orphan_adoptions(db: Database, days: int = 7) -> tuple[int, int]:
     return orphan, recovered
 
 
-def build_report(db: Database) -> str:
+def build_report(db: Database, deterministic_scoring: bool = False) -> str:
     summary_7 = compute_weekly_summary(db, days=7)
     summary_30 = compute_weekly_summary(db, days=30)
     score_30, n_30 = compute_hit_rate_by_score(db, days=30)
@@ -176,7 +176,10 @@ def build_report(db: Database) -> str:
     )
 
     suggestions = (
-        suggest_from_score_buckets(score_buckets_for_suggest)
+        suggest_from_score_buckets(
+            score_buckets_for_suggest,
+            deterministic_scoring=deterministic_scoring,
+        )
         + suggest_from_asset_buckets(asset_buckets_for_suggest)
     )
     suggest_block = ""
@@ -208,7 +211,7 @@ def main() -> int:
 
     config = load_config()
     db = Database(config)
-    report = build_report(db)
+    report = build_report(db, deterministic_scoring=config.scoring_llm_off)
 
     if dry_run:
         print(report)
