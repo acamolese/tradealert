@@ -34,6 +34,8 @@ ESMA_LEVERAGE_BY_EPIC: dict[str, int] = {
     "GOLD": 20,       # oro
     "US500": 20,      # indice maggiore
     "US100": 20,      # indice maggiore (Nasdaq 100)
+    "DE40": 20,       # indice maggiore (DAX) - Sprint 8 ridisegno indici
+    "US30": 20,       # indice maggiore (Dow) - Sprint 8 ridisegno indici
     "EURUSD": 30,     # FX maggiore
     "AUDUSD": 30,
     "GBPUSD": 30,
