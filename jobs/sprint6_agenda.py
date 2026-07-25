@@ -59,6 +59,9 @@ A3_DEADLINE = date(2026, 8, 15)
 A3_MIN_TRADES_AT_DEADLINE = 8
 A4_WINDOW_START = "2026-07-02"
 A4_TARGET_TRADES = 50
+# Sprint 8: gate forward del paniere INDICI (docs/sprint8-indici-gate.md).
+INDICI_START = "2026-07-25"
+INDICI_TARGET = 25
 
 
 def _load_state() -> dict:
@@ -273,6 +276,20 @@ def main() -> int:
             )
             state["fase_b_gate_sent"] = True
             log.info("Fase B gate alert inviato (n=%d, delta=%.3f)", n_det, delta)
+
+    # --- Gate paniere INDICI: 25 trade chiusi dal ridisegno 2026-07-24 ---
+    n_idx = sum(1 for t in closed if (t["closed_at"] or "") >= INDICI_START)
+    if n_idx >= INDICI_TARGET and not state.get("indici_gate_sent"):
+        telegram.send_message(
+            "📋 <b>Agenda Sprint 8 — gate paniere INDICI maturo</b>\n"
+            f"Trade chiusi dal ridisegno: <b>{n_idx}</b> (soglia {INDICI_TARGET}).\n"
+            "Valutare il gate forward pre-registrato (expectancy_R vs +0.05 conferma / "
+            "-0.05 rollback):\n"
+            "<code>PYTHONPATH=$PWD .venv/bin/python jobs/indici_gate.py</code>\n"
+            "Rif: docs/sprint8-indici-gate.md"
+        )
+        state["indici_gate_sent"] = True
+        log.info("Gate INDICI alert inviato (n=%d)", n_idx)
 
     _save_state(state)
     log.info(
