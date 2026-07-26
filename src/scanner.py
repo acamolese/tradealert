@@ -1485,8 +1485,13 @@ def run_morning_scan(config: Config) -> None:
             len(removed_assets),
         )
         if not features:
-            telegram.send_message(
-                "ℹ️ Scanner weekend: nessun crypto major nel bacino. Skip."
+            # Silenzio, come tutti gli altri esiti no_setup (nessun spam orario).
+            # Col paniere ridisegnato ai soli indici (Sprint 8) e Bitcoin rimosso,
+            # il weekend il bacino crypto-only e' SEMPRE vuoto (indici chiusi): il
+            # sistema non trada nel weekend, e' atteso, non serve avvisare ogni ora.
+            log.info(
+                "Scanner weekend: bacino crypto-only vuoto (paniere senza crypto), "
+                "skip silenzioso"
             )
             _log_run(
                 db,
