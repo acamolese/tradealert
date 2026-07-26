@@ -86,7 +86,11 @@ def main() -> int:
 
     # --- equity ---
     acc = (capital.get_account_info().get("accounts") or [{}])[0]
-    equity = float((acc.get("balance") or {}).get("balance") or 0.0)
+    # §2.2 "E = equity del conto": saldo realizzato + P&L flottante delle posizioni
+    # aperte. Cosi' il guadagno flottante fa crescere N_max e il compounding e'
+    # automatico (non serve chiudere per aumentare la capacita' di esposizione).
+    _bal = acc.get("balance") or {}
+    equity = float(_bal.get("balance") or 0.0) + float(_bal.get("profitLoss") or 0.0)
 
     # --- volatilita' da candele giornaliere ---
     prices = capital.get_prices(cfg.epic, resolution="DAY", max_bars=400)
