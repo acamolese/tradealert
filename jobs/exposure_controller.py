@@ -94,12 +94,15 @@ def main() -> int:
     sigma = ewma_sigma(closes)
 
     # --- stato corrente: blocchi aperti + storico target ---
+    today = _today()
     open_blocks = (db._client.table("block").select("id,deal_id,opened_at")
                    .eq("epic", cfg.epic).is_("closed_at", "null").order("opened_at").execute().data)
     blocks_current = len(open_blocks)
+    # isteresi sui giorni PRECEDENTI: escludi la riga di oggi, altrimenti run
+    # ripetuti nello stesso giorno soddisferebbero l'isteresi falsamente.
     hist = (db._client.table("exposure_state").select("blocks_target,as_of_date")
-            .eq("epic", cfg.epic).order("as_of_date", desc=True)
-            .limit(cfg.hysteresis_days + 2).execute().data)
+            .eq("epic", cfg.epic).lt("as_of_date", today)
+            .order("as_of_date", desc=True).limit(cfg.hysteresis_days + 2).execute().data)
     recent_targets = [int(r["blocks_target"]) for r in reversed(hist)]
 
     # --- macro scale: v1 flag off -> 1.0 (si logga il valore ma non si applica, §5.1) ---
@@ -114,7 +117,7 @@ def main() -> int:
 
     # --- scrivi exposure_state (idempotente sul giorno) ---
     state_row = {
-        "as_of_date": _today(), "epic": cfg.epic,
+        "as_of_date": today, "epic": cfg.epic,
         "sigma_hat": round(sigma, 6) if sigma else 0.0,
         "scale_raw": round(plan.scale_raw, 6), "scale_applied": round(plan.scale_applied, 6),
         "macro_impact": macro_impact, "macro_scale": macro_scale,
