@@ -105,9 +105,19 @@ def main() -> int:
             .order("as_of_date", desc=True).limit(cfg.hysteresis_days + 2).execute().data)
     recent_targets = [int(r["blocks_target"]) for r in reversed(hist)]
 
-    # --- macro scale: v1 flag off -> 1.0 (si logga il valore ma non si applica, §5.1) ---
-    macro_scale = 1.0
+    # --- macro impact (§5.1): letto dall'ultimo macro_variance di oggi. Con
+    # MACRO_SCALE_ENABLED off (v1) si LOGGA ma NON si applica (macro_scale resta 1.0). ---
+    MACRO_MAP = {"low": 1.0, "medium": 0.7, "high": 0.5}
     macro_impact = None
+    try:
+        mv = (db._client.table("monitoring_events").select("details,created_at")
+              .eq("event_type", "macro_variance").gte("created_at", today)
+              .order("created_at", desc=True).limit(1).execute().data)
+        if mv:
+            macro_impact = (mv[0].get("details") or {}).get("impact")
+    except Exception:
+        log.exception("lettura macro_variance fallita (proseguo)")
+    macro_scale = MACRO_MAP.get(macro_impact, 1.0) if cfg.macro_scale_enabled else 1.0
 
     plan = plan_exposure(sigma, blocks_current, recent_targets, equity, L, cfg, macro_scale)
 
@@ -195,6 +205,16 @@ def _open_blocks(capital, db, telegram, cfg, meta, mid, q2r, n, state_row):
             "open_price": fill, "size_units": sz.size,
             "margin_eur": round(sz.margin_estimate, 2), "catastrophe_stop": cat,
         }).execute()
+        # §6.1 execution_quality: slippage modeled(mid) vs actual(fill)
+        try:
+            db._client.table("execution_quality").insert({
+                "deal_id": deal_id, "side": "open",
+                "requested_at": datetime.now(timezone.utc).isoformat(),
+                "modeled_price": round(mid, 4), "actual_price": round(fill, 4),
+                "slippage_bps": round((fill - mid) / mid * 10000, 2) if mid else 0.0,
+            }).execute()
+        except Exception:
+            log.exception("log execution_quality (open) fallito")
         log.info("Blocco aperto: deal=%s fill=%.2f size=%s", deal_id, fill, sz.size)
     telegram.send_message(f"✅ {n} blocco/i aperto/i su {cfg.epic}.")
 
