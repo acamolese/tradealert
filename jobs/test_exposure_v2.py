@@ -13,7 +13,7 @@ from src.volatility import ewma_sigma
 
 
 CFG = ExposureConfig(
-    enabled=True, epic="US500", block_margin_eur=20.0, gap_tolerance=0.10,
+    enabled=True, auto_execute=False, epic="US500", block_margin_eur=20.0, gap_tolerance=0.10,
     kill_equity_floor_eur=40.0, sigma_target=0.15, max_scale=2.0, hysteresis_days=2,
     catastrophe_stop_pct=0.075, macro_scale_enabled=False, use_guaranteed_stop=False,
 )

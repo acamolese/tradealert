@@ -30,6 +30,8 @@ TRADING_DAYS: int = 252           # annualizzazione della sigma
 @dataclass(frozen=True)
 class ExposureConfig:
     enabled: bool                 # V2_EXPOSURE_ENABLED, master flag
+    auto_execute: bool            # V2_AUTO_EXECUTE: se false calcola+propone ma NON
+                                  # apre/chiude (in attesa del veto pieno §4.3)
     epic: str                     # strumento singolo (§1.1)
     block_margin_eur: float       # margine per blocco (§1)
     gap_tolerance: float          # g in N_max (§2.2)
@@ -50,6 +52,7 @@ class ExposureConfig:
 def load_exposure_config() -> ExposureConfig:
     return ExposureConfig(
         enabled=_b("V2_EXPOSURE_ENABLED", False),
+        auto_execute=_b("V2_AUTO_EXECUTE", False),
         epic=os.environ.get("V2_EPIC", "US500"),
         block_margin_eur=_f("BLOCK_MARGIN_EUR", 20.0),
         gap_tolerance=_f("GAP_TOLERANCE", 0.10),

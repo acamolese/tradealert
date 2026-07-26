@@ -138,14 +138,22 @@ def main() -> int:
         log.info("delta 0: nessuna azione.")
         return 0
 
-    # --- esecuzione con finestra di veto ---
+    # --- proposta su Telegram (§4.3) ---
     verb = "APRE" if plan.delta > 0 else ("HALT/chiude" if plan.action == "halt" else "chiude")
+    proposta = "" if cfg.auto_execute else "\n<i>(V2_AUTO_EXECUTE off: proposta, non eseguita)</i>"
     telegram.send_message(
         f"📦 <b>Controller esposizione — {cfg.epic}</b>\n"
         f"Blocchi: {blocks_current} → <b>{plan.blocks_to_reach}</b> (target {plan.blocks_target}, N_max {plan.n_max})\n"
         f"σ stimata: {sigma:.1%} | scale {plan.scale_applied:.2f}\n"
-        f"Azione: <b>{verb} {abs(plan.delta)}</b>\n<i>{plan.reason}</i>"
+        f"Azione: <b>{verb} {abs(plan.delta)}</b>\n<i>{plan.reason}</i>{proposta}"
     )
+
+    # Esecuzione fisica gated dal flag auto_execute finche' il veto pieno (§4.3) non
+    # e' implementato: le RIDUZIONI di rischio si eseguono comunque (halt/close),
+    # gli AUMENTI (apertura) solo con auto_execute on.
+    if not cfg.auto_execute and plan.delta > 0:
+        log.info("auto_execute off: apertura solo proposta, non eseguita.")
+        return 0
 
     if plan.delta > 0:
         _open_blocks(capital, db, telegram, cfg, meta, mid, q2r, plan.delta, state_row)
