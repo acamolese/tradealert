@@ -151,9 +151,13 @@ def main() -> int:
                 continue   # not_executable: non registrato (Fase 1, universo grande)
             executable += 1
             # dettagli freschi solo sugli eseguibili
+            # Capital overnightFee: rate NEGATIVO = addebito (costo) al cliente. La
+            # spec usa fin = tasso PAGATO (negativo = ricevuto), quindi fin = -rate.
+            # Confermato dal primo scan (indici long non "ricevono" financing) e da
+            # verificare empiricamente §12.8 (posizione demo aperta il 2026-07-27).
             of = instr.get("overnightFee") or {}
-            fin_long = float(of.get("longRate") or 0.0)
-            fin_short = float(of.get("shortRate") or 0.0)
+            fin_long = -float(of.get("longRate") or 0.0)
+            fin_short = -float(of.get("shortRate") or 0.0)
             b, o = snap.get("bid"), snap.get("offer")
             spread_bps = ((float(o) - float(b)) / price * 10000.0) if (b and o) else None
             closes = []

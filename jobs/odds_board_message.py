@@ -85,6 +85,7 @@ def build(sp) -> str:
 
     L.append(f"\nSet eligible vuoto da {_empty_weeks(sp)} settimane. EXECUTION_TARGET="
              f"{load_spinner_config().execution_target}.")
+    L.append("Modello costi in verifica (financing demo §12.8): numeri provvisori.")
     return "\n".join(L)
 
 
