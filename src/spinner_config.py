@@ -1,0 +1,92 @@
+"""Configurazione TradeSpinner (spec §2). Le tabelle di premi/parametri sono
+COSTANTI nel codice, versionate, NON calibrabili: modificarle richiede un record
+constants_log con revisione avversaria (§6.2). RF_REF e' l'eccezione (dato di
+mercato). I soli valori da env sono gli operativi (EXECUTION_TARGET, tolleranze demo).
+"""
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass, field
+
+# --- §2.1 premi per classe (excess return annuo atteso sul nozionale) ---
+PREMIUM: dict[str, float] = {
+    "equity_index": 0.045,
+    "equity_etf": 0.045,
+    "equity_stock": 0.045,
+    "gold": 0.005,
+    "fx": 0.000,
+    "commodity": 0.000,
+    "crypto": 0.000,
+}
+
+# --- §2.2 parametri (costanti dichiarate) ---
+RF_REF = 0.02                 # tasso di riferimento annuo (aggiornato a mano, con log)
+G_MIN = 0.02                  # soglia di apertura: g >= 2%/anno
+G_EXIT = 0.0                  # sotto zero si chiude
+F_MAX_POS = 1.0               # leva max per posizione
+F_MAX_ACCOUNT = 1.5           # leva max aggregata
+MAX_POSITIONS = 3
+MAX_PER_CLASS = 1
+HOLDING_DAYS_MIN = 60         # orizzonte per ammortizzare lo spread
+ENTRY_CONFIRM_SCANS = 2       # scansioni consecutive per entrare
+EWMA_LAMBDA = 0.94            # riusa src/volatility.py
+SPREAD_SAMPLES_MIN = 5
+EMPTY_SET_KILL_WEEKS = 8
+
+
+def mu_total(asset_class: str) -> float:
+    """§2.1: MU_TOTAL = RF_REF + PREMIUM, tranne fx/commodity/crypto dove e' 0
+    (il prezzo non ha deriva dichiarata, il carry sta tutto nel financing)."""
+    if asset_class in ("fx", "commodity", "crypto"):
+        return 0.0
+    return RF_REF + PREMIUM.get(asset_class, 0.0)
+
+
+# --- mappatura instrumentType Capital -> classe (§3 anagrafica) ---
+def classify(instrument: dict) -> str:
+    """Classe di asset da instrument. 'excluded' se non mappabile (mai eligible)."""
+    t = (instrument.get("instrumentType") or instrument.get("type") or "").upper()
+    epic = (instrument.get("epic") or "").upper()
+    name = (instrument.get("name") or "").upper()
+    if t in ("CURRENCIES", "CURRENCY"):
+        return "fx"
+    if t in ("CRYPTOCURRENCIES", "CRYPTOCURRENCY"):
+        return "crypto"
+    if t == "INDICES":
+        return "equity_index"
+    if t == "SHARES":
+        return "equity_stock"
+    if t in ("ETF", "ETFS"):
+        return "equity_etf"
+    if t == "COMMODITIES":
+        # l'oro ha un premio proprio (§2.1), le altre commodity no
+        if "GOLD" in epic or "XAU" in epic or "GOLD" in name:
+            return "gold"
+        return "commodity"
+    return "excluded"
+
+
+@dataclass(frozen=True)
+class SpinnerConfig:
+    execution_target: str          # none|demo|real (§11)
+    demo_fin_tolerance: float      # scarto rel. max financing modellato/addebitato
+    demo_min_nights: int           # notti richieste per la promozione
+    telegram_prefix: str = "[ODDS]"
+    # costanti riesposte (restano non-calibrabili)
+    g_min: float = G_MIN
+    f_max_pos: float = F_MAX_POS
+    f_max_account: float = F_MAX_ACCOUNT
+    max_positions: int = MAX_POSITIONS
+    max_per_class: int = MAX_PER_CLASS
+    holding_days_min: int = HOLDING_DAYS_MIN
+    entry_confirm_scans: int = ENTRY_CONFIRM_SCANS
+    spread_samples_min: int = SPREAD_SAMPLES_MIN
+    empty_set_kill_weeks: int = EMPTY_SET_KILL_WEEKS
+
+
+def load_spinner_config() -> SpinnerConfig:
+    return SpinnerConfig(
+        execution_target=os.environ.get("EXECUTION_TARGET", "none").strip().lower(),
+        demo_fin_tolerance=float(os.environ.get("DEMO_FIN_TOLERANCE", "0.10")),
+        demo_min_nights=int(os.environ.get("DEMO_MIN_NIGHTS", "10")),
+    )
