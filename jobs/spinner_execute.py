@@ -14,6 +14,12 @@ Nessuno stop-loss: lo spinner e' buy&hold a leva ottimale, l'uscita e' la
 re-valutazione giornaliera (esci appena non piu' eligible). Su demo il rischio
 di coda e' accettato a f<=1.
 
+!!! VINCOLO A MASSIMA PRIORITA' (utente 2026-07-28): l'assenza di SL vale SOLO in
+demo. Prima di QUALUNQUE esecuzione con denaro REALE, ogni posizione DEVE avere uno
+stop-loss. Il ramo real e' bloccato fail-closed piu' sotto (return 3) apposta per
+impedire aperture reali senza SL: chi vorra' abilitare il real dovra' prima
+implementare l'SL e rimuovere consapevolmente quel blocco.
+
 Uso: CAPITAL_ENV=demo EXECUTION_TARGET=demo SPINNER_EQUITY_CAP=100 \\
      PYTHONPATH=$PWD .venv/bin/python -m jobs.spinner_execute [--dry-run]
 """
@@ -68,6 +74,15 @@ def main() -> int:
     scfg = load_spinner_config()
 
     # --- GUARD di sicurezza: mai il conto reale ---
+    # VINCOLO A MASSIMA PRIORITA' (utente 2026-07-28): il real e' bloccato finche'
+    # non esiste uno stop-loss obbligatorio su ogni posizione. Fail-closed: chi
+    # abilitera' il real dovra' prima implementare l'SL e togliere consapevolmente
+    # questo blocco.
+    if scfg.execution_target == "real":
+        log.error("STOP: esecuzione REAL bloccata. Requisito a MASSIMA PRIORITA': "
+                  "nessuna apertura con denaro reale senza stop-loss obbligatorio. "
+                  "Implementare l'SL prima di abilitare il real.")
+        return 3
     if scfg.execution_target != "demo":
         log.info("EXECUTION_TARGET=%s (non demo): esecutore no-op.", scfg.execution_target)
         return 0
