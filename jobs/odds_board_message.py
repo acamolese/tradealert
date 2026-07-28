@@ -101,8 +101,11 @@ def main() -> int:
     if dry:
         print("\n(dry-run: non inviato)")
         return 0
-    # Fase 1: stesso bot, prefisso [ODDS] gia' nel testo (in <pre> per il monospazio)
-    TelegramClient(v1).send_message("<pre>" + msg.replace("<", "&lt;") + "</pre>")
+    # Fase 1: stesso bot, prefisso [ODDS] gia' nel testo (in <pre> per il monospazio).
+    # Escape HTML COMPLETO: & < > vanno tutti convertiti o Telegram rifiuta il parse
+    # (Bad Request: can't parse entities) e il messaggio non parte.
+    esc = msg.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    TelegramClient(v1).send_message("<pre>" + esc + "</pre>")
     return 0
 
 
