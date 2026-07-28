@@ -123,11 +123,14 @@ def main() -> int:
     capital = CapitalClient(v1)
     capital.login()
 
-    equity = float(((capital.get_account_info().get("accounts") or [{}])[0]
-                    .get("balance") or {}).get("balance") or 0.0)
+    equity_raw = float(((capital.get_account_info().get("accounts") or [{}])[0]
+                        .get("balance") or {}).get("balance") or 0.0)
+    # cap dell'equity di lavoro (demo: rispecchia il reale invece dei ~1000 EURd)
+    equity = min(equity_raw, scfg.equity_cap) if scfg.equity_cap else equity_raw
     anag = load_universe(capital, rebuild=rebuild)
     today = datetime.now(timezone.utc).date().isoformat()
-    log.info("equity=%.2f | universo=%d | scan_date=%s", equity, len(anag), today)
+    log.info("equity=%.2f (raw %.2f, cap %s, env %s) | universo=%d | scan_date=%s",
+             equity, equity_raw, scfg.equity_cap, v1.capital_env, len(anag), today)
 
     scanned = executable = eligible = 0
     rows = []
@@ -198,14 +201,14 @@ def main() -> int:
         except Exception:
             log.exception("upsert odds_board fallito")
 
-    _build_target(sp, db, today, scfg)
+    _build_target(sp, db, today, scfg, equity)
     log.info("SCAN completo: scansionati %d | eseguibili %d | eligible %d",
              scanned, executable, eligible)
     print(f"universo {scanned} | eseguibili {executable} | eligible {eligible}")
     return 0
 
 
-def _build_target(sp, db, today, scfg):
+def _build_target(sp, db, today, scfg, equity):
     """§4: ordina eligible per g_exec, max MAX_POSITIONS, max MAX_PER_CLASS,
     Sigma f_exec <= F_MAX_ACCOUNT, isteresi ENTRY_CONFIRM_SCANS in ingresso.
     Uscite immediate se g < G_EXIT (qui: non piu' eligible). Scrive target_portfolio."""
@@ -243,13 +246,15 @@ def _build_target(sp, db, today, scfg):
     target = []
     for e in chosen:
         key = (e["epic"], e["side"])
+        # units = n. di lotti minimi (f_exec*equity/nozionale-a-taglia-minima); valore
+        # indicativo, l'esecutore ricalcola col prezzo fresco (§6.3 tolleranza 5%).
+        mn = float(e["min_notional_eur"] or 0)
+        units = max(1, round(float(e["f_exec"] or 0) * equity / mn)) if mn > 0 else 1
         target.append({
             "as_of_date": today, "epic": e["epic"], "side": e["side"],
-            "units": None, "f_exec": e["f_exec"], "g_exec": e["g_exec"],
+            "units": units, "f_exec": e["f_exec"], "g_exec": e["g_exec"],
             "reason": "hold" if key in open_now else "enter",
         })
-    # units = f_exec * equity / min_notional (multiplo di minDealSize); qui lasciato
-    # all'esecutore che valida col prezzo corrente (§6.3 tolleranza 5%)
     try:
         if target:
             sp.table("target_portfolio").upsert(target, on_conflict="as_of_date,epic").execute()

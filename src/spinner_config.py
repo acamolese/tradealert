@@ -71,6 +71,8 @@ class SpinnerConfig:
     execution_target: str          # none|demo|real (§11)
     demo_fin_tolerance: float      # scarto rel. max financing modellato/addebitato
     demo_min_nights: int           # notti richieste per la promozione
+    equity_cap: float | None = None  # tetto all'equity di lavoro (demo: rispecchia
+                                     # il reale invece dei 1000 EURd del demo)
     telegram_prefix: str = "[ODDS]"
     # costanti riesposte (restano non-calibrabili)
     g_min: float = G_MIN
@@ -85,8 +87,10 @@ class SpinnerConfig:
 
 
 def load_spinner_config() -> SpinnerConfig:
+    cap = os.environ.get("SPINNER_EQUITY_CAP")
     return SpinnerConfig(
         execution_target=os.environ.get("EXECUTION_TARGET", "none").strip().lower(),
         demo_fin_tolerance=float(os.environ.get("DEMO_FIN_TOLERANCE", "0.10")),
         demo_min_nights=int(os.environ.get("DEMO_MIN_NIGHTS", "10")),
+        equity_cap=float(cap) if cap else None,
     )
