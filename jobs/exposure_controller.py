@@ -24,6 +24,16 @@ from src.risk import calculate_size, quote_to_ref_factor
 log = logging.getLogger(__name__)
 
 
+def _esc(text: object) -> str:
+    """Escape HTML per Telegram (i reason possono contenere '<', es. '0 < correnti')."""
+    return (
+        str(text)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+
+
 def _mid_closes(prices: list[dict]) -> list[float]:
     out: list[float] = []
     for p in prices:
@@ -162,7 +172,7 @@ def main() -> int:
         f"📦 <b>Controller esposizione — {cfg.epic}</b>\n"
         f"Blocchi: {blocks_current} → <b>{plan.blocks_to_reach}</b> (target {plan.blocks_target}, N_max {plan.n_max})\n"
         f"σ stimata: {sigma:.1%} | scale {plan.scale_applied:.2f}\n"
-        f"Azione: <b>{verb} {abs(plan.delta)}</b>\n<i>{plan.reason}</i>{proposta}"
+        f"Azione: <b>{verb} {abs(plan.delta)}</b>\n<i>{_esc(plan.reason)}</i>{proposta}"
     )
 
     # Esecuzione fisica gated dal flag auto_execute finche' il veto pieno (§4.3) non
@@ -189,7 +199,7 @@ def _open_blocks(capital, db, telegram, cfg, meta, mid, q2r, n, state_row):
             size_step=meta["size_step"], stop_pct=cfg.catastrophe_stop_pct * 100.0,
             max_loss_per_trade_eur=None, quote_to_ref=q2r)
         if sz.size is None:
-            telegram.send_message(f"⚠️ Apertura blocco fallita: {sz.reason}")
+            telegram.send_message(f"⚠️ Apertura blocco fallita: {_esc(sz.reason)}")
             return
         cat = round(mid * (1.0 - cfg.catastrophe_stop_pct), 2)
         try:
@@ -201,7 +211,7 @@ def _open_blocks(capital, db, telegram, cfg, meta, mid, q2r, n, state_row):
             fill = float(conf.get("level") or mid)
         except Exception as exc:
             log.exception("create_position blocco fallita")
-            telegram.send_message(f"⚠️ Apertura blocco fallita: {exc}")
+            telegram.send_message(f"⚠️ Apertura blocco fallita: {_esc(exc)}")
             return
         db._client.table("block").insert({
             "epic": cfg.epic, "deal_id": deal_id,
@@ -234,7 +244,7 @@ def _close_blocks(capital, db, telegram, cfg, open_blocks, n, reason):
             pnl = conf.get("profit") or conf.get("profitAndLoss")
         except Exception as exc:
             log.exception("close_position blocco fallita")
-            telegram.send_message(f"⚠️ Chiusura blocco {deal_id} fallita: {exc}")
+            telegram.send_message(f"⚠️ Chiusura blocco {deal_id} fallita: {_esc(exc)}")
             continue
         db._client.table("block").update({
             "closed_at": datetime.now(timezone.utc).isoformat(),
