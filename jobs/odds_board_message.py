@@ -75,7 +75,10 @@ def build(sp) -> str:
         L.append(" (nessun financing negativo tra gli eseguibili)")
     L.append("")
 
-    tgt = sp.table("target_portfolio").select("*").execute().data
+    # solo il target dell'ULTIMO scan (prima si leggevano tutte le date e le
+    # posizioni tenute comparivano duplicate, una riga per giorno)
+    tgt = (sp.table("target_portfolio").select("*")
+           .eq("as_of_date", today).execute().data)
     L.append("IN PORTAFOGLIO")
     if tgt:
         for t in tgt:

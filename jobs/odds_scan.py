@@ -208,58 +208,79 @@ def main() -> int:
     return 0
 
 
+def consecutive_eligible(sp, today, lookback_days=10):
+    """(epic,side) -> n. di scan CONSECUTIVI (dal piu' recente prima di oggi)
+    in cui era eligible. Un giorno di scan senza quella riga interrompe il conteggio
+    (prima si contavano le occorrenze su tutto lo storico, non la consecutivita')."""
+    from collections import defaultdict
+    dates = sorted({r["scan_date"] for r in
+                    (sp.table("odds_board").select("scan_date")
+                     .neq("scan_date", today).order("scan_date", desc=True)
+                     .limit(4000).execute().data or [])}, reverse=True)[:lookback_days]
+    if not dates:
+        return {}
+    rows = (sp.table("odds_board").select("scan_date,epic,side")
+            .eq("status", "eligible").in_("scan_date", dates)
+            .limit(2000).execute().data or [])
+    by_date = defaultdict(set)
+    for r in rows:
+        by_date[r["scan_date"]].add((r["epic"], r["side"]))
+    consec = {}
+    for key in {k for s in by_date.values() for k in s}:
+        n = 0
+        for d in dates:                       # dal piu' recente, si ferma al primo buco
+            if key in by_date[d]:
+                n += 1
+            else:
+                break
+        consec[key] = n
+    return consec
+
+
 def _build_target(sp, db, today, scfg, equity):
-    """§4: ordina eligible per g_exec, max MAX_POSITIONS, max MAX_PER_CLASS,
-    Sigma f_exec <= F_MAX_ACCOUNT, isteresi ENTRY_CONFIRM_SCANS in ingresso.
-    Uscite immediate se g < G_EXIT (qui: non piu' eligible). Scrive target_portfolio."""
+    """§4 + F_BUDGET_POS (constants_log 2026-07-30): eligible per g_exec, budget di
+    leva per posizione, isteresi consecutiva in ingresso (le posizioni gia' in
+    target la saltano: continuita' buy&hold). Uscite: non piu' eligible.
+    Riscrive le righe del giorno (delete+insert: un re-run non lascia residui)."""
+    from src.spinner_config import F_BUDGET_POS
+    from src.spinner_odds import select_target
+
     elig = (sp.table("odds_board").select("*")
             .eq("scan_date", today).eq("status", "eligible")
             .order("g_exec", desc=True).execute().data)
-    # conteggio scan consecutivi eligible per (epic,side) sugli ultimi giorni
-    recent = (sp.table("odds_board").select("scan_date,epic,side,status")
-              .neq("scan_date", today).eq("status", "eligible")
-              .order("scan_date", desc=True).limit(400).execute().data)
-    consec = {}
-    for r in recent:
-        consec[(r["epic"], r["side"])] = consec.get((r["epic"], r["side"]), 0) + 1
+    consec = consecutive_eligible(sp, today)
 
-    chosen, per_class, f_sum = [], {}, 0.0
-    for e in elig:
-        if len(chosen) >= scfg.max_positions:
-            break
-        cls = e["asset_class"]
-        if per_class.get(cls, 0) >= scfg.max_per_class:
-            continue
-        f = float(e["f_exec"] or 0)
-        if f_sum + f > scfg.f_max_account:
-            continue
-        # isteresi: entra solo dopo ENTRY_CONFIRM_SCANS scansioni consecutive
-        confirms = consec.get((e["epic"], e["side"]), 0) + 1  # +oggi
-        if confirms < scfg.entry_confirm_scans:
-            continue
-        chosen.append(e)
-        per_class[cls] = per_class.get(cls, 0) + 1
-        f_sum += f
+    # posizioni nell'ULTIMO target (non tutta la storia): sono gli hold
+    prev = (sp.table("target_portfolio").select("as_of_date,epic,side")
+            .order("as_of_date", desc=True).limit(50).execute().data or [])
+    held = ({(r["epic"], r["side"]) for r in prev if r["as_of_date"] == prev[0]["as_of_date"]}
+            if prev else set())
 
-    open_now = {(r["epic"], r["side"]) for r in
-                (sp.table("target_portfolio").select("epic,side").execute().data or [])}
-    target = []
-    for e in chosen:
-        key = (e["epic"], e["side"])
-        # units = n. di lotti minimi (f_exec*equity/nozionale-a-taglia-minima); valore
-        # indicativo, l'esecutore ricalcola col prezzo fresco (§6.3 tolleranza 5%).
-        mn = float(e["min_notional_eur"] or 0)
-        units = max(1, round(float(e["f_exec"] or 0) * equity / mn)) if mn > 0 else 1
-        target.append({
-            "as_of_date": today, "epic": e["epic"], "side": e["side"],
-            "units": units, "f_exec": e["f_exec"], "g_exec": e["g_exec"],
-            "reason": "hold" if key in open_now else "enter",
-        })
+    chosen, rejects = select_target(
+        elig, held, consec, equity,
+        max_positions=scfg.max_positions, max_per_class=scfg.max_per_class,
+        f_max_account=scfg.f_max_account, f_max_pos=scfg.f_max_pos,
+        f_budget=F_BUDGET_POS, g_min=scfg.g_min,
+        entry_confirm_scans=scfg.entry_confirm_scans)
+    for ep, side, why in rejects:
+        log.info("target: scartato %s %s (%s)", ep, side, why)
+
+    target = [{
+        "as_of_date": today, "epic": c["epic"], "side": c["side"],
+        # units = n. lotti minimi alla taglia di portafoglio; l'esecutore ricalcola
+        # col prezzo fresco da f_exec (§6.3 tolleranza 5%).
+        "units": c["units"], "f_exec": c["f_chosen"], "g_exec": c["g_chosen"],
+        "reason": c["reason"],
+    } for c in chosen]
     try:
+        sp.table("target_portfolio").delete().eq("as_of_date", today).execute()
         if target:
-            sp.table("target_portfolio").upsert(target, on_conflict="as_of_date,epic").execute()
+            sp.table("target_portfolio").insert(target).execute()
     except Exception:
-        log.exception("upsert target_portfolio fallito")
+        log.exception("scrittura target_portfolio fallita")
+    log.info("target %s: %s (f_sum %.2f)", today,
+             [(c["epic"], c["side"], c["f_chosen"]) for c in chosen],
+             sum(c["f_chosen"] for c in chosen))
 
 
 if __name__ == "__main__":

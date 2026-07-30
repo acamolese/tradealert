@@ -26,6 +26,13 @@ G_EXIT = 0.0                  # sotto zero si chiude
 F_MAX_POS = 1.0               # leva max per posizione
 F_MAX_ACCOUNT = 1.5           # leva max aggregata
 MAX_POSITIONS = 3
+# Budget di leva per posizione nella COSTRUZIONE del portafoglio (constants_log
+# 2026-07-30): senza budget ogni posizione entrava a f~F_MAX_POS e il tetto
+# aggregato ne conteneva UNA sola (MAX_POSITIONS irraggiungibile per costruzione).
+# La misura sul tabellone (f_exec/g_exec alla taglia massima) resta invariata.
+# Eccezione ticket lumpy: 1 unita' anche sopra il budget, se sta in F_MAX_POS
+# e nel budget aggregato residuo. G_MIN si valuta alla taglia aperta davvero.
+F_BUDGET_POS = F_MAX_ACCOUNT / MAX_POSITIONS   # 0.5
 MAX_PER_CLASS = 1
 HOLDING_DAYS_MIN = 60         # orizzonte per ammortizzare lo spread
 ENTRY_CONFIRM_SCANS = 2       # scansioni consecutive per entrare

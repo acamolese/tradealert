@@ -107,14 +107,19 @@ def main() -> int:
     equity = min(equity_raw, scfg.equity_cap) if scfg.equity_cap else equity_raw
     log.info("DEMO equity=%.2f (raw %.2f, cap %s)", equity, equity_raw, scfg.equity_cap)
 
-    # target corrente = righe dell'ultimo as_of_date
-    allt = (sp.table("target_portfolio").select("*")
-            .order("as_of_date", desc=True).limit(50).execute().data or [])
-    if not allt:
-        log.info("nessun target_portfolio: niente da fare.")
+    # Target corrente = righe dell'ULTIMO SCAN (odds_board), non l'ultimo as_of_date
+    # presente in target_portfolio: se lo scan di ieri sera ha prodotto un target
+    # VUOTO (nessun eligible selezionato), qui si deve CHIUDERE tutto, non tenere
+    # per sbaglio il target del giorno prima.
+    scans = (sp.table("odds_board").select("scan_date")
+             .order("scan_date", desc=True).limit(1).execute().data or [])
+    if not scans:
+        log.info("nessuno scan in odds_board: niente da fare.")
         return 0
-    maxd = allt[0]["as_of_date"]
-    target = {(t["epic"], t["side"]): t for t in allt if t["as_of_date"] == maxd}
+    maxd = scans[0]["scan_date"]
+    allt = (sp.table("target_portfolio").select("*")
+            .eq("as_of_date", maxd).execute().data or [])
+    target = {(t["epic"], t["side"]): t for t in allt}
 
     # stato spinner: posizioni aperte da noi (closed_at null)
     open_rows = (sp.table("executor_position").select("*")

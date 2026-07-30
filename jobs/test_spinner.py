@@ -5,8 +5,11 @@ from __future__ import annotations
 
 import sys
 
-from src.spinner_config import mu_total, classify, G_MIN, F_MAX_POS
-from src.spinner_odds import evaluate_side, executable_f
+from src.spinner_config import (mu_total, classify, G_MIN, F_MAX_POS,
+                                F_MAX_ACCOUNT, F_BUDGET_POS, MAX_POSITIONS,
+                                MAX_PER_CLASS, ENTRY_CONFIRM_SCANS)
+from src.spinner_odds import (evaluate_side, executable_f, portfolio_size,
+                              select_target)
 
 
 def check(name, cond):
@@ -64,6 +67,66 @@ def main() -> int:
     e5 = evaluate_side("long", 0.0, -0.03, None, spread_bps=2, min_notional_eur=30,
                        equity=60, holding_days=60, f_max_pos=1.0, g_min=G_MIN, asset_class="fx")
     check("sigma None -> not_rated", e5.status == "not_rated")
+
+    print("=== F_BUDGET_POS: taglia di portafoglio (constants_log 2026-07-30) ===")
+    # SW20-like: f_unit 0.177, budget 0.5 -> 3 unita' f 0.53, g sopra G_MIN
+    p1 = portfolio_size(0.177, F_BUDGET_POS, remaining=1.5, f_max_pos=1.0,
+                        net_adj=0.0529, sigma=0.1296, g_min=G_MIN)
+    check("granulare: ~budget 0.5 (3 unita')", p1 is not None and p1[0] == 3
+          and abs(p1[1] - 0.531) < 0.01 and p1[2] >= G_MIN)
+    # ticket lumpy (AUDCHF-like f_unit 0.69 > budget): 1 unita' se sta nei cap
+    p2 = portfolio_size(0.695, F_BUDGET_POS, remaining=0.97, f_max_pos=1.0,
+                        net_adj=0.0461, sigma=0.0581, g_min=G_MIN)
+    check("lumpy sopra budget ma nei cap: 1 unita'", p2 is not None and p2[0] == 1)
+    # lumpy che NON sta nel budget residuo: None
+    p3 = portfolio_size(0.695, F_BUDGET_POS, remaining=0.30, f_max_pos=1.0,
+                        net_adj=0.0461, sigma=0.0581, g_min=G_MIN)
+    check("lumpy fuori dal residuo: None", p3 is None)
+    # g sotto G_MIN alla taglia budget -> aumenta n dentro i cap
+    p4 = portfolio_size(0.0668, F_BUDGET_POS, remaining=1.5, f_max_pos=1.0,
+                        net_adj=0.0374, sigma=0.1422, g_min=G_MIN)
+    check("n cresce fino a g>=G_MIN dentro i cap", p4 is not None and p4[2] >= G_MIN)
+
+    print("=== select_target: budget per posizione + isteresi + guard ===")
+    board = [  # replica del board 2026-07-29 (equity 100)
+        {"epic": "SW20", "side": "long", "asset_class": "equity_index",
+         "min_notional_eur": 17.69, "net_adj": 0.05294, "sigma_ann": 0.12963},
+        {"epic": "NL25", "side": "long", "asset_class": "equity_index",
+         "min_notional_eur": 12.47, "net_adj": 0.04714, "sigma_ann": 0.12685},
+        {"epic": "AUDCHF", "side": "long", "asset_class": "fx",
+         "min_notional_eur": 69.48, "net_adj": 0.04606, "sigma_ann": 0.05807},
+        {"epic": "VOO", "side": "long", "asset_class": "equity_stock",
+         "min_notional_eur": 6.68, "net_adj": 0.03743, "sigma_ann": 0.14223},
+    ]
+    kw = dict(max_positions=MAX_POSITIONS, max_per_class=MAX_PER_CLASS,
+              f_max_account=F_MAX_ACCOUNT, f_max_pos=F_MAX_POS,
+              f_budget=F_BUDGET_POS, g_min=G_MIN,
+              entry_confirm_scans=ENTRY_CONFIRM_SCANS)
+    # tutti confermati: indice + fx carry; VOO alla taglia residua (f~0.27) ha
+    # g < G_MIN e resta GIUSTAMENTE fuori (la soglia vale alla taglia aperta)
+    consec = {(b["epic"], b["side"]): 5 for b in board}
+    ch, rj = select_target(board, set(), consec, 100.0, **kw)
+    check("diversifica: indice + carry fx", [c["epic"] for c in ch] == ["SW20", "AUDCHF"])
+    check("NL25 scartato per classe", any(r[0] == "NL25" and "MAX_PER_CLASS" in r[2] for r in rj))
+    check("VOO scartato: g sotto soglia alla taglia residua",
+          any(r[0] == "VOO" and r[2] == "G_MIN_TAGLIA" for r in rj))
+    check("f_sum <= F_MAX_ACCOUNT", sum(c["f_chosen"] for c in ch) <= F_MAX_ACCOUNT + 1e-9)
+    check("somma g batte la singola migliore",
+          sum(c["g_chosen"] for c in ch) > 0.0403)
+    # isteresi consecutiva: AUDCHF nuovo (0 scan precedenti) resta fuori
+    consec2 = dict(consec); consec2[("AUDCHF", "long")] = 0
+    ch2, rj2 = select_target(board, set(), consec2, 100.0, **kw)
+    check("nuovo non confermato -> ISTERESI", any(r[0] == "AUDCHF" and "ISTERESI" in r[2] for r in rj2))
+    # held salta l'isteresi e ha priorita'
+    ch3, _ = select_target(board, {("AUDCHF", "long")}, consec2, 100.0, **kw)
+    check("held salta isteresi (hold)", any(c["epic"] == "AUDCHF" and c["reason"] == "hold" for c in ch3))
+    # mai due versi dello stesso epic
+    board2 = board + [{"epic": "SW20", "side": "short", "asset_class": "equity_index",
+                       "min_notional_eur": 17.69, "net_adj": 0.03, "sigma_ann": 0.12963}]
+    consec3 = {(b["epic"], b["side"]): 5 for b in board2}
+    _, rj4 = select_target(board2, set(), consec3, 100.0, **kw)
+    check("secondo verso stesso epic -> EPIC_DOPPIO",
+          any(r[0] == "SW20" and r[2] == "EPIC_DOPPIO" for r in rj4))
 
     print(f"\n{'TUTTI I TEST PASSANO' if check.failed == 0 else str(check.failed) + ' TEST FALLITI'}")
     return 1 if check.failed else 0
