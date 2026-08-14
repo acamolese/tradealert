@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import sys
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from src.config import load_config
@@ -51,9 +52,25 @@ def _today() -> str:
     return datetime.now(timezone.utc).date().isoformat()
 
 
-def _instrument_ctx(capital, epic: str, cfg):
-    """Contesto di mercato di uno strumento: (meta, mid, L, q2r, min_margin).
-    Solleva ValueError se manca il prezzo. min_margin e' il costo in EUR della
+@dataclass(frozen=True)
+class InstrumentCtx:
+    """Contesto di mercato di uno strumento. `status` e' il marketStatus del
+    broker: serve al gate weekend dello switch (un CFD si apre solo TRADEABLE)."""
+    epic: str
+    meta: dict
+    mid: float
+    leverage: float
+    q2r: float
+    min_margin: float
+    status: str
+
+    @property
+    def tradeable(self) -> bool:
+        return self.status == "TRADEABLE"
+
+
+def _instrument_ctx(capital, epic: str, cfg) -> InstrumentCtx:
+    """Solleva ValueError se manca il prezzo. min_margin e' il costo in EUR della
     taglia minima del broker: se supera il blocco, lo strumento non e' eseguibile
     da v2 (§2.1)."""
     from src.executor import _market_meta
@@ -69,7 +86,8 @@ def _instrument_ctx(capital, epic: str, cfg):
     L = real_leverage(epic) or (1.0 / meta["margin_factor"] if meta["margin_factor"] else 20.0)
     q2r = quote_to_ref_factor(instr.get("currency"), capital) or 1.0
     min_margin = meta["min_size"] * mid * meta["margin_factor"] * q2r
-    return meta, mid, L, q2r, min_margin
+    status = ((market.get("snapshot") or {}).get("marketStatus") or "UNKNOWN")
+    return InstrumentCtx(epic, meta, mid, L, q2r, min_margin, status)
 
 
 def _pick_instrument(capital, db, cfg, epic_current: str, plan_action: str, today: str):
@@ -109,15 +127,15 @@ def _pick_instrument(capital, db, cfg, epic_current: str, plan_action: str, toda
     executable: set[str] = set()
     for ep in shortlist:
         try:
-            _, _, _, _, min_margin = _instrument_ctx(capital, ep, cfg)
+            c = _instrument_ctx(capital, ep, cfg)
         except Exception:
             log.warning("eseguibilita' di %s non verificabile: escluso", ep)
             continue
-        if min_margin <= cfg.block_margin_eur:
+        if c.min_margin <= cfg.block_margin_eur:
             executable.add(ep)
         else:
             log.info("%s non eseguibile: taglia minima %.2f€ > blocco %.0f€",
-                     ep, min_margin, cfg.block_margin_eur)
+                     ep, c.min_margin, cfg.block_margin_eur)
 
     candidates = rank_candidates(rows, executable)
     best = candidates[0].epic if candidates else None
@@ -201,10 +219,11 @@ def main() -> int:
 
     # --- mercato, leva reale, vincolo taglia minima (§2.1) ---
     try:
-        meta, mid, L, q2r, min_margin = _instrument_ctx(capital, epic, cfg)
+        ctx = _instrument_ctx(capital, epic, cfg)
     except Exception as exc:
         log.error("Contesto di mercato per %s non disponibile: %s", epic, exc)
         return 1
+    meta, mid, L, q2r, min_margin = (ctx.meta, ctx.mid, ctx.leverage, ctx.q2r, ctx.min_margin)
     if min_margin > cfg.block_margin_eur:
         telegram.send_message(
             f"🛑 <b>v2 non avviabile</b>\n{epic}: la taglia minima broker richiede "
@@ -335,14 +354,27 @@ def _switch_instrument(capital, db, telegram, cfg, epic_from, decision,
     """
     epic_to = decision.to_epic
     try:
-        meta_b, mid_b, _L_b, q2r_b, min_margin_b = _instrument_ctx(capital, epic_to, cfg)
+        ctx_b = _instrument_ctx(capital, epic_to, cfg)
+        ctx_a = _instrument_ctx(capital, epic_from, cfg)
     except Exception as exc:
-        log.error("Contesto di %s non disponibile: switch annullato (%s)", epic_to, exc)
+        log.error("Contesto di mercato non disponibile: switch annullato (%s)", exc)
         return 1
-    if min_margin_b > cfg.block_margin_eur:
+    if ctx_b.min_margin > cfg.block_margin_eur:
         log.error("%s non piu' eseguibile (%.2f€ > %.0f€): switch annullato",
-                  epic_to, min_margin_b, cfg.block_margin_eur)
+                  epic_to, ctx_b.min_margin, cfg.block_margin_eur)
         return 1
+
+    # Gate mercato aperto. Il controller gira alle 23:30 TUTTI i giorni, weekend
+    # inclusi, e lo switch chiude su A PRIMA di aprire su B: con B chiuso (orari
+    # diversi tra piazze, es. US500 riapre domenica 22:00 UTC mentre le borse
+    # europee no) il sistema resterebbe flat per tutto il weekend, incassando il
+    # gap del lunedi' senza esposizione. Fail-closed: servono entrambi TRADEABLE.
+    if not (ctx_a.tradeable and ctx_b.tradeable):
+        log.info("Switch rinviato: %s=%s, %s=%s (servono entrambi TRADEABLE)",
+                 epic_from, ctx_a.status, epic_to, ctx_b.status)
+        return 0
+
+    meta_b, mid_b, q2r_b = ctx_b.meta, ctx_b.mid, ctx_b.q2r
 
     telegram.send_message(
         f"🔄 <b>Cambio strumento</b>\n{epic_from} → <b>{epic_to}</b>\n"
@@ -368,6 +400,18 @@ def _switch_instrument(capital, db, telegram, cfg, epic_from, decision,
     if blocks_current:
         _open_blocks(capital, db, telegram, cfg, epic_to, meta_b, mid_b, q2r_b,
                      blocks_current, {})
+        aperti = (db._client.table("block").select("id")
+                  .eq("epic", epic_to).is_("closed_at", "null").execute().data)
+        if len(aperti) < blocks_current:
+            telegram.send_message(
+                f"⚠️ <b>Switch incompleto</b>\nChiusi {blocks_current} blocchi su "
+                f"{epic_from}, riaperti {len(aperti)} su {epic_to}. Il sistema e' "
+                f"{'FLAT' if not aperti else 'sotto-esposto'}: il controller "
+                f"ricostruira' l'esposizione al prossimo run."
+            )
+            log.error("Switch incompleto: %d/%d blocchi riaperti su %s",
+                      len(aperti), blocks_current, epic_to)
+            return 1
     log.info("Switch completato: %s -> %s (%d blocchi)", epic_from, epic_to, blocks_current)
     return 0
 
