@@ -42,11 +42,30 @@ EMPTY_SET_KILL_WEEKS = 8
 
 
 def mu_total(asset_class: str) -> float:
-    """§2.1: MU_TOTAL = RF_REF + PREMIUM, tranne fx/commodity/crypto dove e' 0
-    (il prezzo non ha deriva dichiarata, il carry sta tutto nel financing)."""
-    if asset_class in ("fx", "commodity", "crypto"):
+    """§2.1: MU_TOTAL = RF_REF + PREMIUM, tranne le classi senza deriva dichiarata
+    (fx/commodity/crypto/bond) dove e' 0: il prezzo non ha premio, il carry sta
+    tutto nel financing.
+
+    'bond' e' entrato con il fix di classificazione 2026-08-14: un CFD su ETF
+    obbligazionario NON incassa le cedole, quindi il rendimento atteso del PREZZO
+    e' ~0, non il premio azionario. Non e' un premio nuovo: e' la rimozione di un
+    premio attribuito per errore di tipizzazione (Capital marca gli ETF SHARES)."""
+    if asset_class in ("fx", "commodity", "crypto", "bond"):
         return 0.0
     return RF_REF + PREMIUM.get(asset_class, 0.0)
+
+
+# --- override di classificazione (fix 2026-08-14) ---
+# instrumentType di Capital e' grossolano: 'SHARES' include tutti gli ETF (anche
+# obbligazionari e monetari), 'INDICES' include indici valutari. Senza override il
+# motore attribuisce il premio azionario a T-bill e al dollaro, e siccome g cresce
+# al calare di sigma (f_opt = net_adj/sigma^2), l'errore finisce sistematicamente
+# in CIMA alla classifica. Riconoscimento sul nome dello strumento, esplicito.
+_BOND_MARKERS = (
+    "TREASURY", "BOND", " MBS", "MBS ", "AGGREGATE", "GILT", "BUND", "BTP",
+    "CORPORATE", "MUNICIPAL", "HIGH YIELD", "TIPS", "T-BILL", "FIXED INCOME",
+)
+_FX_INDEX_MARKERS = ("DOLLAR INDEX",)
 
 
 # --- mappatura instrumentType Capital -> classe (§3 anagrafica) ---
@@ -55,6 +74,12 @@ def classify(instrument: dict) -> str:
     t = (instrument.get("instrumentType") or instrument.get("type") or "").upper()
     epic = (instrument.get("epic") or "").upper()
     name = (instrument.get("name") or "").upper()
+    # override sul nome PRIMA del tipo API (fix 2026-08-14): un ETF obbligazionario
+    # resta obbligazionario anche se Capital lo marca SHARES.
+    if any(m in name for m in _BOND_MARKERS):
+        return "bond"
+    if any(m in name for m in _FX_INDEX_MARKERS):
+        return "fx"
     if t in ("CURRENCIES", "CURRENCY"):
         return "fx"
     if t in ("CRYPTOCURRENCIES", "CRYPTOCURRENCY"):

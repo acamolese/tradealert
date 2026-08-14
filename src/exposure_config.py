@@ -43,6 +43,13 @@ class ExposureConfig:
     macro_scale_enabled: bool     # §5.1, default false: si logga ma non si applica
     use_guaranteed_stop: bool     # §7.2, da valutare
 
+    # --- selezione dinamica dello strumento (2026-08-14) ---
+    # Default OFF: il deploy non cambia comportamento finche' non si attiva.
+    switch_enabled: bool          # V2_SWITCH_ENABLED
+    switch_min_edge: float        # miglioramento RELATIVO di net_adj/sigma richiesto
+    switch_stable_days: int       # giorni consecutivi in testa prima di muovere
+    board_max_age_days: int       # oltre questa eta' il tabellone non e' affidabile
+
     # costanti riesposte per comodita' (restano non-calibrabili)
     ewma_lambda: float = EWMA_LAMBDA
     warmup_bars: int = WARMUP_BARS
@@ -63,4 +70,8 @@ def load_exposure_config() -> ExposureConfig:
         catastrophe_stop_pct=_f("CATASTROPHE_STOP_PCT", 0.075),
         macro_scale_enabled=_b("MACRO_SCALE_ENABLED", False),
         use_guaranteed_stop=_b("USE_GUARANTEED_STOP", False),
+        switch_enabled=_b("V2_SWITCH_ENABLED", False),
+        switch_min_edge=_f("V2_SWITCH_MIN_EDGE", 0.15),
+        switch_stable_days=int(_f("V2_SWITCH_STABLE_DAYS", 2)),
+        board_max_age_days=int(_f("V2_BOARD_MAX_AGE_DAYS", 2)),
     )
