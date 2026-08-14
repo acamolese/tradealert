@@ -90,7 +90,8 @@ def _instrument_ctx(capital, epic: str, cfg) -> InstrumentCtx:
     return InstrumentCtx(epic, meta, mid, L, q2r, min_margin, status)
 
 
-def _pick_instrument(capital, db, cfg, epic_current: str, plan_action: str, today: str):
+def _pick_instrument(capital, db, cfg, epic_current: str, plan_action: str, today: str,
+                     dry: bool = False):
     """Valuta la sostituzione dello strumento leggendo il tabellone dello spinner.
     Ritorna (SwitchDecision, best_epic|None). Non esegue nulla.
 
@@ -140,14 +141,22 @@ def _pick_instrument(capital, db, cfg, epic_current: str, plan_action: str, toda
     candidates = rank_candidates(rows, executable)
     best = candidates[0].epic if candidates else None
 
-    # storia dei pick per l'isteresi di switch (giorni PRECEDENTI, piu' recente ultimo)
+    # Storia dei pick per l'isteresi (giorni PRECEDENTI, piu' recente ultimo).
+    # DEDUPLICATA PER GIORNO: il job puo' girare piu' volte al giorno (retry, run
+    # manuali), e senza dedup N run dello stesso giorno soddisferebbero da soli
+    # un'isteresi di N giorni. Di ogni giorno vale l'ultimo pick.
     try:
         prev = (db._client.table("monitoring_events").select("details,created_at")
                 .eq("event_type", "v2_instrument_pick").lt("created_at", today)
                 .order("created_at", desc=True)
-                .limit(cfg.switch_stable_days + 2).execute().data)
-        picks = [(p.get("details") or {}).get("best_epic") for p in reversed(prev)]
-        picks = [p for p in picks if p]
+                .limit((cfg.switch_stable_days + 2) * 10).execute().data)
+        by_day: dict[str, str] = {}
+        for p in prev:                       # ordine desc: il primo di ogni giorno
+            day = str(p.get("created_at") or "")[:10]
+            ep = (p.get("details") or {}).get("best_epic")
+            if day and ep and day not in by_day:
+                by_day[day] = ep
+        picks = [by_day[d] for d in sorted(by_day)][-(cfg.switch_stable_days + 2):]
     except Exception:
         log.exception("lettura storico pick fallita: isteresi non verificabile")
         return _no("storico pick illeggibile: nessuno switch")
@@ -161,7 +170,10 @@ def _pick_instrument(capital, db, cfg, epic_current: str, plan_action: str, toda
     )
 
     # registra il pick del giorno (serve all'isteresi di domani anche a flag off,
-    # cosi' l'attivazione parte con una storia gia' pronta)
+    # cosi' l'attivazione parte con una storia gia' pronta). Mai in dry-run: il
+    # dry-run deve restare di sola lettura, altrimenti falsa la storia.
+    if dry:
+        return decision, best
     try:
         db._client.table("monitoring_events").insert({
             "event_type": "v2_instrument_pick",
@@ -295,7 +307,7 @@ def main() -> int:
     # --- selezione dello strumento (2026-08-14): si valuta SEMPRE (anche a flag
     # off e in dry-run) per costruire la storia dei pick, ma esegue solo con
     # V2_SWITCH_ENABLED e piano 'hold'. ---
-    decision, best = _pick_instrument(capital, db, cfg, epic, plan.action, today)
+    decision, best = _pick_instrument(capital, db, cfg, epic, plan.action, today, dry)
     log.info("Strumento: corrente=%s migliore=%s switch=%s | %s",
              epic, best, decision.switch, decision.reason)
 
