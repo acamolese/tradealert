@@ -6,8 +6,9 @@ exposure_state, e — solo se abilitato e non dry-run — apre/chiude blocchi co
 finestra di veto su Telegram, registrandoli in `block`.
 
 Uso:
-  PYTHONPATH=$PWD .venv/bin/python -m jobs.exposure_controller --dry-run   # calcola, non esegue
-  PYTHONPATH=$PWD .venv/bin/python -m jobs.exposure_controller             # reale (richiede V2_EXPOSURE_ENABLED)
+  PYTHONPATH=$PWD .venv/bin/python -m jobs.exposure_controller --dry-run      # calcola, non esegue
+  PYTHONPATH=$PWD .venv/bin/python -m jobs.exposure_controller               # reale (richiede V2_EXPOSURE_ENABLED)
+  PYTHONPATH=$PWD .venv/bin/python -m jobs.exposure_controller --switch-only # solo cambio strumento, in orario di mercato
 """
 from __future__ import annotations
 
@@ -194,6 +195,13 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     dry = "--dry-run" in sys.argv
+    # --switch-only: esegue SOLO l'eventuale sostituzione di strumento, senza
+    # toccare il livello di esposizione. Serve perche' il controller gira alle
+    # 23:30 (candele giornaliere chiuse) mentre le piazze europee negoziano
+    # 06:00-20:00 UTC: la decisione si prende la sera, l'esecuzione avviene il
+    # giorno dopo in finestra di mercato. Non scrive exposure_state (la sigma qui
+    # e' calcolata su una candela daily incompleta) e non registra il pick.
+    switch_only = "--switch-only" in sys.argv
 
     from src.capital_client import CapitalClient
     from src.db import Database
@@ -299,17 +307,26 @@ def main() -> int:
         "blocks_current": blocks_current, "action": plan.action, "delta": plan.delta,
         "equity_eur": round(equity, 2), "real_leverage": L,
     }
-    try:
-        db._client.table("exposure_state").upsert(state_row, on_conflict="as_of_date").execute()
-    except Exception:
-        log.exception("upsert exposure_state fallito (proseguo)")
+    if not switch_only:
+        try:
+            db._client.table("exposure_state").upsert(state_row, on_conflict="as_of_date").execute()
+        except Exception:
+            log.exception("upsert exposure_state fallito (proseguo)")
 
     # --- selezione dello strumento (2026-08-14): si valuta SEMPRE (anche a flag
     # off e in dry-run) per costruire la storia dei pick, ma esegue solo con
     # V2_SWITCH_ENABLED e piano 'hold'. ---
-    decision, best = _pick_instrument(capital, db, cfg, epic, plan.action, today, dry)
+    decision, best = _pick_instrument(capital, db, cfg, epic, plan.action, today,
+                                      dry or switch_only)
     log.info("Strumento: corrente=%s migliore=%s switch=%s | %s",
              epic, best, decision.switch, decision.reason)
+
+    if switch_only:
+        if not (decision.switch and decision.to_epic):
+            log.info("switch-only: nessuna sostituzione da eseguire.")
+            return 0
+        return _switch_instrument(capital, db, telegram, cfg, epic, decision,
+                                  open_blocks, blocks_current, sigma)
 
     if dry:
         print("\n=== DRY-RUN — nessun ordine ===")
