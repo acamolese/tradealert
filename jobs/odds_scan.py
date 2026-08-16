@@ -87,6 +87,10 @@ def build_universe(capital):
                 "epic": ep, "asset_class": cls, "min_size": meta["min_size"],
                 "real_leverage": real_leverage(ep) or (1.0 / meta["margin_factor"] if meta["margin_factor"] else None),
                 "currency": instr.get("currency"),
+                # name e tipo servono a RIclassificare al load senza rifare 700
+                # get_market: la classe in cache non e' autoritativa (vedi load_universe)
+                "name": instr.get("name") or ep,
+                "instrument_type": (instr.get("instrumentType") or instr.get("type") or ""),
             })
         except Exception:
             continue
@@ -95,10 +99,31 @@ def build_universe(capital):
 
 
 def load_universe(capital, rebuild=False):
+    """Anagrafica dell'universo, con cache su file (700 get_market sono lenti).
+
+    La CLASSE non e' mai letta dalla cache: viene ricalcolata a ogni load dal
+    `name` memorizzato. Motivo (bug 2026-08-16): asset_class era congelata nel
+    file, quindi il fix di classificazione del 14/08 sarebbe entrato in vigore
+    solo alla scadenza della cache, 4 giorni dopo e in silenzio. Una cache di
+    DATI non deve contenere il risultato di una DECISIONE che puo' cambiare.
+    """
     if not rebuild and CACHE.exists():
         age = (time.time() - CACHE.stat().st_mtime) / 86400
         if age < CACHE_MAX_AGE_DAYS:
-            return json.loads(CACHE.read_text())
+            anag = json.loads(CACHE.read_text())
+            if all(a.get("name") for a in anag):
+                riclass = 0
+                for a in anag:
+                    cls = classify({"epic": a["epic"], "name": a["name"],
+                                    "type": a.get("instrument_type", "")})
+                    if cls != a.get("asset_class"):
+                        riclass += 1
+                    a["asset_class"] = cls
+                if riclass:
+                    log.info("anagrafica: %d strumenti riclassificati rispetto alla cache",
+                             riclass)
+                return [a for a in anag if a["asset_class"] != "excluded"]
+            log.info("cache senza 'name' (formato pre-2026-08-16): ricostruisco")
     log.info("(ri)costruisco anagrafica universo...")
     anag = build_universe(capital)
     CACHE.parent.mkdir(parents=True, exist_ok=True)
