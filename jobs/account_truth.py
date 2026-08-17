@@ -59,7 +59,97 @@ def _amount(t: dict) -> float:
         return 0.0
 
 
+def weekly_snapshot(capital, db, telegram=None) -> dict:
+    """Resa/perdita OGGETTIVA della settimana, letta dal broker.
+
+    Misura richiesta esplicitamente il 2026-08-17. Fonte = /history/transactions +
+    saldo: mai il DB, i cui pnl hanno segno inaffidabile. Scompone il risultato in
+    trade / financing / dividendi, cosi' si vede SEMPRE quanto e' costata la sola
+    detenzione, che e' il numero che decide se il conto puo' capitalizzare.
+
+    Persiste in monitoring_events (`account_week`) per costruire la serie storica:
+    dalla seconda settimana il confronto e' con lo snapshot precedente, quindi la
+    variazione di equity e' esatta e non stimata.
+    """
+    acc = (capital.get_account_info().get("accounts") or [{}])[0]
+    bal = acc.get("balance") or {}
+    equity = float(bal.get("balance") or 0) + float(bal.get("profitLoss") or 0)
+
+    tx = fetch_transactions(capital, 8)
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    week = [t for t in tx if (t.get("dateUtc") or "") >= cutoff]
+    per_type: dict[str, float] = defaultdict(float)
+    for t in week:
+        per_type[t.get("transactionType") or "?"] += _amount(t)
+    realizzato = sum(per_type.values())
+
+    prev = None
+    try:
+        rows = (db._client.table("monitoring_events").select("details,created_at")
+                .eq("event_type", "account_week")
+                .order("created_at", desc=True).limit(1).execute().data)
+        if rows:
+            prev = rows[0].get("details") or {}
+    except Exception:
+        pass
+
+    delta_equity = (equity - float(prev["equity"])) if prev and prev.get("equity") else None
+    pct = (delta_equity / float(prev["equity"]) * 100) if (delta_equity is not None
+                                                           and float(prev["equity"])) else None
+
+    pos = capital.get_open_positions()
+    snap = {
+        "equity": round(equity, 2),
+        "balance": round(float(bal.get("balance") or 0), 2),
+        "floating": round(float(bal.get("profitLoss") or 0), 2),
+        "trade": round(per_type.get("TRADE", 0.0), 2),
+        "financing": round(per_type.get("SWAP", 0.0), 2),
+        "dividendi": round(per_type.get("CORPORATE_ACTION", 0.0), 2),
+        "realizzato": round(realizzato, 2),
+        "delta_equity": round(delta_equity, 2) if delta_equity is not None else None,
+        "pct": round(pct, 2) if pct is not None else None,
+        "posizioni": len(pos),
+        "movimenti": len(week),
+    }
+
+    if telegram:
+        seg = "n/d (prima settimana)" if snap["delta_equity"] is None else \
+              f"{snap['delta_equity']:+.2f}€ ({snap['pct']:+.2f}%)"
+        costo_anno = snap["financing"] / 7 * 365
+        telegram.send_message(
+            f"📊 <b>Settimana — resa oggettiva</b>\n"
+            f"Equity: <b>{snap['equity']:.2f}€</b> (saldo {snap['balance']:.2f} + "
+            f"flottante {snap['floating']:+.2f})\n"
+            f"Variazione: <b>{seg}</b>\n\n"
+            f"Da cosa viene:\n"
+            f"• trade chiusi {snap['trade']:+.2f}€\n"
+            f"• interessi overnight <b>{snap['financing']:+.2f}€</b>\n"
+            f"• dividendi {snap['dividendi']:+.2f}€\n"
+            f"• movimenti: {snap['movimenti']} | posizioni aperte: {snap['posizioni']}\n\n"
+            f"<i>Al ritmo attuale la sola detenzione costa {costo_anno:.2f}€/anno "
+            f"({abs(costo_anno)/snap['equity']*100:.1f}% dell'equity).</i>"
+        )
+    try:
+        db._client.table("monitoring_events").insert(
+            {"event_type": "account_week", "details": snap}).execute()
+    except Exception:
+        pass
+    return snap
+
+
 def main() -> int:
+    if "--weekly" in sys.argv:
+        from src.db import Database
+        from src.telegram_client import TelegramClient
+        v1 = load_config()
+        capital = CapitalClient(v1)
+        capital.login()
+        snap = weekly_snapshot(capital, Database(v1),
+                               None if "--no-telegram" in sys.argv else TelegramClient(v1))
+        for k, v in snap.items():
+            print(f"  {k}: {v}")
+        return 0
+
     days = int(sys.argv[1]) if len(sys.argv) > 1 else 60
     capital = CapitalClient(load_config())
     capital.login()
