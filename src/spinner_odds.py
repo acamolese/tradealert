@@ -10,6 +10,32 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
+def annual_financing(rate: float | None, interval_minutes: float | None) -> float:
+    """Converte l'overnightFee di Capital in TASSO ANNUO PAGATO (frazione).
+
+    Capital espone `longRate`/`shortRate` come PERCENTUALE per intervallo di
+    addebito (`swapChargeInterval`, tipicamente 1440 minuti = 1 giorno), con segno
+    negativo quando l'importo e' addebitato al cliente. Esempio reale US500:
+    longRate=-0.0214847, interval=1440 -> 0.0214847% al giorno -> 7.84% annuo.
+
+    BUG CORRETTO IL 2026-08-17: il codice usava `-rate` direttamente come frazione
+    annua, cioe' leggeva 2.15% dove il costo vero era 7.84%. Sottostima di 3.65x
+    (=365/100), che e' esattamente il fattore di conversione mancante. Con il
+    costo giusto il premio netto dell'azionario su CFD e' circa ZERO: e' il motivo
+    per cui il conto non capitalizza (-15.03 EUR nei 75 giorni al 16/08, di cui
+    -1.85 di soli interessi overnight).
+
+    Ritorna il tasso PAGATO: positivo = costo, negativo = incassato.
+    """
+    if rate is None:
+        return 0.0
+    interval = float(interval_minutes or 1440.0)
+    if interval <= 0:
+        interval = 1440.0
+    addebiti_al_giorno = 1440.0 / interval
+    return -(float(rate) / 100.0) * addebiti_al_giorno * 365.0
+
+
 def net_long(mu_total: float, fin_long: float) -> float:
     """Deriva netta long sul nozionale. fin = tasso PAGATO (negativo = ricevuto)."""
     return mu_total - fin_long

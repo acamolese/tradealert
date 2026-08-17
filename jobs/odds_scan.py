@@ -26,7 +26,7 @@ from src.spinner_config import (
     F_MAX_ACCOUNT, MAX_POSITIONS, MAX_PER_CLASS, ENTRY_CONFIRM_SCANS,
     SPREAD_SAMPLES_MIN,
 )
-from src.spinner_odds import evaluate_side
+from src.spinner_odds import annual_financing, evaluate_side
 from src.volatility import ewma_sigma
 
 log = logging.getLogger(__name__)
@@ -184,8 +184,9 @@ def main() -> int:
             # Confermato dal primo scan (indici long non "ricevono" financing) e da
             # verificare empiricamente §12.8 (posizione demo aperta il 2026-07-27).
             of = instr.get("overnightFee") or {}
-            fin_long = -float(of.get("longRate") or 0.0)
-            fin_short = -float(of.get("shortRate") or 0.0)
+            _iv = of.get("swapChargeInterval")
+            fin_long = annual_financing(of.get("longRate"), _iv)
+            fin_short = annual_financing(of.get("shortRate"), _iv)
             b, o = snap.get("bid"), snap.get("offer")
             spread_bps = ((float(o) - float(b)) / price * 10000.0) if (b and o) else None
             closes = []
