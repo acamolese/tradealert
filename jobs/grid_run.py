@@ -111,7 +111,10 @@ def main() -> int:
         if marg_min > 0:
             n = int((budget / max_pos) / marg_min)
             step_size = meta.get("size_step") or meta["min_size"]
-            unit_size = max(meta["min_size"], round(n * meta["min_size"] / step_size) * step_size)
+            # round a 8 decimali: senza, il float lascia code tipo
+            # 0.0006000000000000001 che il broker puo' rifiutare
+            unit_size = round(max(meta["min_size"],
+                                  round(n * meta["min_size"] / step_size) * step_size), 8)
 
     acc = (capital.get_account_info().get("accounts") or [{}])[0]
     bal = acc.get("balance") or {}
