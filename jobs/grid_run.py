@@ -16,6 +16,7 @@ Uso:
   python -m jobs.grid_run --dry-run    # calcola e stampa, non esegue
   python -m jobs.grid_run              # esegue (richiede GRID_ENABLED=true)
   python -m jobs.grid_run --stop       # chiude tutto il grid e si ferma
+  python -m jobs.grid_run --profile demo   # usa le variabili GRID_DEMO_*
 """
 from __future__ import annotations
 
@@ -33,8 +34,24 @@ log = logging.getLogger(__name__)
 STATE = Path(__file__).resolve().parent.parent / "data" / "grid_state.json"
 
 
+PROFILO = ""
+
+
+def _env(name: str, default: str) -> str:
+    """Legge GRID_<PROFILO>_<NAME> con fallback su GRID_<NAME>.
+
+    Serve a far convivere piu' grid indipendenti (reale e demo, versi e passi
+    diversi) sullo stesso codice e sullo stesso .env, senza che uno erediti per
+    sbaglio i parametri dell'altro."""
+    if PROFILO:
+        v = os.environ.get(f"GRID_{PROFILO}_{name}")
+        if v is not None:
+            return v
+    return os.environ.get(f"GRID_{name}", default)
+
+
 def _f(name, default):
-    return float(os.environ.get(name, str(default)))
+    return float(_env(name, str(default)))
 
 
 def _esc(t):
@@ -46,21 +63,25 @@ def main() -> int:
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     dry = "--dry-run" in sys.argv
     stop = "--stop" in sys.argv
+    global PROFILO
+    if "--profile" in sys.argv:
+        PROFILO = sys.argv[sys.argv.index("--profile") + 1].upper()
 
     from src.capital_client import CapitalClient
     from src.telegram_client import TelegramClient
     from src.executor import _market_meta
 
     v1 = load_config()
-    enabled = os.environ.get("GRID_ENABLED", "false").strip().lower() == "true"
-    epic = os.environ.get("GRID_EPIC", "BTCUSD")
-    side = os.environ.get("GRID_SIDE", "long").strip().lower()
-    step = _f("GRID_STEP", 0.02)
-    max_pos = int(_f("GRID_MAX_POS", 8))
-    kill_pnl = _f("GRID_KILL_PNL_EUR", 15.0)
-    kill_eq = _f("GRID_KILL_EQUITY_EUR", 40.0)
-    catastrofe = _f("GRID_CATASTROPHE", 0.35)
-    min_avail = _f("GRID_MIN_AVAILABLE_EUR", 10.0)
+    enabled = _env("ENABLED", "false").strip().lower() == "true"
+    epic = _env("EPIC", "BTCUSD")
+    side = _env("SIDE", "long").strip().lower()
+    step = _f("STEP", 0.02)
+    max_pos = int(_f("MAX_POS", 8))
+    kill_pnl = _f("KILL_PNL_EUR", 15.0)
+    kill_eq = _f("KILL_EQUITY_EUR", 40.0)
+    catastrofe = _f("CATASTROPHE", 0.35)
+    min_avail = _f("MIN_AVAILABLE_EUR", 10.0)
+    budget = _f("BUDGET_EUR", 0.0)
 
     if not enabled and not dry and not stop:
         log.info("GRID_ENABLED=false: skip.")
@@ -79,6 +100,18 @@ def main() -> int:
     if not prezzo:
         log.error("nessun prezzo per %s", epic)
         return 1
+
+    # taglia di una unita': dal budget se impostato, altrimenti la minima del
+    # broker. Il budget e' MARGINE massimo impegnabile, ripartito sui livelli.
+    unit_size = meta["min_size"]
+    if budget > 0 and max_pos > 0:
+        from src.risk import quote_to_ref_factor
+        q2r = quote_to_ref_factor((mk.get("instrument") or {}).get("currency"), capital) or 1.0
+        marg_min = meta["min_size"] * prezzo * meta["margin_factor"] * q2r
+        if marg_min > 0:
+            n = int((budget / max_pos) / marg_min)
+            step_size = meta.get("size_step") or meta["min_size"]
+            unit_size = max(meta["min_size"], round(n * meta["min_size"] / step_size) * step_size)
 
     acc = (capital.get_account_info().get("accounts") or [{}])[0]
     bal = acc.get("balance") or {}
@@ -100,7 +133,12 @@ def main() -> int:
             "size": float(po.get("size") or 0),
         })
 
-    # ancoraggio della griglia: fissato al primo avvio, mai spostato dopo
+    # ancoraggio della griglia: fissato al primo avvio, mai spostato dopo.
+    # Il file e' separato per ambiente/strumento/verso: il grid demo NON deve
+    # sovrascrivere l'ancoraggio di quello reale (sarebbe una perdita di stato
+    # silenziosa su denaro vero).
+    global STATE
+    STATE = STATE.parent / f"grid_state_{v1.capital_env}_{epic}_{side}.json"
     if STATE.exists():
         st = json.loads(STATE.read_text())
         p0 = float(st.get("p0") or prezzo)
@@ -135,6 +173,8 @@ def main() -> int:
     if dry:
         print(f"\n=== DRY-RUN grid {epic} {side} ===")
         print(f"  prezzo {prezzo:.2f} | ancoraggio p0 {p0:.2f} | passo {step:.1%}")
+        print(f"  unita': size {unit_size} = {unit_size*prezzo:.2f} nozionale | "
+              f"max {max_pos} unita' | budget {budget:.0f}€")
         print(f"  gradino corrente: {piano.livello_corrente} | aperti: {piano.livelli_aperti}")
         print(f"  equity {equity:.2f}€ | disponibile {disponibile:.2f}€ | mercato {stato_mercato}")
         print(f"  P&L aperto: {piano.pnl_aperto:+.2f}€")
@@ -169,7 +209,7 @@ def main() -> int:
             sl = (p0 * (1 - catastrofe)) if side == "long" else (p0 * (1 + catastrofe))
             try:
                 r = capital.create_position(
-                    epic, "BUY" if side == "long" else "SELL", meta["min_size"],
+                    epic, "BUY" if side == "long" else "SELL", unit_size,
                     stop_level=round(sl, 2))
                 conf = capital.confirm_deal(r.get("dealReference")) if r.get("dealReference") else {}
                 if (conf.get("dealStatus") or "").upper() not in ("ACCEPTED", ""):
