@@ -78,29 +78,41 @@ def pianifica(
 
     azioni: list[Azione] = []
 
-    # 1) chiusure in profitto: una unita' aperta al gradino j si chiude quando il
-    #    prezzo ha guadagnato un gradino pieno nella direzione del verso.
-    for p in posizioni:
-        j = livello(p["prezzo_apertura"], p0, step)
-        guadagno = (k - j) if side == "long" else (j - k)
-        if guadagno >= 1:
-            azioni.append(Azione("chiudi", p["deal_id"], j,
-                                 f"gradino {j} -> {k}: +{guadagno} livelli"))
+    # Il confronto e' sui PREZZI, non sui livelli interi.
+    # Bug del 2026-08-18 (colto su denaro reale prima che facesse danni): il
+    # gradino corrente si calcola sul MID, ma il broker registra l'apertura al
+    # prezzo ASK (long). Con p0=64589.75 la prima unita' e' finita a 64613.85,
+    # cioe' al gradino 0, mentre il mid stava gia' al gradino -1: il livello -1
+    # risultava "scoperto" e il grid avrebbe riaperto allo stesso prezzo a ogni
+    # run, fino al cap. Confrontare i prezzi rende la regola immune allo spread e
+    # coincide con il backtest: si compra un gradino sotto l'ULTIMO acquisto.
+    if side == "long":
+        soglia_apertura = (min(p["prezzo_apertura"] for p in posizioni) * (1 - step)
+                           if posizioni else p0 * (1 - step))
+        apri = prezzo <= soglia_apertura
+    else:
+        soglia_apertura = (max(p["prezzo_apertura"] for p in posizioni) * (1 + step)
+                           if posizioni else p0 * (1 + step))
+        apri = prezzo >= soglia_apertura
 
-    # 2) apertura: SOLO scendendo (long), mai inseguendo il prezzo verso l'alto.
-    #    Questa e' la regola del backtest validato (jobs/grid_backtest.py): li' si
-    #    apre dentro `while new < cur`, cioe' esclusivamente quando il prezzo
-    #    scende di un gradino. Aprire anche al rialzo trasformerebbe il grid in un
-    #    DCA che compra sui massimi, che NON e' cio' che e' stato misurato.
+    # 1) chiusure: una unita' si chiude quando ha guadagnato un gradino pieno
+    #    rispetto al SUO prezzo di carico (spread di entrata gia' incluso).
+    for p in posizioni:
+        c = p["prezzo_apertura"]
+        obiettivo = c * (1 + step) if side == "long" else c * (1 - step)
+        raggiunto = prezzo >= obiettivo if side == "long" else prezzo <= obiettivo
+        if raggiunto:
+            azioni.append(Azione("chiudi", p["deal_id"], livello(c, p0, step),
+                                 f"carico {c:.2f} -> {prezzo:.2f} "
+                                 f"(obiettivo {obiettivo:.2f})"))
+
+    # 2) apertura: una sola per run, e solo nella direzione favorevole.
     restanti = len(posizioni) - len(azioni)
-    if restanti < max_posizioni and k not in aperti:
-        if side == "long":
-            scende = (k < min(aperti)) if aperti else (k <= -1)
-        else:
-            scende = (k > max(aperti)) if aperti else (k >= 1)
-        if scende:
-            azioni.append(Azione("apri", None, k,
-                                 f"gradino {k} scoperto in direzione favorevole"))
+    if apri and restanti < max_posizioni:
+        azioni.append(Azione("apri", None, k,
+                             f"prezzo {prezzo:.2f} <= soglia {soglia_apertura:.2f}"
+                             if side == "long" else
+                             f"prezzo {prezzo:.2f} >= soglia {soglia_apertura:.2f}"))
 
     motivo = "; ".join(a.motivo for a in azioni) if azioni else "nessun gradino attraversato"
     return Piano(k, aperti, azioni, pnl, motivo)
