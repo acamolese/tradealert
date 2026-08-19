@@ -13,6 +13,7 @@ Uso:
   python -m jobs.grid2 --profile ORO --dry-run
   python -m jobs.grid2 --profile ORO
   python -m jobs.grid2 --profile ORO --stop
+  python -m jobs.grid2 --profile ORO --riparti   # sblocca dopo il traguardo
 """
 from __future__ import annotations
 
@@ -25,6 +26,7 @@ from pathlib import Path
 
 from src.config import load_config
 from src.grid_net import pianifica_net, livello
+from src.grid_profit import valuta
 
 log = logging.getLogger(__name__)
 DATA = Path(__file__).resolve().parent.parent / "data"
@@ -55,6 +57,7 @@ def main() -> int:
         PROFILO = sys.argv[sys.argv.index("--profile") + 1].upper()
     dry = "--dry-run" in sys.argv
     stop = "--stop" in sys.argv
+    riparti = "--riparti" in sys.argv
 
     from src.capital_client import CapitalClient
     from src.telegram_client import TelegramClient
@@ -69,6 +72,9 @@ def main() -> int:
     kill_pnl = _f("KILL_PNL_EUR", 15.0)
     kill_eq = _f("KILL_EQUITY_EUR", 30.0)
     catastrofe = _f("CATASTROPHE", 0.20)
+    # soglie di PROFITTO: avviso e blocco alla crescita del conto (2026-08-19)
+    profit_alert = _f("PROFIT_ALERT_EUR", 10.0)
+    profit_stop = _f("PROFIT_STOP_EUR", 20.0)
 
     if not enabled and not dry and not stop:
         log.info("profilo %s disabilitato", PROFILO or "(default)")
@@ -77,6 +83,23 @@ def main() -> int:
     capital = CapitalClient(v1)
     capital.login()
     telegram = TelegramClient(v1)
+
+    if riparti:
+        # sblocca dopo un blocco per obiettivo raggiunto e riparte dal valore
+        # attuale del conto: il guadagno incassato diventa la nuova base.
+        acc0 = (capital.get_account_info().get("accounts") or [{}])[0]
+        b0 = acc0.get("balance") or {}
+        eq0 = float(b0.get("balance") or 0) + float(b0.get("profitLoss") or 0)
+        PS = DATA / f"g2_profit_{v1.capital_env}.json"
+        PS.write_text(json.dumps({"baseline": round(eq0, 2), "avvisate": [],
+                                  "bloccato": False,
+                                  "creato": datetime.now(timezone.utc).isoformat()}, indent=1))
+        telegram.send_message(
+            f"▶️ <b>Grid ripartiti</b>\nNuova base: {eq0:.2f}€\n"
+            f"Prossimo avviso a +{_f('PROFIT_ALERT_EUR', 10.0):.0f}€, "
+            f"pausa a +{_f('PROFIT_STOP_EUR', 20.0):.0f}€.")
+        print(f"ripartito da baseline {eq0:.2f}€")
+        return 0
 
     mk = capital.get_market(epic)
     snap = mk.get("snapshot", {}) or {}
@@ -136,6 +159,62 @@ def main() -> int:
         if STATE.exists():
             STATE.unlink()
         telegram.send_message(f"⏹️ <b>Grid {epic} fermato</b> ({len(deals)} posizioni chiuse)")
+        return 0
+
+    # --- soglie di profitto, stato condiviso da tutti i grid dello STESSO conto ---
+    PSTATE = DATA / f"g2_profit_{v1.capital_env}.json"
+    ps = {}
+    if PSTATE.exists():
+        try:
+            ps = json.loads(PSTATE.read_text())
+        except Exception:
+            ps = {}
+    if not ps.get("baseline"):
+        ps = {"baseline": round(equity, 2), "avvisate": [], "bloccato": False,
+              "creato": datetime.now(timezone.utc).isoformat()}
+        if not dry:
+            DATA.mkdir(parents=True, exist_ok=True)
+            PSTATE.write_text(json.dumps(ps, indent=1))
+        log.info("baseline profitto fissata a %.2f€", ps["baseline"])
+
+    v = valuta(equity, float(ps["baseline"]), [profit_alert], profit_stop,
+               [float(x) for x in ps.get("avvisate", [])], bool(ps.get("bloccato")))
+
+    if v.stato == "gia_bloccato":
+        log.info("%s: sistema in pausa (obiettivo raggiunto), nessuna operazione", epic)
+        return 0
+
+    if v.stato == "avviso" and not dry:
+        ps.setdefault("avvisate", []).append(v.soglia_colpita)
+        PSTATE.write_text(json.dumps(ps, indent=1))
+        telegram.send_message(
+            f"🔔 <b>Conto cresciuto di {v.guadagno:+.2f}€</b>\n"
+            f"da {v.baseline:.2f}€ a {equity:.2f}€\n"
+            f"Il sistema continua a lavorare. Al prossimo traguardo "
+            f"(+{profit_stop:.0f}€) si ferma da solo per farti decidere.")
+
+    if v.stato == "blocco" and not dry:
+        chiuse = 0
+        for d in deals:
+            try:
+                capital.close_position(d)
+                chiuse += 1
+            except Exception as exc:
+                log.error("chiusura %s fallita: %s", d, exc)
+        ps["bloccato"] = True
+        ps["bloccato_a"] = round(equity, 2)
+        ps["bloccato_il"] = datetime.now(timezone.utc).isoformat()
+        PSTATE.write_text(json.dumps(ps, indent=1))
+        telegram.send_message(
+            f"🎯 <b>Obiettivo raggiunto: {v.guadagno:+.2f}€</b>\n"
+            f"da {v.baseline:.2f}€ a <b>{equity:.2f}€</b>\n"
+            f"Chiuse {chiuse} posizioni, tutti i grid in pausa.\n\n"
+            f"Ora puoi scegliere:\n"
+            f"• <b>incassare</b> il guadagno e ripartire dalla taglia di prima\n"
+            f"• <b>reinvestire</b>: alzare il budget dei grid e ripartire piu' grande\n"
+            f"• <b>ripartire uguale</b> senza toccare nulla\n"
+            f"<i>Finche' non scegli, nessun grid apre posizioni.</i>")
+        log.warning("BLOCCO profitto: %s, chiuse %d posizioni", v.messaggio, chiuse)
         return 0
 
     piano = pianifica_net(prezzo, p0, step, unita_correnti, max_unita=max_unita,
