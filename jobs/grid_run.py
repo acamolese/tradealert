@@ -145,6 +145,20 @@ def main() -> int:
     if STATE.exists():
         st = json.loads(STATE.read_text())
         p0 = float(st.get("p0") or prezzo)
+        # RIANCORAGGIO a inventory vuoto (fix 2026-08-19).
+        # Con p0 congelato al primo avvio, un grid senza posizioni resta in attesa
+        # che il prezzo torni al punto di partenza: il demo short e' rimasto fermo
+        # mezza giornata perche' serviva +0.87% invece di +0.5%. Il backtest non ha
+        # questo vincolo (il riferimento segue sempre il prezzo), quindi il p0 fisso
+        # era una DIVERGENZA dalla strategia validata, non una scelta. Si riancora
+        # solo a inventory vuoto: con posizioni aperte la scaletta deve restare ferma.
+        if not posizioni and abs(prezzo - p0) / p0 > step / 4:
+            log.info("riancoraggio: p0 %.2f -> %.2f (nessuna posizione aperta)", p0, prezzo)
+            p0 = prezzo
+            st["p0"] = p0
+            st["riancorato"] = datetime.now(timezone.utc).isoformat()
+            if not dry:
+                STATE.write_text(json.dumps(st, indent=1))
     else:
         st = {"p0": prezzo, "epic": epic, "side": side, "step": step,
               "creato": datetime.now(timezone.utc).isoformat()}
