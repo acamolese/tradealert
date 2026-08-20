@@ -75,6 +75,12 @@ def main() -> int:
     # soglie di PROFITTO: avviso e blocco alla crescita del conto (2026-08-19)
     profit_alert = _f("PROFIT_ALERT_EUR", 10.0)
     profit_stop = _f("PROFIT_STOP_EUR", 20.0)
+    # Notifica per OGNI mossa: spenta di default. Con decine di operazioni al
+    # giorno (186 messaggi il 20/08) diventa rumore e nasconde gli avvisi che
+    # contano. Il riepilogo orario e i comandi /stat coprono il monitoraggio;
+    # restano notificati solo gli eventi che richiedono attenzione: soglie di
+    # profitto, kill switch, blocchi ed errori.
+    notifica_mosse = _env("NOTIFICA_MOSSE", "false").strip().lower() == "true"
 
     if not enabled and not dry and not stop:
         log.info("profilo %s disabilitato", PROFILO or "(default)")
@@ -258,19 +264,17 @@ def main() -> int:
         return 1
 
     nuova = piano.unita_target
-    icona = "🟢" if piano.delta > 0 else "🔴"
-    if piano.azione == "kill":
-        icona = "🛑"
+    icona = "🛑" if piano.azione == "kill" else ("🟢" if piano.delta > 0 else "🔴")
     verso = "LONG" if nuova > 0 else ("SHORT" if nuova < 0 else "FLAT")
-    telegram.send_message(
-        f"{icona} <b>{epic}</b>  {'compra' if piano.delta > 0 else 'vende'} "
-        f"{abs(piano.delta):.0f} unita' a {fill}\n"
-        f"posizione: <b>{nuova:+d} unita' {verso}</b> "
-        f"({abs(nuova)*unit_size*prezzo*q2r:.0f}€ di esposizione)\n"
-        f"prezzo {prezzo:.4f} | riferimento {p0:.4f} | gradino {piano.livello}\n"
-        f"P&L aperto {pnl:+.2f}€ | conto {equity:.2f}€"
-        + (f"\n<i>{_esc(piano.motivo)}</i>" if piano.azione == "kill" else "")
-    )
+    if notifica_mosse or piano.azione == "kill":
+        telegram.send_message(
+            f"{icona} <b>{epic}</b>  {'compra' if piano.delta > 0 else 'vende'} "
+            f"{abs(piano.delta):.0f} unita' a {fill}\n"
+            f"posizione: <b>{nuova:+d} unita' {verso}</b> "
+            f"({abs(nuova)*unit_size*prezzo*q2r:.0f}€ di esposizione)\n"
+            f"prezzo {prezzo:.4f} | riferimento {p0:.4f} | gradino {piano.livello}\n"
+            f"P&L aperto {pnl:+.2f}€ | conto {equity:.2f}€"
+            + (f"\n<i>{_esc(piano.motivo)}</i>" if piano.azione == "kill" else ""))
     log.info("ESEGUITO %s %s @ %s -> netta %+d unita'", direzione, size_ordine, fill, nuova)
 
     # stop di catastrofe sulla posizione risultante (gate: mai denaro reale senza SL)
