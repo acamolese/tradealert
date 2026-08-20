@@ -32,7 +32,39 @@ log = logging.getLogger(__name__)
 
 POSITIONS_COMMANDS = ("/posizioni", "/positions")
 STATUS_COMMANDS = ("/status", "/stato")
-KNOWN_COMMANDS = POSITIONS_COMMANDS + STATUS_COMMANDS
+# Comandi grid (2026-08-20): /stat riepilogo dei due conti, /statN ultimi N
+# movimenti, /conti solo i saldi. Rispondono sempre su ENTRAMBI i conti.
+GRID_COMMANDS = ("/stat", "/conti", "/grid")
+KNOWN_COMMANDS = POSITIONS_COMMANDS + STATUS_COMMANDS + GRID_COMMANDS
+
+
+def _handle_grid_command(config: Config, text: str) -> bool:
+    """/stat, /statN, /conti. Ritorna True se il comando e' stato gestito."""
+    import re
+
+    from .grid_report import messaggio_riepilogo, messaggio_ultimi
+    from .telegram_client import TelegramClient
+    from jobs.grid_hourly import leggi_conti
+
+    m = re.fullmatch(r"/stat(\d*)", text)
+    if not m and text not in ("/conti", "/grid"):
+        return False
+
+    telegram = TelegramClient(config)
+    try:
+        n = int(m.group(1)) if (m and m.group(1)) else 0
+        conti = leggi_conti(max(n, 10))
+        if not conti:
+            telegram.send_message("Non riesco a leggere i conti adesso, riprova.")
+            return True
+        if n:
+            telegram.send_message(messaggio_ultimi(conti, n))
+        else:
+            telegram.send_message(messaggio_riepilogo(conti, "Situazione ora"))
+    except Exception as exc:
+        log.exception("comando grid fallito")
+        telegram.send_message(f"Errore nel recupero dati: {type(exc).__name__}")
+    return True
 
 
 def _answer_callback(telegram: TelegramClient, cb_id: str, text: str = "Ricevuto") -> None:
@@ -63,6 +95,9 @@ def _process_message(
     if text in STATUS_COMMANDS:
         log.info("Comando %s ricevuto, invio status", text)
         send_status(config)
+        return text
+    if _handle_grid_command(config, text):
+        log.info("Comando grid %s gestito", text)
         return text
     # Comandi gestione eventi critici (case-insensitive, con argomenti)
     handled = try_handle_event_command(config, raw_text)
