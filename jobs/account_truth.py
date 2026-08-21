@@ -22,15 +22,22 @@ from src.capital_client import CapitalClient
 
 
 def fetch_transactions(capital, days: int) -> list[dict]:
-    """Storico transazioni, paginato a ritroso: l'endpoint tronca a 100 righe,
-    quindi si spezza la finestra in blocchi finche' non si esaurisce il periodo."""
+    """Storico transazioni, paginato a ritroso.
+
+    L'endpoint tronca a 100 righe per chiamata. Con i grid, che fanno decine di
+    movimenti al giorno, una finestra di 7 giorni satura e i movimenti piu'
+    vecchi spariscono: il 21/08 il riepilogo mostrava "+0.49€ oggi" mentre il
+    conto aveva perso 5.66€ realizzati. Ora la finestra si RESTRINGE finche' non
+    rientra sotto il limite, invece di limitarsi ad avvisare.
+    """
     end = datetime.now(timezone.utc)
     start = end - timedelta(days=days)
     out: list[dict] = []
     seen: set[str] = set()
     cur_end = end
+    ampiezza = timedelta(days=min(7, max(1, days)))
     while cur_end > start:
-        cur_start = max(start, cur_end - timedelta(days=7))
+        cur_start = max(start, cur_end - ampiezza)
         url = (f"/history/transactions?from={cur_start.strftime('%Y-%m-%dT%H:%M:%S')}"
                f"&to={cur_end.strftime('%Y-%m-%dT%H:%M:%S')}")
         r = capital._session.get(capital._url(url),
@@ -39,14 +46,15 @@ def fetch_transactions(capital, days: int) -> list[dict]:
             print(f"  ! finestra {cur_start.date()}..{cur_end.date()}: HTTP {r.status_code}")
             break
         tx = r.json().get("transactions", [])
+        # finestra satura: dimezza e riprova, cosi' nessun movimento va perso
+        if len(tx) >= 100 and ampiezza > timedelta(hours=1):
+            ampiezza = max(timedelta(hours=1), ampiezza / 2)
+            continue
         for t in tx:
             ref = t.get("reference") or f"{t.get('date')}|{t.get('size')}|{t.get('note')}"
             if ref not in seen:
                 seen.add(ref)
                 out.append(t)
-        if len(tx) >= 100:
-            print(f"  ! finestra {cur_start.date()}..{cur_end.date()} satura "
-                  f"(100 righe): possibile troncamento")
         cur_end = cur_start
     out.sort(key=lambda t: t.get("dateUtc") or t.get("date") or "")
     return out

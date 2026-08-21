@@ -21,6 +21,29 @@ import math
 from dataclasses import dataclass
 
 
+def ancora_mobile(closes: list[float], periodo: int) -> float | None:
+    """Ancoraggio = media mobile esponenziale del prezzo.
+
+    FIX 2026-08-21. Con ancoraggio FISSO al prezzo di partenza, un mercato che
+    sale e non torna indietro porta il grid al tetto dello scoperto e ce lo
+    lascia: misurato su 400 giorni, GOLD 98.5% del tempo short, US100 98.5%,
+    US500 97.8%, con correlazione -0.97 tra deriva dell'asset e posizione media.
+    Non era un grid, era una scommessa fissa contro la tendenza.
+
+    Con l'ancoraggio mobile il riferimento segue la tendenza: il grid scommette
+    sul ritorno verso una media che si MUOVE, non verso un punto del passato.
+    Su trend persistenti la posizione resta vicina allo zero invece di incollarsi
+    al tetto; prende posizione solo sugli scostamenti dalla media.
+    """
+    if not closes or periodo <= 1:
+        return closes[-1] if closes else None
+    k = 2.0 / (periodo + 1.0)
+    ema = closes[0]
+    for p in closes[1:]:
+        ema = p * k + ema * (1 - k)
+    return ema
+
+
 def livello(prezzo: float, p0: float, step: float) -> int:
     if prezzo <= 0 or p0 <= 0 or step <= 0:
         return 0

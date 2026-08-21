@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from src.config import load_config
-from src.grid_net import pianifica_net, livello
+from src.grid_net import pianifica_net, livello, ancora_mobile
 from src.grid_profit import valuta
 
 log = logging.getLogger(__name__)
@@ -72,9 +72,21 @@ def main() -> int:
     kill_pnl = _f("KILL_PNL_EUR", 15.0)
     kill_eq = _f("KILL_EQUITY_EUR", 30.0)
     catastrofe = _f("CATASTROPHE", 0.20)
+    # Ancoraggio MOBILE (fix 2026-08-21): periodo della media esponenziale in
+    # barre giornaliere. Con ancoraggio fisso il grid si incollava al tetto dello
+    # scoperto sugli asset in salita (misurato: 90% del tempo al tetto, 20% di
+    # finestre positive). Con EMA5 e passo 3%: 82% di finestre positive e caso
+    # peggiore -42% invece di -174%. 0 = torna al comportamento fisso.
+    ema_periodo = int(_f("EMA_PERIODO", 5))
     # soglie di PROFITTO: avviso e blocco alla crescita del conto (2026-08-19)
     profit_alert = _f("PROFIT_ALERT_EUR", 10.0)
     profit_stop = _f("PROFIT_STOP_EUR", 20.0)
+    # Stop di PERDITA sul CONTO, simmetrico a quello di profitto (fix 2026-08-21).
+    # Mancava: il kill switch guardava il flottante di OGNI strumento separatamente
+    # (-12€ ciascuno) e nessuno guardava il totale, cosi' il conto e' sceso del 20%
+    # senza che nulla intervenisse. Questo guarda l'equity contro la baseline.
+    loss_alert = _f("LOSS_ALERT_EUR", 5.0)
+    loss_stop = _f("LOSS_STOP_EUR", 10.0)
     # Notifica per OGNI mossa: spenta di default. Con decine di operazioni al
     # giorno (186 messaggi il 20/08) diventa rumore e nasconde gli avvisi che
     # contano. Il riepilogo orario e i comandi /stat coprono il monitoraggio;
@@ -146,7 +158,20 @@ def main() -> int:
     unita_correnti = netta / unit_size if unit_size else 0.0
 
     STATE = DATA / f"g2_{v1.capital_env}_{epic}.json"
-    if STATE.exists():
+    if ema_periodo > 0:
+        # riferimento = media mobile del prezzo: segue la tendenza invece di
+        # restare inchiodato al giorno in cui il grid e' partito.
+        closes = []
+        for x in capital.get_prices(epic, resolution="DAY",
+                                    max_bars=max(30, ema_periodo * 5)):
+            cp = x.get("closePrice") or {}
+            if cp.get("bid") and cp.get("ask"):
+                closes.append((float(cp["bid"]) + float(cp["ask"])) / 2)
+        p0 = ancora_mobile(closes, ema_periodo) if closes else prezzo
+        if not p0:
+            log.error("ancoraggio non calcolabile per %s", epic)
+            return 1
+    elif STATE.exists():
         p0 = float(json.loads(STATE.read_text()).get("p0") or prezzo)
     else:
         p0 = prezzo
@@ -185,6 +210,38 @@ def main() -> int:
 
     v = valuta(equity, float(ps["baseline"]), [profit_alert], profit_stop,
                [float(x) for x in ps.get("avvisate", [])], bool(ps.get("bloccato")))
+
+    # perdita: stessa meccanica, segno opposto
+    perdita = float(ps["baseline"]) - equity
+    if not ps.get("bloccato") and loss_stop > 0 and perdita >= loss_stop:
+        chiuse = 0
+        for d in deals:
+            try:
+                capital.close_position(d)
+                chiuse += 1
+            except Exception as exc:
+                log.error("chiusura %s fallita: %s", d, exc)
+        ps["bloccato"] = True
+        ps["bloccato_per"] = "perdita"
+        ps["bloccato_a"] = round(equity, 2)
+        if not dry:
+            PSTATE.write_text(json.dumps(ps, indent=1))
+            telegram.send_message(
+                f"🛑 <b>Stop perdita: -{perdita:.2f}€</b>\n"
+                f"da {ps['baseline']:.2f}€ a <b>{equity:.2f}€</b>\n"
+                f"Chiuse {chiuse} posizioni, tutti i grid in pausa.\n"
+                f"<i>Nessun grid riapre finche' non decidi. Usa /stat per i dettagli.</i>")
+        log.warning("STOP PERDITA: -%.2f€, chiuse %d posizioni", perdita, chiuse)
+        return 0
+    if (not ps.get("bloccato") and loss_alert > 0 and perdita >= loss_alert
+            and -loss_alert not in [float(x) for x in ps.get("avvisate", [])]):
+        ps.setdefault("avvisate", []).append(-loss_alert)
+        if not dry:
+            PSTATE.write_text(json.dumps(ps, indent=1))
+            telegram.send_message(
+                f"⚠️ <b>Conto in perdita di {perdita:.2f}€</b>\n"
+                f"da {ps['baseline']:.2f}€ a {equity:.2f}€\n"
+                f"Il sistema continua. A -{loss_stop:.0f}€ chiude tutto e si ferma.")
 
     if v.stato == "gia_bloccato":
         log.info("%s: sistema in pausa (obiettivo raggiunto), nessuna operazione", epic)
