@@ -14,6 +14,28 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+
+ROMA = ZoneInfo("Europe/Rome")
+
+
+def ora_locale(iso_utc: str, fmt: str = "%d/%m %H:%M") -> str:
+    """Converte un timestamp UTC del broker in ora italiana.
+
+    L'API Capital lavora in UTC (verificato il 21/08: le query con orari UTC
+    trovano i movimenti, quelle con orari locali no), ma i messaggi li legge una
+    persona che guarda l'orologio italiano: mostrarli in UTC ha gia' generato
+    confusione. I CONFRONTI restano in UTC, si converte solo per la stampa.
+    """
+    if not iso_utc:
+        return "?"
+    try:
+        dt = datetime.fromisoformat(iso_utc.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(ROMA).strftime(fmt)
+    except ValueError:
+        return iso_utc[:16]
 from pathlib import Path
 
 DATA = Path(__file__).resolve().parent.parent / "data"
@@ -142,11 +164,12 @@ def messaggio_ultimi(conti: list[Conto], n: int) -> str:
             continue
         righe = []
         for t in c.ultimi[:n]:
-            q = (t.get("dateUtc") or "")[5:16].replace("T", " ")
+            q = ora_locale(t.get("dateUtc") or "")
             imp = _amount(t)
             ic = "🟢" if imp >= 0 else "🔴"
             righe.append(f"{ic} {q}  {t.get('instrumentName', '?'):<9} {imp:+.2f}€")
         somma = sum(_amount(t) for t in c.ultimi[:n])
         blocchi.append(f"<b>{c.nome}</b> (ultimi {len(c.ultimi[:n])}, "
                        f"totale {somma:+.2f}€)\n" + "\n".join(righe))
-    return f"🧾 <b>Ultimi movimenti</b>\n\n" + "\n\n".join(blocchi)
+    return (f"🧾 <b>Ultimi movimenti</b> <i>(ora italiana)</i>\n\n"
+            + "\n\n".join(blocchi))

@@ -12,10 +12,12 @@ from __future__ import annotations
 import os
 import sys
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from src.config import load_config
 
-# istante del cambio: prima apertura del sistema corretto
+# istante del cambio: prima apertura del sistema corretto.
+# In UTC perche' si confronta con dateUtc del broker; sono le 13:31 italiane.
 TAGLIO = "2026-08-21T11:31"
 
 
@@ -62,7 +64,7 @@ def main() -> int:
 
     testo = (
         "🔻 <b>SPARTIACQUE — fine del vecchio sistema</b>\n"
-        f"<i>{datetime.now(timezone.utc).strftime('%d/%m/%Y %H:%M')} UTC</i>\n\n"
+        f"<i>{datetime.now(ZoneInfo('Europe/Rome')).strftime('%d/%m/%Y %H:%M')}</i>\n\n"
         "<b>COSA NON ANDAVA</b>\n"
         "Il grid teneva il punto di riferimento fisso al prezzo di partenza. "
         "Su un mercato che sale e non torna indietro vendeva a ogni gradino fino "
