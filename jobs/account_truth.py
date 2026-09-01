@@ -18,7 +18,8 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
 from src.config import load_config
-from src.capital_client import CapitalClient
+from src.capital_client import (CapitalClient, cash_conto, equity_conto,
+                                flottante_conto)
 
 
 def fetch_transactions(capital, days: int) -> list[dict]:
@@ -81,7 +82,7 @@ def weekly_snapshot(capital, db, telegram=None) -> dict:
     """
     acc = (capital.get_account_info().get("accounts") or [{}])[0]
     bal = acc.get("balance") or {}
-    equity = float(bal.get("balance") or 0) + float(bal.get("profitLoss") or 0)
+    equity = equity_conto(bal)
 
     tx = fetch_transactions(capital, 8)
     cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
@@ -101,15 +102,22 @@ def weekly_snapshot(capital, db, telegram=None) -> dict:
     except Exception:
         pass
 
-    delta_equity = (equity - float(prev["equity"])) if prev and prev.get("equity") else None
-    pct = (delta_equity / float(prev["equity"]) * 100) if (delta_equity is not None
-                                                           and float(prev["equity"])) else None
+    # Confronto con lo snapshot precedente sul campo "balance": fino al 01/09 il
+    # campo "equity" era gonfiato dal doppio conteggio del flottante (vedi
+    # equity_conto), mentre "balance" conteneva gia' l'equity vera del broker.
+    # Leggere "balance" tiene la serie storica omogenea attraverso il fix.
+    prev_eq = float(prev.get("balance") or prev.get("equity") or 0) if prev else 0.0
+    delta_equity = (equity - prev_eq) if prev_eq else None
+    pct = (delta_equity / prev_eq * 100) if (delta_equity is not None and prev_eq) else None
 
     pos = capital.get_open_positions()
     snap = {
         "equity": round(equity, 2),
-        "balance": round(float(bal.get("balance") or 0), 2),
-        "floating": round(float(bal.get("profitLoss") or 0), 2),
+        # "balance" = equity, ridondante ma tenuto perche' e' il campo su cui si
+        # aggancia la serie storica pre-fix; il cash sta in "cash"
+        "balance": round(equity, 2),
+        "cash": round(cash_conto(bal), 2),
+        "floating": round(flottante_conto(bal), 2),
         "trade": round(per_type.get("TRADE", 0.0), 2),
         "financing": round(per_type.get("SWAP", 0.0), 2),
         "dividendi": round(per_type.get("CORPORATE_ACTION", 0.0), 2),
@@ -126,7 +134,7 @@ def weekly_snapshot(capital, db, telegram=None) -> dict:
         costo_anno = snap["financing"] / 7 * 365
         telegram.send_message(
             f"📊 <b>Settimana — resa oggettiva</b>\n"
-            f"Equity: <b>{snap['equity']:.2f}€</b> (saldo {snap['balance']:.2f} + "
+            f"Equity: <b>{snap['equity']:.2f}€</b> (cash {snap['cash']:.2f} + "
             f"flottante {snap['floating']:+.2f})\n"
             f"Variazione: <b>{seg}</b>\n\n"
             f"Da cosa viene:\n"
@@ -164,9 +172,9 @@ def main() -> int:
 
     acc = (capital.get_account_info().get("accounts") or [{}])[0]
     bal = acc.get("balance") or {}
-    equity = float(bal.get("balance") or 0) + float(bal.get("profitLoss") or 0)
-    print(f"CONTO: saldo {bal.get('balance')}€ | flottante {bal.get('profitLoss')}€ "
-          f"| equity {equity:.2f}€ | depositato {bal.get('deposit')}€\n")
+    equity = equity_conto(bal)
+    print(f"CONTO: equity {equity:.2f}€ (cash {bal.get('deposit')}€ "
+          f"+ flottante {bal.get('profitLoss')}€) | disponibile {bal.get('available')}€\n")
 
     tx = fetch_transactions(capital, days)
     if not tx:

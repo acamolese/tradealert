@@ -22,6 +22,34 @@ log = logging.getLogger(__name__)
 _PREFERENCES_TTL_SEC = 3600.0
 
 
+def equity_conto(bal: dict) -> float:
+    """Equity del conto (cash + flottante) dal blocco `balance` di /accounts.
+
+    Semantica di Capital, verificata il 01/09/2026 su conto reale e demo:
+    `deposit` e' il cash, `profitLoss` il flottante delle posizioni aperte e
+    `balance` e' GIA' la loro somma, cioe' l'equity che l'app mostra
+    (52.85 - 1.79 = 51.06). Il codice sommava `balance + profitLoss` in otto
+    punti e contava il flottante due volte: il riepilogo Telegram diceva 49.27€
+    dove Capital ne mostrava 51.06, e il "dall'avvio" del reale leggeva -2.01€
+    invece di -0.21€. Passare sempre da qui evita che il pattern torni.
+    """
+    return float((bal or {}).get("balance") or 0.0)
+
+
+def flottante_conto(bal: dict) -> float:
+    """P&L non realizzato delle posizioni aperte (gia' incluso nell'equity)."""
+    return float((bal or {}).get("profitLoss") or 0.0)
+
+
+def cash_conto(bal: dict) -> float:
+    """Cash depositato, al netto dei soli movimenti chiusi (senza flottante)."""
+    b = bal or {}
+    dep = b.get("deposit")
+    if dep is not None:
+        return float(dep or 0.0)
+    return equity_conto(b) - flottante_conto(b)
+
+
 class CapitalAPIError(Exception):
     """Errore Capital.com con corpo della risposta."""
 

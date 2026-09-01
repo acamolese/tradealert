@@ -59,7 +59,7 @@ def main() -> int:
     stop = "--stop" in sys.argv
     riparti = "--riparti" in sys.argv
 
-    from src.capital_client import CapitalClient
+    from src.capital_client import CapitalClient, equity_conto
     from src.telegram_client import TelegramClient
     from src.executor import _market_meta
 
@@ -107,7 +107,7 @@ def main() -> int:
         # attuale del conto: il guadagno incassato diventa la nuova base.
         acc0 = (capital.get_account_info().get("accounts") or [{}])[0]
         b0 = acc0.get("balance") or {}
-        eq0 = float(b0.get("balance") or 0) + float(b0.get("profitLoss") or 0)
+        eq0 = equity_conto(b0)
         PS = DATA / f"g2_profit_{v1.capital_env}.json"
         PS.write_text(json.dumps({"baseline": round(eq0, 2), "avvisate": [],
                                   "bloccato": False,
@@ -130,7 +130,7 @@ def main() -> int:
 
     acc = (capital.get_account_info().get("accounts") or [{}])[0]
     bal = acc.get("balance") or {}
-    equity = float(bal.get("balance") or 0) + float(bal.get("profitLoss") or 0)
+    equity = equity_conto(bal)
 
     # taglia di una unita' dal budget (margine), altrimenti la minima del broker
     from src.risk import quote_to_ref_factor

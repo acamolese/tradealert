@@ -67,7 +67,7 @@ def main() -> int:
     if "--profile" in sys.argv:
         PROFILO = sys.argv[sys.argv.index("--profile") + 1].upper()
 
-    from src.capital_client import CapitalClient
+    from src.capital_client import CapitalClient, equity_conto
     from src.telegram_client import TelegramClient
     from src.executor import _market_meta
 
@@ -118,7 +118,7 @@ def main() -> int:
 
     acc = (capital.get_account_info().get("accounts") or [{}])[0]
     bal = acc.get("balance") or {}
-    equity = float(bal.get("balance") or 0) + float(bal.get("profitLoss") or 0)
+    equity = equity_conto(bal)
     disponibile = float(bal.get("available") or 0)
 
     # posizioni del grid = quelle sul suo epic (v2 vive su un altro strumento)

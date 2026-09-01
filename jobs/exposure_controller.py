@@ -17,6 +17,7 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+from src.capital_client import equity_conto
 from src.config import load_config
 from src.exposure_config import load_exposure_config
 from src.exposure_controller import plan_exposure
@@ -259,7 +260,7 @@ def main() -> int:
     # aperte. Cosi' il guadagno flottante fa crescere N_max e il compounding e'
     # automatico (non serve chiudere per aumentare la capacita' di esposizione).
     _bal = acc.get("balance") or {}
-    equity = float(_bal.get("balance") or 0.0) + float(_bal.get("profitLoss") or 0.0)
+    equity = equity_conto(_bal)
 
     # --- volatilita' da candele giornaliere ---
     prices = capital.get_prices(epic, resolution="DAY", max_bars=400)

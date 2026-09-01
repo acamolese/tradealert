@@ -17,7 +17,7 @@ import sys
 from src.config import load_config
 from src.db import Database
 from src.exposure_config import load_exposure_config
-from src.capital_client import CapitalClient
+from src.capital_client import CapitalClient, equity_conto
 from src.executor import _market_meta
 from src.leverage import real_leverage
 from src.risk import quote_to_ref_factor
@@ -45,7 +45,7 @@ def main() -> int:
     capital.login()
     acc = (capital.get_account_info().get("accounts") or [{}])[0]
     bal = acc.get("balance") or {}
-    equity = float(bal.get("balance") or 0.0) + float(bal.get("profitLoss") or 0.0)
+    equity = equity_conto(bal)
     lev_map = capital.get_leverages_map()
 
     print(f"Tabellone {last}: {len(board)} candidati (top {topn} per g_exec)")

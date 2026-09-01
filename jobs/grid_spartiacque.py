@@ -22,14 +22,14 @@ TAGLIO = "2026-08-21T11:31"
 
 
 def raccogli(env: str, nome: str) -> dict:
-    from src.capital_client import CapitalClient
+    from src.capital_client import CapitalClient, equity_conto
     from jobs.account_truth import fetch_transactions, _amount
 
     os.environ["CAPITAL_ENV"] = env
     cap = CapitalClient(load_config())
     cap.login()
     bal = (cap.get_account_info().get("accounts") or [{}])[0].get("balance") or {}
-    equity = float(bal.get("balance") or 0) + float(bal.get("profitLoss") or 0)
+    equity = equity_conto(bal)
 
     tx = fetch_transactions(cap, 4)
     tr = [t for t in tx if t.get("transactionType") == "TRADE"]

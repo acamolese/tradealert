@@ -102,13 +102,19 @@ def _baseline_giorno(env: str, equity: float) -> float:
 def raccogli(capital, env: str, nome: str, n_ultimi: int = 10) -> Conto:
     """Fotografia di un conto: saldo, posizioni, movimenti e P&L da broker."""
     from jobs.account_truth import fetch_transactions
+    from src.capital_client import cash_conto, equity_conto, flottante_conto
 
     c = Conto(nome=nome, env=env)
     acc = (capital.get_account_info().get("accounts") or [{}])[0]
     bal = acc.get("balance") or {}
-    c.saldo = float(bal.get("balance") or 0)
-    c.flottante = float(bal.get("profitLoss") or 0)
-    c.equity = c.saldo + c.flottante
+    # ATTENZIONE alla semantica di Capital (verificata il 01/09 su entrambi i
+    # conti): "deposit" e' il cash, "profitLoss" il flottante delle posizioni
+    # aperte e "balance" e' GIA' la somma dei due, cioe' l'equity che l'app
+    # mostra. Sommare balance+profitLoss contava il flottante due volte e faceva
+    # leggere 49.27€ dove Capital diceva 51.06€.
+    c.equity = equity_conto(bal)
+    c.flottante = flottante_conto(bal)
+    c.saldo = cash_conto(bal)
 
     st = DATA / f"g2_profit_{env}.json"
     if st.exists():
@@ -181,7 +187,8 @@ def _riga_conto(c: Conto) -> str:
                         f"({p['pnl']:+.2f}€)" for p in c.posizioni)
         righe.append(f"   aperte: {det}")
         righe.append(f"   flottante inventario: {c.flottante:+.2f}€ "
-                     f"(scorta del grid, normale che sia sotto)")
+                     f"(GIA' dentro l'equity qui sopra; scorta del grid, "
+                     f"normale che sia sotto)")
     else:
         righe.append("   aperte: nessuna")
     return "\n".join(righe)

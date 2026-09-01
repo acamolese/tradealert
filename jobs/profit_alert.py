@@ -36,7 +36,7 @@ def main() -> int:
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     dry = "--dry-run" in sys.argv
 
-    from src.capital_client import CapitalClient
+    from src.capital_client import CapitalClient, equity_conto, flottante_conto
     from src.db import Database
     from src.telegram_client import TelegramClient
 
@@ -48,8 +48,8 @@ def main() -> int:
 
     acc = (capital.get_account_info().get("accounts") or [{}])[0]
     bal = acc.get("balance") or {}
-    balance = float(bal.get("balance") or 0.0)     # realizzato
-    floating = float(bal.get("profitLoss") or 0.0)  # flottante (upl posizioni)
+    balance = equity_conto(bal)                     # equity (cash + flottante)
+    floating = flottante_conto(bal)                 # flottante (upl posizioni)
     if balance <= 0:
         log.info("balance non leggibile, skip.")
         return 0
