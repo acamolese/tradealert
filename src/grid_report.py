@@ -312,8 +312,8 @@ def messaggio_aiuto() -> str:
             "/ferma prova · lo stesso sul conto di prova\n"
             "/riparti reale · fa ripartire il conto reale dalla cifra attuale\n"
             "/riparti prova · lo stesso sul conto di prova\n\n"
-            "<i>Messaggi automatici: buongiorno alle 8, chiusura alle 22:30 nei "
-            "giorni di mercato, riepilogo della settimana la domenica sera. "
+            "<i>Messaggi automatici: riepilogo ogni ora, buongiorno alle 8, "
+            "riepilogo della settimana la domenica sera. "
             "Gli avvisi importanti arrivano subito.</i>")
 
 

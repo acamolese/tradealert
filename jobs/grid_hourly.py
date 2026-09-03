@@ -3,11 +3,12 @@
 Legge entrambi i conti nella stessa esecuzione: e' l'unico modo per confrontare
 la stessa strategia a taglie diverse.
 
-Dal 2026-09-03 non c'e' piu' il riepilogo ogni ora (24 messaggi al giorno,
-anche di notte e nel weekend a mercati chiusi): arrivano un buongiorno alle 8 e
-una chiusura alle 22:30 nei giorni di mercato, il resto si chiede con /stato.
+Il riepilogo ogni ora resta (richiesta esplicita dell'utente del 2026-09-03:
+"lo voglio comunque almeno ogni ora"), nel formato nuovo; in piu' un buongiorno
+alle 8 con lo stato del sistema. Il resto si chiede con /stato.
 
 Uso:
+  python -m jobs.grid_hourly --orario         # riepilogo orario (cron)
   python -m jobs.grid_hourly --mattina        # buongiorno
   python -m jobs.grid_hourly --sera           # chiusura di giornata
   python -m jobs.grid_hourly                  # situazione adesso (come /stato)
@@ -83,6 +84,8 @@ def main() -> int:
         testo = messaggio_mattina(conti, sistema_ok())
     elif "--sera" in sys.argv:
         testo = messaggio_sera(conti)
+    elif "--orario" in sys.argv:
+        testo = messaggio_stato(conti, "Riepilogo orario")
     elif "--posizioni" in sys.argv:
         testo = messaggio_posizioni(conti)
     elif "--oggi" in sys.argv or n:
