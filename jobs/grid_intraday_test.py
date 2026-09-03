@@ -14,7 +14,7 @@ costo overnight stimato dai SWAP addebitati, e confronta:
 
 Uso:
   python -m jobs.grid_intraday_test [--giorni 180] [--finestra 30] [--hop 10]
-                                    [--epic US100,GOLD] [--refresh]
+                                    [--epic US100,GOLD] [--refresh] [--res MINUTE_5]
 I prezzi vengono messi in cache in data/cache/ (il demo e il reale hanno gli
 stessi prezzi, si puo' lanciare in locale).
 """
@@ -42,8 +42,10 @@ def _arg(name, default):
     return default
 
 
-def fetch_15m(capital, epic: str, giorni: int, refresh: bool) -> list[dict]:
-    f = CACHE / f"15m_{epic}.json"
+def fetch_15m(capital, epic: str, giorni: int, refresh: bool,
+              res: str = "MINUTE_15") -> list[dict]:
+    tag = {"MINUTE_15": "15m", "MINUTE_5": "5m", "MINUTE_30": "30m", "HOUR": "1h"}.get(res, res)
+    f = CACHE / f"{tag}_{epic}.json"
     if f.exists() and not refresh:
         d = json.loads(f.read_text())
         if d.get("giorni", 0) >= giorni:
@@ -53,10 +55,11 @@ def fetch_15m(capital, epic: str, giorni: int, refresh: bool) -> list[dict]:
     out, seen = [], set()
     cur = start
     while cur < end:
-        nxt = min(end, cur + timedelta(days=10))
+        passo_gg = {"MINUTE_5": 3, "MINUTE_15": 10}.get(res, 10)
+        nxt = min(end, cur + timedelta(days=passo_gg))
         r = capital._session.get(
             capital._url(f"/prices/{epic}"), headers=capital._auth_headers(),
-            params={"resolution": "MINUTE_15", "max": 1000,
+            params={"resolution": res, "max": 1000,
                     "from": cur.strftime("%Y-%m-%dT%H:%M:%S"),
                     "to": nxt.strftime("%Y-%m-%dT%H:%M:%S")}, timeout=30)
         if r.status_code != 200:
@@ -206,6 +209,7 @@ def main() -> int:
     refresh = "--refresh" in sys.argv
     max_unita = int(_arg("--max-unita", 2))
     periodo = int(_arg("--ema", 5))
+    res = _arg("--res", "MINUTE_15")
 
     from src.capital_client import CapitalClient
     CACHE.mkdir(parents=True, exist_ok=True)
@@ -214,11 +218,11 @@ def main() -> int:
 
     dati = {}
     for ep in epics:
-        b = fetch_15m(cap, ep, giorni, refresh)
+        b = fetch_15m(cap, ep, giorni, refresh, res)
         d = fetch_day(cap, ep, refresh)
         noz = nozionale_unita(cap, ep)
         dati[ep] = (b, ema_per_giorno(d, periodo), noz)
-        print(f"{ep}: {len(b)} barre 15m dal {b[0]['t'][:10] if b else '?'}, "
+        print(f"{ep}: {len(b)} barre {res} dal {b[0]['t'][:10] if b else '?'}, "
               f"{len(d)} barre DAY, unita' = {noz:.1f}€")
 
     print(f"\nFinestre di {fin} giorni, hop {hop}, max {max_unita} unita', EMA{periodo}, "
