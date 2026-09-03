@@ -25,8 +25,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from src.config import load_config
-from src.grid_net import pianifica_net, livello, ancora_mobile
+from src.grid_net import pianifica_net, livello, ancora_mobile, barre_chiuse
 from src.grid_profit import valuta
+from src.grid_control import (avvisa_lettura_fallita, eur, leggi_equity,
+                              nome_conto, parola_conto)
 
 log = logging.getLogger(__name__)
 DATA = Path(__file__).resolve().parent.parent / "data"
@@ -59,7 +61,7 @@ def main() -> int:
     stop = "--stop" in sys.argv
     riparti = "--riparti" in sys.argv
 
-    from src.capital_client import CapitalClient, equity_conto
+    from src.capital_client import CapitalClient
     from src.telegram_client import TelegramClient
     from src.executor import _market_meta
 
@@ -93,6 +95,16 @@ def main() -> int:
     # restano notificati solo gli eventi che richiedono attenzione: soglie di
     # profitto, kill switch, blocchi ed errori.
     notifica_mosse = _env("NOTIFICA_MOSSE", "false").strip().lower() == "true"
+    # Isteresi da grid classico e ancoraggio sulle sole barre chiuse
+    # (2026-09-03): disponibili ma SPENTI. Il 79% dei fill reali dista <0.15%
+    # dal precedente e il passo del 3% non viene mai incassato per intero, ma il
+    # backtest a 15 minuti (`jobs/grid_intraday_test.py`, 180 giorni, 8
+    # strumenti, calibrato sui fill reali) dice che questo mean-reversion ad
+    # alta frequenza rende +0.39€/30gg a finestra con 68% di finestre positive,
+    # e l'isteresi NON lo batte (3%: +0.35€, 48%). Si accendono solo dopo un
+    # nuovo backtest che dica il contrario.
+    isteresi = _env("ISTERESI", "false").strip().lower() == "true"
+    ema_chiusa = _env("EMA_CHIUSA", "false").strip().lower() == "true"
 
     if not enabled and not dry and not stop:
         log.info("profilo %s disabilitato", PROFILO or "(default)")
@@ -103,20 +115,11 @@ def main() -> int:
     telegram = TelegramClient(v1)
 
     if riparti:
-        # sblocca dopo un blocco per obiettivo raggiunto e riparte dal valore
-        # attuale del conto: il guadagno incassato diventa la nuova base.
-        acc0 = (capital.get_account_info().get("accounts") or [{}])[0]
-        b0 = acc0.get("balance") or {}
-        eq0 = equity_conto(b0)
-        PS = DATA / f"g2_profit_{v1.capital_env}.json"
-        PS.write_text(json.dumps({"baseline": round(eq0, 2), "avvisate": [],
-                                  "bloccato": False,
-                                  "creato": datetime.now(timezone.utc).isoformat()}, indent=1))
-        telegram.send_message(
-            f"▶️ <b>Grid ripartiti</b>\nNuova base: {eq0:.2f}€\n"
-            f"Prossimo avviso a +{_f('PROFIT_ALERT_EUR', 10.0):.0f}€, "
-            f"pausa a +{_f('PROFIT_STOP_EUR', 20.0):.0f}€.")
-        print(f"ripartito da baseline {eq0:.2f}€")
+        # sblocca dopo una pausa e riparte dal valore attuale del conto: il
+        # guadagno (o la perdita) diventa la nuova base. Stessa funzione del
+        # comando Telegram /riparti.
+        from src.grid_control import riparti as _riparti
+        print(_riparti(v1.capital_env, telegram, profit_alert, profit_stop))
         return 0
 
     mk = capital.get_market(epic)
@@ -128,9 +131,14 @@ def main() -> int:
         log.error("nessun prezzo per %s", epic)
         return 1
 
-    acc = (capital.get_account_info().get("accounts") or [{}])[0]
-    bal = acc.get("balance") or {}
-    equity = equity_conto(bal)
+    # Lettura SICURA del conto (fix 2026-09-03): se il broker non risponde o
+    # risponde vuoto, questo run non decide nulla. Prima una risposta vuota
+    # veniva letta come equity 0,00 € e faceva scattare lo stop di perdita.
+    equity = leggi_equity(capital)
+    if equity is None:
+        if not dry:
+            avvisa_lettura_fallita(telegram, v1.capital_env)
+        return 1
 
     # taglia di una unita' dal budget (margine), altrimenti la minima del broker
     from src.risk import quote_to_ref_factor
@@ -161,12 +169,16 @@ def main() -> int:
     if ema_periodo > 0:
         # riferimento = media mobile del prezzo: segue la tendenza invece di
         # restare inchiodato al giorno in cui il grid e' partito.
-        closes = []
-        for x in capital.get_prices(epic, resolution="DAY",
-                                    max_bars=max(30, ema_periodo * 5)):
-            cp = x.get("closePrice") or {}
-            if cp.get("bid") and cp.get("ask"):
-                closes.append((float(cp["bid"]) + float(cp["ask"])) / 2)
+        prices = capital.get_prices(epic, resolution="DAY",
+                                    max_bars=max(30, ema_periodo * 5))
+        if ema_chiusa:
+            closes = barre_chiuse(prices, datetime.now(timezone.utc).date().isoformat())
+        else:
+            closes = []
+            for x in prices:
+                cp = x.get("closePrice") or {}
+                if cp.get("bid") and cp.get("ask"):
+                    closes.append((float(cp["bid"]) + float(cp["ask"])) / 2)
         p0 = ancora_mobile(closes, ema_periodo) if closes else prezzo
         if not p0:
             log.error("ancoraggio non calcolabile per %s", epic)
@@ -189,7 +201,9 @@ def main() -> int:
                 log.error("chiusura %s fallita: %s", d, exc)
         if STATE.exists():
             STATE.unlink()
-        telegram.send_message(f"⏹️ <b>Grid {epic} fermato</b> ({len(deals)} posizioni chiuse)")
+        telegram.send_message(
+            f"⏹️ <b>{nome_conto(v1.capital_env)}: grid {epic} fermato</b> "
+            f"({len(deals)} posizioni chiuse)")
         return 0
 
     # --- soglie di profitto, stato condiviso da tutti i grid dello STESSO conto ---
@@ -213,6 +227,15 @@ def main() -> int:
 
     # perdita: stessa meccanica, segno opposto
     perdita = float(ps["baseline"]) - equity
+    # Sanity (fix 2026-09-03): una "perdita" di oltre meta' del conto in un
+    # singolo run non e' un evento di mercato con queste taglie (il kill per
+    # profilo scatta molto prima), e' una lettura sbagliata: non si decide.
+    if perdita > 0.5 * float(ps["baseline"]):
+        log.error("perdita %.2f€ non plausibile su base %.2f€: lettura sospetta, "
+                  "nessuna decisione", perdita, float(ps["baseline"]))
+        if not dry:
+            avvisa_lettura_fallita(telegram, v1.capital_env)
+        return 1
     if not ps.get("bloccato") and loss_stop > 0 and perdita >= loss_stop:
         chiuse = 0
         for d in deals:
@@ -224,13 +247,15 @@ def main() -> int:
         ps["bloccato"] = True
         ps["bloccato_per"] = "perdita"
         ps["bloccato_a"] = round(equity, 2)
+        ps["bloccato_il"] = datetime.now(timezone.utc).isoformat()
         if not dry:
             PSTATE.write_text(json.dumps(ps, indent=1))
             telegram.send_message(
-                f"🛑 <b>Stop perdita: -{perdita:.2f}€</b>\n"
-                f"da {ps['baseline']:.2f}€ a <b>{equity:.2f}€</b>\n"
-                f"Chiuse {chiuse} posizioni, tutti i grid in pausa.\n"
-                f"<i>Nessun grid riapre finche' non decidi. Usa /stat per i dettagli.</i>")
+                f"🛑 <b>Stop di perdita sul {nome_conto(v1.capital_env).lower()}</b>\n"
+                f"Il conto è sceso da {eur(float(ps['baseline']))} a "
+                f"<b>{eur(equity)}</b> ({eur(-perdita, True)}).\n"
+                f"Ho chiuso {chiuse} posizioni e fermato tutti i grid di questo conto.\n"
+                f"Per ripartire da {eur(equity)}: /riparti {parola_conto(v1.capital_env)}")
         log.warning("STOP PERDITA: -%.2f€, chiuse %d posizioni", perdita, chiuse)
         return 0
     if (not ps.get("bloccato") and loss_alert > 0 and perdita >= loss_alert
@@ -239,9 +264,10 @@ def main() -> int:
         if not dry:
             PSTATE.write_text(json.dumps(ps, indent=1))
             telegram.send_message(
-                f"⚠️ <b>Conto in perdita di {perdita:.2f}€</b>\n"
-                f"da {ps['baseline']:.2f}€ a {equity:.2f}€\n"
-                f"Il sistema continua. A -{loss_stop:.0f}€ chiude tutto e si ferma.")
+                f"⚠️ <b>{nome_conto(v1.capital_env)} in perdita di {eur(perdita)}</b>\n"
+                f"da {eur(float(ps['baseline']))} a {eur(equity)}.\n"
+                f"Il sistema continua. Se arriva a {eur(-loss_stop, True)} chiude "
+                f"tutto e si ferma da solo.")
 
     if v.stato == "gia_bloccato":
         log.info("%s: sistema in pausa (obiettivo raggiunto), nessuna operazione", epic)
@@ -251,10 +277,10 @@ def main() -> int:
         ps.setdefault("avvisate", []).append(v.soglia_colpita)
         PSTATE.write_text(json.dumps(ps, indent=1))
         telegram.send_message(
-            f"🔔 <b>Conto cresciuto di {v.guadagno:+.2f}€</b>\n"
-            f"da {v.baseline:.2f}€ a {equity:.2f}€\n"
-            f"Il sistema continua a lavorare. Al prossimo traguardo "
-            f"(+{profit_stop:.0f}€) si ferma da solo per farti decidere.")
+            f"🔔 <b>{nome_conto(v1.capital_env)} cresciuto di {eur(v.guadagno, True)}</b>\n"
+            f"da {eur(v.baseline)} a {eur(equity)}.\n"
+            f"Il sistema continua a lavorare. A {eur(profit_stop, True)} si ferma "
+            f"da solo per farti decidere cosa fare del guadagno.")
 
     if v.stato == "blocco" and not dry:
         chiuse = 0
@@ -269,20 +295,21 @@ def main() -> int:
         ps["bloccato_il"] = datetime.now(timezone.utc).isoformat()
         PSTATE.write_text(json.dumps(ps, indent=1))
         telegram.send_message(
-            f"🎯 <b>Obiettivo raggiunto: {v.guadagno:+.2f}€</b>\n"
-            f"da {v.baseline:.2f}€ a <b>{equity:.2f}€</b>\n"
-            f"Chiuse {chiuse} posizioni, tutti i grid in pausa.\n\n"
+            f"🎯 <b>{nome_conto(v1.capital_env)}: obiettivo raggiunto, "
+            f"{eur(v.guadagno, True)}</b>\n"
+            f"da {eur(v.baseline)} a <b>{eur(equity)}</b>.\n"
+            f"Ho chiuso {chiuse} posizioni e fermato i grid di questo conto.\n\n"
             f"Ora puoi scegliere:\n"
-            f"• <b>incassare</b> il guadagno e ripartire dalla taglia di prima\n"
-            f"• <b>reinvestire</b>: alzare il budget dei grid e ripartire piu' grande\n"
-            f"• <b>ripartire uguale</b> senza toccare nulla\n"
-            f"<i>Finche' non scegli, nessun grid apre posizioni.</i>")
+            f"• <b>incassare</b>: prelevi il guadagno e riparti come prima\n"
+            f"• <b>reinvestire</b>: alzi i budget e riparti più grande\n"
+            f"• <b>ripartire uguale</b>: /riparti {parola_conto(v1.capital_env)}\n"
+            f"<i>Finché non scegli, nessun grid apre posizioni.</i>")
         log.warning("BLOCCO profitto: %s, chiuse %d posizioni", v.messaggio, chiuse)
         return 0
 
     piano = pianifica_net(prezzo, p0, step, unita_correnti, max_unita=max_unita,
                           pnl_aperto=pnl, kill_pnl_eur=kill_pnl, equity=equity,
-                          kill_equity_eur=kill_eq)
+                          kill_equity_eur=kill_eq, isteresi=isteresi)
 
     log.info("%s %.4f | p0 %.4f | grad %d | netta %+.0f -> %+d | %s | %s",
              epic, prezzo, p0, piano.livello, unita_correnti, piano.unita_target,
@@ -290,7 +317,8 @@ def main() -> int:
 
     if dry:
         print(f"\n=== {epic} (profilo {PROFILO or 'default'}) ===")
-        print(f"  prezzo {prezzo:.4f} | ancoraggio {p0:.4f} | passo {step:.2%}")
+        print(f"  prezzo {prezzo:.4f} | ancoraggio {p0:.4f} | passo {step:.2%} | "
+              f"isteresi {'si' if isteresi else 'no'} | EMA {'chiusa' if ema_chiusa else 'con barra corrente'}")
         print(f"  unita': {unit_size} = {unit_size*prezzo*q2r:.2f}€ nozionale, "
               f"max {max_unita} | budget {budget:.0f}€")
         print(f"  posizione netta: {unita_correnti:+.1f} unita' -> target "
@@ -323,15 +351,21 @@ def main() -> int:
     nuova = piano.unita_target
     icona = "🛑" if piano.azione == "kill" else ("🟢" if piano.delta > 0 else "🔴")
     verso = "LONG" if nuova > 0 else ("SHORT" if nuova < 0 else "FLAT")
-    if notifica_mosse or piano.azione == "kill":
+    if piano.azione == "kill":
+        from src.grid_control import nome_strumento
+        telegram.send_message(
+            f"🛑 <b>{nome_conto(v1.capital_env)}: chiuso {nome_strumento(epic)}</b>\n"
+            f"Perdita aperta oltre il limite di questo strumento: ho azzerato la "
+            f"posizione ({eur(pnl, True)}). Gli altri grid continuano.\n"
+            f"<i>{_esc(piano.motivo)}</i>")
+    elif notifica_mosse:
         telegram.send_message(
             f"{icona} <b>{epic}</b>  {'compra' if piano.delta > 0 else 'vende'} "
             f"{abs(piano.delta):.0f} unita' a {fill}\n"
             f"posizione: <b>{nuova:+d} unita' {verso}</b> "
             f"({abs(nuova)*unit_size*prezzo*q2r:.0f}€ di esposizione)\n"
             f"prezzo {prezzo:.4f} | riferimento {p0:.4f} | gradino {piano.livello}\n"
-            f"P&L aperto {pnl:+.2f}€ | conto {equity:.2f}€"
-            + (f"\n<i>{_esc(piano.motivo)}</i>" if piano.azione == "kill" else ""))
+            f"P&L aperto {pnl:+.2f}€ | conto {equity:.2f}€")
     log.info("ESEGUITO %s %s @ %s -> netta %+d unita'", direzione, size_ordine, fill, nuova)
 
     # stop di catastrofe sulla posizione risultante (gate: mai denaro reale senza SL)

@@ -1,32 +1,38 @@
-"""Riepilogo dell'attivita' dei grid, sui DUE conti insieme.
+"""Riepilogo dell'attivita' dei grid sui DUE conti, in parole semplici.
 
-Serve sia il messaggio orario automatico sia i comandi Telegram su richiesta
-(/stat, /stat10, /conti). Fonte dei numeri: sempre il BROKER
+Serve i messaggi automatici (mattina, sera) e i comandi Telegram su richiesta
+(/stato, /posizioni, /oggi). Fonte dei numeri: sempre il BROKER
 (/history/transactions + posizioni + saldo), mai il DB, i cui pnl hanno segno
 inaffidabile.
 
-Un conto solo non basta a capire: reale e demo girano con la stessa logica ma
-taglie diverse, e il confronto dice se una differenza di risultato viene dalla
-strategia o dalla dimensione.
+Riscritto il 2026-09-03 (controanalisi): il vecchio riepilogo orario parlava la
+lingua del broker (equity, flottante, realizzato, mosse, baseline), metteva tre
+P&L diversi nello stesso blocco e arrivava 24 volte al giorno anche a mercati
+chiusi. Regole nuove: una domanda per riga (quanto ho, come e' andata oggi,
+come va da quando e' partito), parole di tutti i giorni, il dettaglio si chiede.
 """
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from src.grid_control import (descrizione_pausa, eur, leggi_equity, nome_conto,
+                              nome_strumento, parola_conto)
+
 ROMA = ZoneInfo("Europe/Rome")
+DATA = Path(__file__).resolve().parent.parent / "data"
+
+GIORNI = ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"]
+MESI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio",
+        "agosto", "settembre", "ottobre", "novembre", "dicembre"]
 
 
 def ora_locale(iso_utc: str, fmt: str = "%d/%m %H:%M") -> str:
-    """Converte un timestamp UTC del broker in ora italiana.
-
-    L'API Capital lavora in UTC (verificato il 21/08: le query con orari UTC
-    trovano i movimenti, quelle con orari locali no), ma i messaggi li legge una
-    persona che guarda l'orologio italiano: mostrarli in UTC ha gia' generato
-    confusione. I CONFRONTI restano in UTC, si converte solo per la stampa.
-    """
+    """Converte un timestamp UTC del broker in ora italiana (solo per la
+    stampa: i confronti restano in UTC)."""
     if not iso_utc:
         return "?"
     try:
@@ -36,9 +42,11 @@ def ora_locale(iso_utc: str, fmt: str = "%d/%m %H:%M") -> str:
         return dt.astimezone(ROMA).strftime(fmt)
     except ValueError:
         return iso_utc[:16]
-from pathlib import Path
 
-DATA = Path(__file__).resolve().parent.parent / "data"
+
+def data_estesa(dt: datetime | None = None) -> str:
+    dt = dt or datetime.now(ROMA)
+    return f"{GIORNI[dt.weekday()]} {dt.day} {MESI[dt.month - 1]}"
 
 
 def _amount(t: dict) -> float:
@@ -52,6 +60,7 @@ def _amount(t: dict) -> float:
 class Conto:
     nome: str
     env: str
+    ok: bool = True                 # False = broker non leggibile
     equity: float = 0.0
     saldo: float = 0.0
     flottante: float = 0.0
@@ -59,12 +68,12 @@ class Conto:
     baseline_data: str = ""
     equity_giorno: float | None = None
     bloccato: bool = False
+    pausa: str = ""
     posizioni: list = field(default_factory=list)
-    movimenti_ora: int = 0
     movimenti_oggi: int = 0
-    realizzato_ora: float = 0.0
     realizzato_oggi: float = 0.0
     costi_oggi: float = 0.0
+    oggi: list = field(default_factory=list)
     ultimi: list = field(default_factory=list)
 
     @property
@@ -73,16 +82,13 @@ class Conto:
 
     @property
     def guadagno_oggi(self) -> float:
-        """Delta equity da inizio giornata (mezzanotte italiana). E' la risposta
-        a "come sto andando OGGI": include il flottante, che il solo realizzato
-        nasconde (il grid porta per costruzione inventario momentaneamente
-        negativo, e contare solo i gradini chiusi ha gia' generato confusione)."""
+        """Delta equity da inizio giornata (mezzanotte italiana): include le
+        posizioni aperte, che il solo realizzato nasconde."""
         return (self.equity - self.equity_giorno) if self.equity_giorno else 0.0
 
 
 def _baseline_giorno(env: str, equity: float) -> float:
-    """Equity alla PRIMA lettura del giorno (ora italiana), persistita su file:
-    tutte le letture successive della giornata confrontano contro quella."""
+    """Equity alla PRIMA lettura del giorno (ora italiana), persistita su file."""
     st = DATA / f"g2_day_{env}.json"
     oggi = datetime.now(ROMA).date().isoformat()
     try:
@@ -99,20 +105,20 @@ def _baseline_giorno(env: str, equity: float) -> float:
     return equity
 
 
-def raccogli(capital, env: str, nome: str, n_ultimi: int = 10) -> Conto:
+def raccogli(capital, env: str, nome: str = "", n_ultimi: int = 10,
+             con_valore: bool = False) -> Conto:
     """Fotografia di un conto: saldo, posizioni, movimenti e P&L da broker."""
     from jobs.account_truth import fetch_transactions
-    from src.capital_client import cash_conto, equity_conto, flottante_conto
+    from src.capital_client import cash_conto, flottante_conto
 
-    c = Conto(nome=nome, env=env)
+    c = Conto(nome=nome or nome_conto(env), env=env)
+    eq = leggi_equity(capital)
+    if eq is None:
+        c.ok = False
+        return c
     acc = (capital.get_account_info().get("accounts") or [{}])[0]
     bal = acc.get("balance") or {}
-    # ATTENZIONE alla semantica di Capital (verificata il 01/09 su entrambi i
-    # conti): "deposit" e' il cash, "profitLoss" il flottante delle posizioni
-    # aperte e "balance" e' GIA' la somma dei due, cioe' l'equity che l'app
-    # mostra. Sommare balance+profitLoss contava il flottante due volte e faceva
-    # leggere 49.27€ dove Capital diceva 51.06€.
-    c.equity = equity_conto(bal)
+    c.equity = eq
     c.flottante = flottante_conto(bal)
     c.saldo = cash_conto(bal)
 
@@ -123,13 +129,14 @@ def raccogli(capital, env: str, nome: str, n_ultimi: int = 10) -> Conto:
             c.baseline = float(d.get("baseline") or 0) or None
             c.bloccato = bool(d.get("bloccato"))
             c.baseline_data = ora_locale(d.get("creato") or "", "%d/%m")
+            if c.bloccato:
+                c.pausa = descrizione_pausa(d)
         except Exception:
             pass
     c.equity_giorno = _baseline_giorno(env, c.equity)
 
     # aggregate per strumento: il broker tiene righe separate per ogni ordine
-    # nella stessa direzione (il netting scatta solo tra versi opposti), ma cio'
-    # che conta per il grid e' la posizione NETTA su ciascun mercato.
+    # nella stessa direzione, ma per il grid conta la posizione NETTA.
     agg: dict[str, dict] = {}
     for p in capital.get_open_positions():
         po, m = p.get("position", {}), p.get("market", {})
@@ -137,17 +144,26 @@ def raccogli(capital, env: str, nome: str, n_ultimi: int = 10) -> Conto:
         if (po.get("direction") or "").upper() == "SELL":
             s = -s
         ep = m.get("epic") or "?"
-        r = agg.setdefault(ep, {"epic": ep, "size": 0.0, "pnl": 0.0, "righe": 0})
+        r = agg.setdefault(ep, {"epic": ep, "size": 0.0, "pnl": 0.0, "righe": 0,
+                                "level": float(po.get("level") or 0),
+                                "bid": float(m.get("bid") or 0), "valore": None})
         r["size"] += s
         r["pnl"] += float(po.get("upl") or 0)
         r["righe"] += 1
+    if con_valore:
+        from src.risk import quote_to_ref_factor
+        for r in agg.values():
+            try:
+                mk = capital.get_market(r["epic"])
+                q2r = quote_to_ref_factor((mk.get("instrument") or {}).get("currency"),
+                                          capital) or 1.0
+                px = r["bid"] or float((mk.get("snapshot") or {}).get("bid") or 0)
+                r["valore"] = abs(r["size"]) * px * q2r
+            except Exception:
+                pass
     c.posizioni = sorted(agg.values(), key=lambda r: r["epic"])
 
-    ora = datetime.now(timezone.utc)
     tx = fetch_transactions(capital, 2)
-    lim_ora = (ora - timedelta(hours=1)).isoformat()
-    # "oggi" = da mezzanotte ITALIANA (convertita in UTC per confrontare con
-    # dateUtc del broker): il giorno UTC inizia alle 02:00 e confondeva i conteggi
     lim_gg = (datetime.now(ROMA).replace(hour=0, minute=0, second=0, microsecond=0)
               .astimezone(timezone.utc).isoformat())
     for t in tx:
@@ -155,69 +171,152 @@ def raccogli(capital, env: str, nome: str, n_ultimi: int = 10) -> Conto:
         tipo = t.get("transactionType")
         imp = _amount(t)
         if d >= lim_gg:
-            c.movimenti_oggi += 1 if tipo == "TRADE" else 0
-            c.realizzato_oggi += imp if tipo == "TRADE" else 0.0
-            if tipo in ("SWAP", "CORPORATE_ACTION"):
+            if tipo == "TRADE":
+                c.movimenti_oggi += 1
+                c.realizzato_oggi += imp
+                c.oggi.append(t)
+            elif tipo in ("SWAP", "CORPORATE_ACTION"):
                 c.costi_oggi += imp
-        if d >= lim_ora:
-            c.movimenti_ora += 1 if tipo == "TRADE" else 0
-            c.realizzato_ora += imp if tipo == "TRADE" else 0.0
+    c.oggi.reverse()
     c.ultimi = [t for t in reversed(tx) if t.get("transactionType") == "TRADE"][:n_ultimi]
     return c
 
 
-def _riga_conto(c: Conto) -> str:
-    # il semaforo dice come sta andando OGGI (equity da mezzanotte italiana):
-    # e' la domanda che si fa chi legge; il cumulato dall'avvio ha la sua riga
+# ---------------------------------------------------------------- messaggi
+
+def _icona(c: Conto) -> str:
+    return "💶" if c.env == "live" else "🧪"
+
+
+def _blocco_conto(c: Conto, con_posizioni: bool = True) -> str:
+    if not c.ok:
+        return (f"{_icona(c)} <b>{c.nome}</b>: il broker non risponde, "
+                f"riprovo più tardi.")
     seg = "🟢" if c.guadagno_oggi >= 0 else "🔴"
-    testa = f"{seg} <b>{c.nome}</b>  {c.equity:.2f}€"
-    if c.bloccato:
-        testa += "  ⏸ IN PAUSA"
-    righe = [testa,
-             f"   oggi: <b>{c.guadagno_oggi:+.2f}€</b> di equity | "
-             f"{c.movimenti_oggi} mosse chiuse {c.realizzato_oggi:+.2f}€ | "
-             f"costi {c.costi_oggi:+.2f}€"]
+    righe = [f"{_icona(c)} <b>{c.nome}: {eur(c.equity)}</b>"
+             + ("  ⏸ FERMO" if c.bloccato else ""),
+             f"   oggi: <b>{eur(c.guadagno_oggi, True)}</b>  {seg}"]
     if c.baseline:
         avvio = f" ({c.baseline_data})" if c.baseline_data else ""
-        righe.append(f"   dall'avvio{avvio}: {c.guadagno:+.2f}€")
-    righe.append(f"   ultima ora: {c.movimenti_ora} mosse, {c.realizzato_ora:+.2f}€")
-    if c.posizioni:
-        det = ", ".join(f"{p['epic']} {'+' if p['size'] > 0 else ''}{p['size']:g}"
-                        f"{'' if p['righe'] == 1 else f'×{p["righe"]}'} "
-                        f"({p['pnl']:+.2f}€)" for p in c.posizioni)
-        righe.append(f"   aperte: {det}")
-        righe.append(f"   flottante inventario: {c.flottante:+.2f}€ "
-                     f"(GIA' dentro l'equity qui sopra; scorta del grid, "
-                     f"normale che sia sotto)")
-    else:
-        righe.append("   aperte: nessuna")
+        righe.append(f"   da quando è partito{avvio}: {eur(c.guadagno, True)}")
+    if c.bloccato:
+        righe.append(f"   {c.pausa}")
+        righe.append(f"   Per farlo ripartire: /riparti {parola_conto(c.env)}")
+    if con_posizioni:
+        n = len(c.posizioni)
+        if n:
+            righe.append(f"   posizioni aperte: {n} (in tutto {eur(c.flottante, True)} "
+                         f"non ancora incassati)")
+        else:
+            righe.append("   posizioni aperte: nessuna")
     return "\n".join(righe)
 
 
-def messaggio_riepilogo(conti: list[Conto], titolo: str = "Riepilogo orario") -> str:
-    tot_mosse = sum(c.movimenti_oggi for c in conti)
-    tot_real = sum(c.realizzato_oggi for c in conti)
-    tot_eq = sum(c.guadagno_oggi for c in conti)
-    corpo = "\n\n".join(_riga_conto(c) for c in conti)
-    return (f"📊 <b>{titolo}</b>\n\n{corpo}\n\n"
-            f"<i>Oggi sui due conti: equity {tot_eq:+.2f}€ | {tot_mosse} mosse "
-            f"chiuse {tot_real:+.2f}€ realizzati.</i>")
+NESSUN_CONTO = "Non riesco a leggere i conti adesso, riprova tra qualche minuto."
 
 
-def messaggio_ultimi(conti: list[Conto], n: int) -> str:
+def messaggio_stato(conti: list[Conto], titolo: str = "Situazione adesso") -> str:
+    if not conti:
+        return NESSUN_CONTO
+    corpo = "\n\n".join(_blocco_conto(c) for c in conti)
+    costi = sum(c.costi_oggi for c in conti if c.ok)
+    ops = sum(c.movimenti_oggi for c in conti if c.ok)
+    coda = (f"\n\n<i>Oggi: {ops} operazioni chiuse, costi del broker "
+            f"{eur(costi, True)}. Dettagli: /posizioni, /oggi</i>")
+    return f"📊 <b>{titolo}</b> · {data_estesa()}\n\n{corpo}{coda}"
+
+
+def messaggio_sera(conti: list[Conto]) -> str:
+    return messaggio_stato(conti, "Chiusura di giornata").replace("📊", "🌙", 1)
+
+
+def messaggio_mattina(conti: list[Conto], sistema_ok: bool | None = None) -> str:
+    if not conti:
+        return NESSUN_CONTO
+    righe = [f"☀️ <b>Buongiorno</b> · {data_estesa()}"]
+    for c in conti:
+        if not c.ok:
+            righe.append(f"{_icona(c)} {c.nome}: il broker non risponde.")
+            continue
+        stato = " (fermo)" if c.bloccato else ""
+        righe.append(f"{_icona(c)} {c.nome}: {eur(c.equity)}{stato}"
+                     + (f", da quando è partito {eur(c.guadagno, True)}" if c.baseline else ""))
+    if sistema_ok is True:
+        righe.append("Sistema: ✅ tutto regolare.")
+    elif sistema_ok is False:
+        righe.append("Sistema: ⚠️ c'è un avviso, guarda il messaggio del controllo.")
+    fermi = [c for c in conti if c.ok and c.bloccato]
+    for c in fermi:
+        righe.append(f"{c.nome}: {c.pausa} Per ripartire: /riparti {parola_conto(c.env)}")
+    return "\n".join(righe)
+
+
+def _riga_posizione(p: dict) -> str:
+    verso = "comprato" if p["size"] > 0 else "venduto"
+    val = f", vale {eur(p['valore'])}" if p.get("valore") else f" ({abs(p['size']):g})"
+    return f"• {nome_strumento(p['epic'])}: {verso}{val}, per ora {eur(p['pnl'], True)}"
+
+
+def messaggio_posizioni(conti: list[Conto]) -> str:
+    if not conti:
+        return NESSUN_CONTO
     blocchi = []
     for c in conti:
-        if not c.ultimi:
-            blocchi.append(f"<b>{c.nome}</b>: nessun movimento recente")
+        if not c.ok:
+            blocchi.append(f"{_icona(c)} <b>{c.nome}</b>: il broker non risponde.")
+            continue
+        if not c.posizioni:
+            blocchi.append(f"{_icona(c)} <b>{c.nome}</b>: nessuna posizione aperta.")
+            continue
+        righe = [f"{_icona(c)} <b>{c.nome}</b>"] + [_riga_posizione(p) for p in c.posizioni]
+        blocchi.append("\n".join(righe))
+    nota = ("\n\n<i>Il grid tiene queste posizioni come scorta: è normale che siano "
+            "in leggera perdita finché il prezzo non torna al livello di vendita.</i>")
+    return "📌 <b>Posizioni aperte</b>\n\n" + "\n\n".join(blocchi) + nota
+
+
+def messaggio_oggi(conti: list[Conto], n: int = 0) -> str:
+    """Operazioni chiuse oggi (o le ultime n se n > 0)."""
+    if not conti:
+        return NESSUN_CONTO
+    blocchi = []
+    for c in conti:
+        if not c.ok:
+            blocchi.append(f"{_icona(c)} <b>{c.nome}</b>: il broker non risponde.")
+            continue
+        lista = c.ultimi[:n] if n else c.oggi
+        if not lista:
+            blocchi.append(f"{_icona(c)} <b>{c.nome}</b>: nessuna operazione"
+                           + (" oggi." if not n else " recente."))
             continue
         righe = []
-        for t in c.ultimi[:n]:
-            q = ora_locale(t.get("dateUtc") or "")
+        for t in lista:
             imp = _amount(t)
-            ic = "🟢" if imp >= 0 else "🔴"
-            righe.append(f"{ic} {q}  {t.get('instrumentName', '?'):<9} {imp:+.2f}€")
-        somma = sum(_amount(t) for t in c.ultimi[:n])
-        blocchi.append(f"<b>{c.nome}</b> (ultimi {len(c.ultimi[:n])}, "
-                       f"totale {somma:+.2f}€)\n" + "\n".join(righe))
-    return (f"🧾 <b>Ultimi movimenti</b> <i>(ora italiana)</i>\n\n"
-            + "\n\n".join(blocchi))
+            ic = "🟢" if imp > 0 else ("🔴" if imp < 0 else "⚪")
+            righe.append(f"{ic} {ora_locale(t.get('dateUtc') or '', '%H:%M')}  "
+                         f"{nome_strumento(t.get('instrumentName', '?'))}  {eur(imp, True)}")
+        somma = sum(_amount(t) for t in lista)
+        titolo = f"ultime {len(lista)}" if n else f"{len(lista)} oggi"
+        blocchi.append(f"{_icona(c)} <b>{c.nome}</b> ({titolo}, totale {eur(somma, True)})\n"
+                       + "\n".join(righe))
+    testa = "🧾 <b>Operazioni chiuse</b>" + ("" if n else f" · {data_estesa()}")
+    return testa + "\n\n" + "\n\n".join(blocchi)
+
+
+def messaggio_aiuto() -> str:
+    return ("ℹ️ <b>Comandi</b>\n"
+            "/stato · quanto ho e come sta andando, adesso\n"
+            "/posizioni · le posizioni aperte, spiegate\n"
+            "/oggi · le operazioni chiuse oggi (/oggi10 = le ultime 10)\n"
+            "/ferma reale · chiude tutto sul conto reale e lo mette in pausa\n"
+            "/ferma prova · lo stesso sul conto di prova\n"
+            "/riparti reale · fa ripartire il conto reale dalla cifra attuale\n"
+            "/riparti prova · lo stesso sul conto di prova\n\n"
+            "<i>Messaggi automatici: buongiorno alle 8, chiusura alle 22:30 nei "
+            "giorni di mercato, riepilogo della settimana la domenica sera. "
+            "Gli avvisi importanti arrivano subito.</i>")
+
+
+# compatibilita' con i vecchi nomi (comandi /stat, /statN)
+messaggio_riepilogo = messaggio_stato
+messaggio_ultimi = messaggio_oggi

@@ -129,21 +129,21 @@ def weekly_snapshot(capital, db, telegram=None) -> dict:
     }
 
     if telegram:
-        seg = "n/d (prima settimana)" if snap["delta_equity"] is None else \
-              f"{snap['delta_equity']:+.2f}€ ({snap['pct']:+.2f}%)"
+        from src.grid_control import eur, nome_conto
+        seg = "prima settimana, ancora niente da confrontare" if snap["delta_equity"] is None else \
+              f"{eur(snap['delta_equity'], True)} ({snap['pct']:+.1f}%)".replace(".", ",")
         costo_anno = snap["financing"] / 7 * 365
         telegram.send_message(
-            f"📊 <b>Settimana — resa oggettiva</b>\n"
-            f"Equity: <b>{snap['equity']:.2f}€</b> (cash {snap['cash']:.2f} + "
-            f"flottante {snap['floating']:+.2f})\n"
-            f"Variazione: <b>{seg}</b>\n\n"
+            f"📅 <b>La settimana del {nome_conto(capital.config.capital_env).lower()}</b>\n"
+            f"Conto: <b>{eur(snap['equity'])}</b>, questa settimana <b>{seg}</b>\n\n"
             f"Da cosa viene:\n"
-            f"• trade chiusi {snap['trade']:+.2f}€\n"
-            f"• interessi overnight <b>{snap['financing']:+.2f}€</b>\n"
-            f"• dividendi {snap['dividendi']:+.2f}€\n"
-            f"• movimenti: {snap['movimenti']} | posizioni aperte: {snap['posizioni']}\n\n"
-            f"<i>Al ritmo attuale la sola detenzione costa {costo_anno:.2f}€/anno "
-            f"({abs(costo_anno)/snap['equity']*100:.1f}% dell'equity).</i>"
+            f"• operazioni chiuse: {eur(snap['trade'], True)}\n"
+            f"• costi notturni del broker: <b>{eur(snap['financing'], True)}</b>\n"
+            f"• dividendi: {eur(snap['dividendi'], True)}\n"
+            f"• posizioni ancora aperte: {eur(snap['floating'], True)}\n"
+            f"• operazioni fatte: {snap['movimenti']}\n\n"
+            f"<i>A questo ritmo tenere le posizioni costa circa {eur(abs(costo_anno))} "
+            f"l'anno, il {abs(costo_anno)/max(snap['equity'],1)*100:.0f}% del conto.</i>"
         )
     try:
         db._client.table("monitoring_events").insert(

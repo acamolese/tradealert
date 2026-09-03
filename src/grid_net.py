@@ -21,6 +21,25 @@ import math
 from dataclasses import dataclass
 
 
+def barre_chiuse(prices: list[dict], oggi_utc: str) -> list[float]:
+    """Close medi (bid+ask)/2 delle sole barre DAY gia' CHIUSE.
+
+    Capital include nella risposta la barra del giorno in corso (verificato il
+    03/09: l'ultima barra ha la data di oggi). Metterla nell'EMA fa muovere
+    l'ancoraggio a ogni run di 10 minuti, inseguendo il prezzo che dovrebbe
+    misurare: i livelli del grid si spostano di continuo e i giri si accorciano.
+    Escludendola i livelli restano fermi per tutta la giornata.
+    """
+    out = []
+    for x in prices:
+        if (x.get("snapshotTimeUTC") or "")[:10] >= oggi_utc[:10]:
+            continue
+        cp = x.get("closePrice") or {}
+        if cp.get("bid") and cp.get("ask"):
+            out.append((float(cp["bid"]) + float(cp["ask"])) / 2)
+    return out
+
+
 def ancora_mobile(closes: list[float], periodo: int) -> float | None:
     """Ancoraggio = media mobile esponenziale del prezzo.
 
@@ -57,6 +76,49 @@ def target_unita(prezzo: float, p0: float, step: float, max_unita: int) -> int:
     return max(-max_unita, min(max_unita, -k))
 
 
+def target_isteresi(prezzo: float, p0: float, step: float,
+                    unita_correnti: float, max_unita: int) -> int:
+    """Unita' nette desiderate con ISTERESI da grid classico (fix 2026-09-03).
+
+    Con `target_unita` la prima unita' long entrava appena SOTTO p0 e usciva
+    appena SOPRA p0: le due soglie coincidevano, e il passo del 3% proteggeva
+    solo la seconda unita'. Misurato sui log dal 22/08: il 79% (reale) e l'83%
+    (demo) dei fill consecutivi distava meno dello 0.15% dal precedente, 1 su
+    250 oltre l'1%. Il grid non incassava il passo, incassava rumore meno lo
+    spread (13 giorni: reale -0.03€ su 129 movimenti).
+
+    ESITO DEL BACKTEST INTRADAY (jobs/grid_intraday_test.py, 180 giorni a 15
+    minuti, calibrato sui fill reali): il chattering NON e' una perdita. La
+    logica `target_unita` rende +0.39€ per finestra di 30 giorni alla taglia
+    reale (68% finestre positive), questa +0.35€ (48%): giri rari e risultato
+    dominato dal mark-to-market. Resta disponibile, spenta di default.
+
+    Qui si compra sul livello INFERIORE e si vende su quello SUPERIORE: con u
+    unita' long si aggiunge solo se il prezzo scende sotto p0*(1+s)^-(u+1) e si
+    riduce solo se risale sopra p0*(1+s)^-(u-1). La prima unita' entra a -1
+    passo ed esce a p0: un giro vale un passo intero. Simmetrico per lo short.
+    Lo stato resta la posizione del broker (u), nessun file.
+    """
+    if prezzo <= 0 or p0 <= 0 or step <= 0:
+        return 0
+    u = int(round(unita_correnti))
+    x = math.log(prezzo / p0) / math.log(1.0 + step)   # posizione frazionaria
+    t = u
+    if u >= 0:
+        while t < max_unita and x < -(t + 1):
+            t += 1
+        if t == u:
+            while t > 0 and x > -(t - 1):
+                t -= 1
+    if u <= 0 and t == u:
+        while -t < max_unita and x > (-t + 1):
+            t -= 1
+        if t == u:
+            while t < 0 and x < (-t - 1):
+                t += 1
+    return max(-max_unita, min(max_unita, t))
+
+
 @dataclass(frozen=True)
 class PianoNet:
     livello: int
@@ -78,6 +140,7 @@ def pianifica_net(
     kill_pnl_eur: float,
     equity: float,
     kill_equity_eur: float,
+    isteresi: bool = False,
 ) -> PianoNet:
     """Un solo ordine per run. Il kill switch azzera la posizione e ha priorita'."""
     k = livello(prezzo, p0, step)
@@ -90,7 +153,10 @@ def pianifica_net(
                         f"perdita aperta {pnl_aperto:.2f}€ oltre il limite "
                         f"{-abs(kill_pnl_eur):.2f}€")
 
-    tgt = target_unita(prezzo, p0, step, max_unita)
+    if isteresi:
+        tgt = target_isteresi(prezzo, p0, step, unita_correnti, max_unita)
+    else:
+        tgt = target_unita(prezzo, p0, step, max_unita)
     delta = tgt - unita_correnti
     if abs(delta) < 0.5:                      # meno di mezza unita': non vale il giro
         return PianoNet(k, unita_correnti, tgt, 0.0, "nulla",

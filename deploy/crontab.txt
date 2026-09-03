@@ -1,60 +1,40 @@
-# TradeAlert crontab per VM Oracle Free Tier (Ubuntu 22.04).
-#
-# Tutti gli orari sono in TZ Europe/Rome (impostata sulla VM).
-# Quiet hours interno blocca le notifiche fuori dalle finestre attive
-# (lun-ven 07:00-22:30, weekend 09:00-22:30).
-#
-# Installazione:
-#   sudo timedatectl set-timezone Europe/Rome
+# Crontab TradeAlert sulla VM Oracle (TZ Europe/Rome). Installare con:
 #   crontab deploy/crontab.txt
-#   crontab -l   # verifica
-#
-# Variabili: lo script load_config() legge da /home/ubuntu/tradealert/.env
-
+# Stato al 2026-09-03: l'unico sistema vivo e' il grid2 bidirezionale (6 profili
+# reali + 8 di prova, ogni 10 minuti sfalsati). Scanner v1, v2, spinner, monitor,
+# trailing, briefing, agenda: tutti SPENTI, i job restano nel repo.
 SHELL=/bin/bash
 PATH=/home/ubuntu/tradealert/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 TRADEALERT_HOME=/home/ubuntu/tradealert
 
-# ---------- Market Scan: ogni 60 min in finestra attiva (2026-04-24: ridotto da 30') ----------
-5 7-22 * * *         cd $TRADEALERT_HOME && python -m jobs.morning_scan >> logs/scan.log 2>&1
-
-# ---------- Position Monitor: ogni 30 min, 7-22 IT (con LLM per close) ----------
-*/30 7-22 * * *      cd $TRADEALERT_HOME && python -m jobs.monitor >> logs/monitor.log 2>&1
-
-# ---------- Trailing stop leggero: ogni 5 min H24 (no LLM, solo migliorativo) ----------
-*/5 * * * *          cd $TRADEALERT_HOME && python -m jobs.trailing_stop >> logs/trailing.log 2>&1
-
-# ---------- Logging high/low intra-trade: ogni 30 min H24 (Sprint 3, read+append) ----------
-*/30 * * * *         cd $TRADEALERT_HOME && python -m jobs.intra_trade_log >> logs/intra_trade.log 2>&1
-
-# ---------- Shadow check scoring: RIMOSSO il 2026-06-09 (verdetto DEPLOY dato, shadow concluso). ----------
-# jobs/shadow_check.py resta nel repo per riferimento ma non e' piu' schedulato.
-
-# ---------- Open-rate check: 1x/giorno 22:35, alert Telegram se il tasso apertura cala post-deploy (Sprint 4 t1) ----------
-35 22 * * *          cd $TRADEALERT_HOME && python -m jobs.open_rate_check >> logs/open_rate.log 2>&1
-
-# ---------- Agenda Sprint 6: 1x/giorno, alert Telegram quando maturano le tappe A2/A3/A4 (una volta sola per tappa) ----------
-20 8 * * *           cd $TRADEALERT_HOME && python -m jobs.sprint6_agenda >> logs/agenda.log 2>&1
-
-# ---------- Briefing: DISABILITATI (2026-04-24) per taglio costi API (~€6/mese).
-# Doppio gate: crontab commentato qui + guard BRIEFING_ENABLED in jobs/briefing.py.
-# Per riabilitare: scommenta le 3 righe sotto, imposta BRIEFING_ENABLED=true nel
-# .env della VM e reinstalla il crontab (crontab deploy/crontab.txt).
-# 2 8 * * *            cd $TRADEALERT_HOME && python -m jobs.briefing morning   >> logs/briefing.log 2>&1
-# 2 16 * * *           cd $TRADEALERT_HOME && python -m jobs.briefing afternoon >> logs/briefing.log 2>&1
-# 2 22 * * *           cd $TRADEALERT_HOME && python -m jobs.briefing evening   >> logs/briefing.log 2>&1
-
-# ---------- Health VM Oracle: 1x/giorno (banda, disco, RAM, listener) ----------
-10 9 * * *           cd $TRADEALERT_HOME && python -m jobs.health_check >> logs/health.log 2>&1
-
-# ---------- Weekly report: domenica 20:00 Europe/Rome ----------
-0 20 * * 0           cd $TRADEALERT_HOME && python -m jobs.weekly_report >> logs/weekly.log 2>&1
-
-# ---------- Macro scan eventi critici dalle news: 06:50 prima del primo scanner ----------
-50 6 * * *           cd $TRADEALERT_HOME && python -m jobs.macro_scan >> logs/macro.log 2>&1
-
-# ---------- Reconcile DB vs Capital: ogni ora (housekeeping) ----------
+# ---------- Housekeeping ----------
 15 * * * *           cd $TRADEALERT_HOME && python -m jobs.reconcile >> logs/reconcile.log 2>&1
+# health: messaggio Telegram SOLO se c'e' un avviso; l'esito finisce nel buongiorno
+10 9 * * *           cd $TRADEALERT_HOME && python -m jobs.health_check >> logs/health.log 2>&1
+# settimana del conto reale, letta dal broker (domenica 18:00)
+0 18 * * 0           cd $TRADEALERT_HOME && python -m jobs.account_truth --weekly >> logs/account_week.log 2>&1
+
+# ---------- Messaggi ai due conti (dal 2026-09-03: mattina e sera nei giorni di mercato) ----------
+0 8 * * 1-5          cd $TRADEALERT_HOME && python -m jobs.grid_hourly --mattina >> logs/g2_hourly.log 2>&1
+30 22 * * 1-5        cd $TRADEALERT_HOME && python -m jobs.grid_hourly --sera >> logs/g2_hourly.log 2>&1
+
+# ---------- Grid2 REALE (ogni 10 minuti, sfalsati) ----------
+*/10 * * * *         cd $TRADEALERT_HOME && python -m jobs.grid2 --profile RNAS >> logs/g2r.log 2>&1
+1-51/10 * * * *      cd $TRADEALERT_HOME && python -m jobs.grid2 --profile RJP >> logs/g2r.log 2>&1
+2-52/10 * * * *      cd $TRADEALERT_HOME && python -m jobs.grid2 --profile RORO >> logs/g2r.log 2>&1
+3-53/10 * * * *      cd $TRADEALERT_HOME && python -m jobs.grid2 --profile RNL >> logs/g2r.log 2>&1
+4-54/10 * * * *      cd $TRADEALERT_HOME && python -m jobs.grid2 --profile RHK >> logs/g2r.log 2>&1
+5-55/10 * * * *      cd $TRADEALERT_HOME && python -m jobs.grid2 --profile RUS30 >> logs/g2r.log 2>&1
+
+# ---------- Grid2 DI PROVA (stessa logica, conto demo) ----------
+*/10 * * * *         cd $TRADEALERT_HOME && sleep 20 && CAPITAL_ENV=demo python -m jobs.grid2 --profile DNAS >> logs/g2d.log 2>&1
+1-51/10 * * * *      cd $TRADEALERT_HOME && sleep 20 && CAPITAL_ENV=demo python -m jobs.grid2 --profile DJP >> logs/g2d.log 2>&1
+2-52/10 * * * *      cd $TRADEALERT_HOME && sleep 20 && CAPITAL_ENV=demo python -m jobs.grid2 --profile DORO >> logs/g2d.log 2>&1
+3-53/10 * * * *      cd $TRADEALERT_HOME && sleep 20 && CAPITAL_ENV=demo python -m jobs.grid2 --profile DNL >> logs/g2d.log 2>&1
+4-54/10 * * * *      cd $TRADEALERT_HOME && sleep 20 && CAPITAL_ENV=demo python -m jobs.grid2 --profile DHK >> logs/g2d.log 2>&1
+5-55/10 * * * *      cd $TRADEALERT_HOME && sleep 20 && CAPITAL_ENV=demo python -m jobs.grid2 --profile DUS30 >> logs/g2d.log 2>&1
+6-56/10 * * * *      cd $TRADEALERT_HOME && sleep 20 && CAPITAL_ENV=demo python -m jobs.grid2 --profile DSP >> logs/g2d.log 2>&1
+7-57/10 * * * *      cd $TRADEALERT_HOME && sleep 20 && CAPITAL_ENV=demo python -m jobs.grid2 --profile DDAX >> logs/g2d.log 2>&1
 
 # Il listener Telegram NON va in crontab: gira come daemon systemd
-# (vedi tradealert-listener.service) per latenza ~secondi sui comandi.
+# (tradealert-listener.service). Dopo un deploy: sudo systemctl restart tradealert-listener
