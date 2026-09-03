@@ -18,23 +18,26 @@ TRADEALERT_HOME=/home/ubuntu/tradealert
 0 8 * * 1-5          cd $TRADEALERT_HOME && python -m jobs.grid_hourly --mattina >> logs/g2_hourly.log 2>&1
 30 22 * * 1-5        cd $TRADEALERT_HOME && python -m jobs.grid_hourly --sera >> logs/g2_hourly.log 2>&1
 
-# ---------- Grid2 REALE (ogni 10 minuti, sfalsati) ----------
-*/10 * * * *         cd $TRADEALERT_HOME && python -m jobs.grid2 --profile RNAS >> logs/g2r.log 2>&1
-1-51/10 * * * *      cd $TRADEALERT_HOME && python -m jobs.grid2 --profile RJP >> logs/g2r.log 2>&1
-2-52/10 * * * *      cd $TRADEALERT_HOME && python -m jobs.grid2 --profile RORO >> logs/g2r.log 2>&1
-3-53/10 * * * *      cd $TRADEALERT_HOME && python -m jobs.grid2 --profile RNL >> logs/g2r.log 2>&1
-4-54/10 * * * *      cd $TRADEALERT_HOME && python -m jobs.grid2 --profile RHK >> logs/g2r.log 2>&1
-5-55/10 * * * *      cd $TRADEALERT_HOME && python -m jobs.grid2 --profile RUS30 >> logs/g2r.log 2>&1
+# ---------- Grid2 REALE (ogni 30 minuti, sfalsati) ----------
+# Dal 2026-09-03: 30 minuti invece di 10. Misurato su 90 giorni a parita' di
+# finestre (jobs/grid_intraday_test.py --res): 5 min +0.24€/30gg, 15 min +0.35,
+# 30 min +0.40, 1h +0.38. Piu' controlli = piu' giri = piu' spread, stesso edge.
+0,30                 None                                                                                           
+1,31                 1                                                                                             
+2,32                 2                                                                                              
+3,33                 3                                                                                             
+4,34                 4                                                                                             
+5,35                 5                                                                                               
 
-# ---------- Grid2 DI PROVA (stessa logica, conto demo) ----------
-*/10 * * * *         cd $TRADEALERT_HOME && sleep 20 && CAPITAL_ENV=demo python -m jobs.grid2 --profile DNAS >> logs/g2d.log 2>&1
-1-51/10 * * * *      cd $TRADEALERT_HOME && sleep 20 && CAPITAL_ENV=demo python -m jobs.grid2 --profile DJP >> logs/g2d.log 2>&1
-2-52/10 * * * *      cd $TRADEALERT_HOME && sleep 20 && CAPITAL_ENV=demo python -m jobs.grid2 --profile DORO >> logs/g2d.log 2>&1
-3-53/10 * * * *      cd $TRADEALERT_HOME && sleep 20 && CAPITAL_ENV=demo python -m jobs.grid2 --profile DNL >> logs/g2d.log 2>&1
-4-54/10 * * * *      cd $TRADEALERT_HOME && sleep 20 && CAPITAL_ENV=demo python -m jobs.grid2 --profile DHK >> logs/g2d.log 2>&1
-5-55/10 * * * *      cd $TRADEALERT_HOME && sleep 20 && CAPITAL_ENV=demo python -m jobs.grid2 --profile DUS30 >> logs/g2d.log 2>&1
-6-56/10 * * * *      cd $TRADEALERT_HOME && sleep 20 && CAPITAL_ENV=demo python -m jobs.grid2 --profile DSP >> logs/g2d.log 2>&1
-7-57/10 * * * *      cd $TRADEALERT_HOME && sleep 20 && CAPITAL_ENV=demo python -m jobs.grid2 --profile DDAX >> logs/g2d.log 2>&1
+# ---------- Grid2 DI PROVA (stessa logica, conto demo, ogni 30 minuti) ----------
+0,30                 None                                                                                                                        
+1,31                 1                                                                                                                          
+2,32                 2                                                                                                                           
+3,33                 3                                                                                                                          
+4,34                 4                                                                                                                          
+5,35                 5                                                                                                                            
+6,36                 6                                                                                                                          
+7,37                 7                                                                                                                           
 
 # Il listener Telegram NON va in crontab: gira come daemon systemd
 # (tradealert-listener.service). Dopo un deploy: sudo systemctl restart tradealert-listener
