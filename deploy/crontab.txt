@@ -15,9 +15,13 @@ TRADEALERT_HOME=/home/ubuntu/tradealert
 0 18 * * 0           cd $TRADEALERT_HOME && python -m jobs.account_truth --weekly >> logs/account_week.log 2>&1
 
 # ---------- Messaggi ai due conti ----------
-# riepilogo ogni ora (voluto dall'utente, formato nuovo) + buongiorno alle 8 con lo stato del sistema
+# riepilogo ogni ora (voluto dall'utente, formato nuovo) + buongiorno alle 8 con lo stato del sistema.
+# Dal 2026-09-05: sabato e domenica il riepilogo delle :05 parte solo se qualcosa
+# e' cambiato (il job esce da solo, il cron resta uguale) e la giornata si chiude
+# alle 22:30. Nei feriali niente chiusura serale: a mezzanotte i mercati si muovono gia'.
 5 * * * *            cd $TRADEALERT_HOME && python -m jobs.grid_hourly --orario >> logs/g2_hourly.log 2>&1
 0 8 * * *            cd $TRADEALERT_HOME && python -m jobs.grid_hourly --mattina >> logs/g2_hourly.log 2>&1
+30 22 * * 6,0        cd $TRADEALERT_HOME && python -m jobs.grid_hourly --sera >> logs/g2_hourly.log 2>&1
 
 # ---------- Grid2 REALE (ogni 30 minuti, sfalsati) ----------
 # Dal 2026-09-03: 30 minuti invece di 10. Misurato su 90 giorni a parita' di

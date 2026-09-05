@@ -313,10 +313,66 @@ def messaggio_aiuto() -> str:
             "/riparti reale · fa ripartire il conto reale dalla cifra attuale\n"
             "/riparti prova · lo stesso sul conto di prova\n\n"
             "<i>Messaggi automatici: riepilogo ogni ora, buongiorno alle 8, "
-            "riepilogo della settimana la domenica sera. "
+            "riepilogo della settimana la domenica sera. Sabato e domenica, a "
+            "mercati fermi, il riepilogo orario arriva solo se cambia qualcosa: "
+            "restano il buongiorno e la chiusura delle 22:30. "
             "Gli avvisi importanti arrivano subito.</i>")
 
 
 # compatibilita' con i vecchi nomi (comandi /stat, /statN)
 messaggio_riepilogo = messaggio_stato
 messaggio_ultimi = messaggio_oggi
+
+
+# ------------------------------------------------- silenzio nei giorni fermi
+
+# Sabato e domenica i mercati del grid (indici e oro) sono chiusi: il riepilogo
+# orario ripeterebbe gli stessi numeri 24 volte. Regola del 2026-09-05: in quei
+# giorni si parla solo se qualcosa e' cambiato davvero.
+GIORNI_SILENZIOSI = {5, 6}
+SOGLIA_EURO = 0.10          # sotto questa cifra non e' una notizia
+
+
+def giorno_silenzioso(dt: datetime | None = None) -> bool:
+    return (dt or datetime.now(ROMA)).weekday() in GIORNI_SILENZIOSI
+
+
+def impronta(conti: list[Conto]) -> dict:
+    """Fotografia minima di cosa c'e' da raccontare: se questa non cambia, il
+    messaggio sarebbe identico al precedente."""
+    out = {}
+    for c in conti:
+        if not c.ok:
+            out[c.env] = {"ok": False}
+            continue
+        out[c.env] = {
+            "ok": True,
+            "equity": round(c.equity, 2),
+            "movimenti": c.movimenti_oggi,
+            "bloccato": c.bloccato,
+            "posizioni": {p["epic"]: round(p["size"], 4) for p in c.posizioni},
+        }
+    return out
+
+
+def cambio_rilevante(prec: dict | None, ora: dict) -> bool:
+    """True se rispetto all'ultimo messaggio inviato e' successo qualcosa:
+    un'operazione, una posizione aperta o chiusa, il conto fermato o ripartito,
+    il broker caduto, oppure un movimento di almeno SOGLIA_EURO."""
+    if not prec:
+        return True
+    if set(prec) != set(ora):
+        return True
+    for env, adesso in ora.items():
+        p = prec[env]
+        if p.get("ok") != adesso.get("ok"):
+            return True
+        if not adesso.get("ok"):
+            continue
+        if (p.get("movimenti") != adesso.get("movimenti")
+                or p.get("bloccato") != adesso.get("bloccato")
+                or p.get("posizioni") != adesso.get("posizioni")):
+            return True
+        if abs(float(p.get("equity", 0)) - adesso["equity"]) >= SOGLIA_EURO:
+            return True
+    return False

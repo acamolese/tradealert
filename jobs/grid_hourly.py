@@ -7,6 +7,10 @@ Il riepilogo ogni ora resta (richiesta esplicita dell'utente del 2026-09-03:
 "lo voglio comunque almeno ogni ora"), nel formato nuovo; in piu' un buongiorno
 alle 8 con lo stato del sistema. Il resto si chiede con /stato.
 
+Dal 2026-09-05, sabato e domenica (mercati del grid chiusi) il riepilogo orario
+parte SOLO se qualcosa e' cambiato davvero rispetto all'ultimo messaggio
+inviato: negli altri casi restano il buongiorno delle 8 e la chiusura 22:30.
+
 Uso:
   python -m jobs.grid_hourly --orario         # riepilogo orario (cron)
   python -m jobs.grid_hourly --mattina        # buongiorno
@@ -15,6 +19,7 @@ Uso:
   python -m jobs.grid_hourly --posizioni
   python -m jobs.grid_hourly --oggi [--ultimi N]
   aggiungere --print per stampare senza inviare
+  aggiungere --sempre per ignorare il silenzio del weekend
 """
 from __future__ import annotations
 
@@ -22,15 +27,18 @@ import json
 import logging
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from src.config import load_config
-from src.grid_report import (messaggio_mattina, messaggio_oggi,
+from src.grid_report import (ROMA, cambio_rilevante, giorno_silenzioso,
+                             impronta, messaggio_mattina, messaggio_oggi,
                              messaggio_posizioni, messaggio_sera,
                              messaggio_stato, raccogli)
 
 log = logging.getLogger(__name__)
 DATA = Path(__file__).resolve().parent.parent / "data"
+STATO = DATA / "g2_msg_last.json"
 
 
 def leggi_conti(n_ultimi: int = 10, con_valore: bool = False):
@@ -68,6 +76,24 @@ def sistema_ok() -> bool | None:
         return None
 
 
+def impronta_precedente() -> dict | None:
+    """Com'erano i conti all'ultimo messaggio automatico inviato."""
+    try:
+        return json.loads(STATO.read_text()).get("impronta")
+    except Exception:
+        return None
+
+
+def salva_impronta(imp: dict) -> None:
+    try:
+        DATA.mkdir(parents=True, exist_ok=True)
+        STATO.write_text(json.dumps(
+            {"quando": datetime.now(ROMA).isoformat(timespec="seconds"),
+             "impronta": imp}))
+    except Exception:
+        log.exception("salvataggio impronta fallito")
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -80,12 +106,18 @@ def main() -> int:
             n = 10
 
     conti = leggi_conti(max(n, 10), con_valore="--posizioni" in sys.argv)
+    foto = impronta(conti)
+    automatico = False
     if "--mattina" in sys.argv:
-        testo = messaggio_mattina(conti, sistema_ok())
+        testo, automatico = messaggio_mattina(conti, sistema_ok()), True
     elif "--sera" in sys.argv:
-        testo = messaggio_sera(conti)
+        testo, automatico = messaggio_sera(conti), True
     elif "--orario" in sys.argv:
-        testo = messaggio_stato(conti, "Riepilogo orario")
+        if (giorno_silenzioso() and "--sempre" not in sys.argv
+                and not cambio_rilevante(impronta_precedente(), foto)):
+            log.info("giorno fermo e nessuna novita': niente riepilogo orario")
+            return 0
+        testo, automatico = messaggio_stato(conti, "Riepilogo orario"), True
     elif "--posizioni" in sys.argv:
         testo = messaggio_posizioni(conti)
     elif "--oggi" in sys.argv or n:
@@ -100,6 +132,8 @@ def main() -> int:
 
     from src.telegram_client import TelegramClient
     TelegramClient(load_config()).send_message(testo)
+    if automatico:
+        salva_impronta(foto)
     return 0
 
 
