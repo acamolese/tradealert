@@ -8,6 +8,7 @@ Uso:
   python -m jobs.grid_esercizio --avvia               # chiude tutto e riparte da 200 €
   python -m jobs.grid_esercizio --avvia --capitale 500
   python -m jobs.grid_esercizio --avvia --senza-chiudere
+  python -m jobs.grid_esercizio --avvia --forza          # rifa' partire da zero
   python -m jobs.grid_esercizio --report              # resoconto della sera (cron)
   aggiungere --print per vedere il testo senza inviarlo su Telegram
 """
@@ -58,6 +59,13 @@ def main() -> int:
         telegram = TelegramClient(cfg)
 
     if "--avvia" in sys.argv:
+        # protezione: un secondo --avvia chiuderebbe le posizioni e azzererebbe
+        # lo storico di un esercizio gia' in corso. Serve --forza per rifarlo.
+        in_corso = leggi(env)
+        if in_corso.get("capitale") and "--forza" not in sys.argv:
+            log.error("esercizio da %.2f€ gia' avviato il %s: serve --forza",
+                      in_corso["capitale"], in_corso.get("avvio", "?")[:10])
+            return 1
         capitale = _arg("--capitale", CAPITALE_DEFAULT)
         testo = avvia(env, capitale, cap, telegram,
                       chiudi="--senza-chiudere" not in sys.argv)
