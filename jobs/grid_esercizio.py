@@ -9,6 +9,8 @@ Uso:
   python -m jobs.grid_esercizio --avvia --capitale 500
   python -m jobs.grid_esercizio --avvia --senza-chiudere
   python -m jobs.grid_esercizio --avvia --forza          # rifa' partire da zero
+  python -m jobs.grid_esercizio --avvia --se-possibile   # nel cron: se i mercati
+                                                        # sono chiusi tace e rimanda
   python -m jobs.grid_esercizio --report              # resoconto della sera (cron)
   aggiungere --print per vedere il testo senza inviarlo su Telegram
 """
@@ -68,7 +70,8 @@ def main() -> int:
             return 1
         capitale = _arg("--capitale", CAPITALE_DEFAULT)
         testo = avvia(env, capitale, cap, telegram,
-                      chiudi="--senza-chiudere" not in sys.argv)
+                      chiudi="--senza-chiudere" not in sys.argv,
+                      silenzioso="--se-possibile" in sys.argv)
         if solo_stampa:
             print(re.sub(r"<[^>]+>", "", testo))
         return 0

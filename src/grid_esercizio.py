@@ -85,23 +85,51 @@ def azzera_stato(env: str) -> int:
     return tolti
 
 
+def negoziabile(capital, epic: str) -> bool:
+    """Il broker accetta ordini su questo strumento adesso?"""
+    try:
+        sn = capital.get_market(epic).get("snapshot") or {}
+    except Exception as exc:
+        log.error("stato mercato %s non leggibile: %s", epic, exc)
+        return False
+    return (sn.get("marketStatus") or "").upper() == "TRADEABLE"
+
+
 def avvia(env: str, capitale: float, capital, telegram=None,
-          chiudi: bool = True) -> str:
+          chiudi: bool = True, silenzioso: bool = False) -> str:
     """Chiude quello che c'e', azzera la memoria e fissa il punto di partenza.
+
+    Si parte solo se ogni strumento con una posizione aperta e' negoziabile:
+    liquidare a mercato chiuso non si puo', e liquidare all'apertura europea
+    significa vendere dentro le oscillazioni (scelta utente 2026-09-06, si
+    riprova ogni dieci minuti dalla mezzanotte e si parte al primo momento
+    buono). Con ``silenzioso`` un rinvio non manda nulla su Telegram.
 
     Ritorna il messaggio inviato (o il motivo per cui non si e' fatto nulla).
     """
     eq = leggi_equity(capital)
     if eq is None:
-        msg = ("Non riesco a leggere il conto di prova adesso: non ho toccato "
-               "nulla, riprova tra qualche minuto.")
-        if telegram:
+        msg = ("Non riesco a leggere il conto adesso: non ho toccato nulla, "
+               "riprovo più tardi.")
+        if telegram and not silenzioso:
             telegram.send_message(msg)
         return msg
 
+    aperte = capital.get_open_positions()
+    if chiudi and aperte:
+        epics = sorted({(p.get("market") or {}).get("epic") for p in aperte} - {None})
+        chiusi = [e for e in epics if not negoziabile(capital, e)]
+        if chiusi:
+            msg = ("Mercati ancora chiusi (" + ", ".join(chiusi)
+                   + "): non parto, riprovo al prossimo giro.")
+            log.info(msg)
+            if telegram and not silenzioso:
+                telegram.send_message(msg)
+            return msg
+
     chiuse, fallite = 0, 0
     if chiudi:
-        for p in capital.get_open_positions():
+        for p in aperte:
             d = (p.get("position") or {}).get("dealId")
             if not d:
                 continue
@@ -111,6 +139,16 @@ def avvia(env: str, capitale: float, capital, telegram=None,
             except Exception as exc:
                 fallite += 1
                 log.error("chiusura %s fallita: %s", d, exc)
+
+    # se qualcosa e' rimasto aperto non si parte: il punto zero deve essere
+    # un conto pulito, non un conto con l'eredita' del giro precedente
+    if chiudi and capital.get_open_positions():
+        msg = ("Non sono riuscito a chiudere tutto: non fisso la partenza, "
+               "riprovo al prossimo giro.")
+        log.warning(msg)
+        if telegram and not silenzioso:
+            telegram.send_message(msg)
+        return msg
 
     # dopo le chiusure il saldo cambia: la base e' quello che resta adesso
     eq_dopo = leggi_equity(capital)
