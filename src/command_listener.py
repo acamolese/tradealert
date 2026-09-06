@@ -33,7 +33,8 @@ log = logging.getLogger(__name__)
 
 # Comandi che leggono e basta. /stat, /statN, /conti restano come alias.
 GRID_COMMANDS = ("/stato", "/status", "/stat", "/conti", "/grid", "/posizioni",
-                 "/positions", "/oggi", "/aiuto", "/help", "/start", "/esercizio", "/claudetrade")
+                 "/positions", "/oggi", "/aiuto", "/help", "/start", "/esercizio", "/claudetrade",
+                 "/pagina", "/link", "/cruscotto")
 # Comandi che muovono denaro: /ferma <reale|prova>, /riparti <reale|prova>.
 GRID_ACTIONS = ("/ferma", "/riparti")
 KNOWN_COMMANDS = GRID_COMMANDS + GRID_ACTIONS
@@ -112,6 +113,9 @@ def _handle_grid_command(config: Config, text: str) -> bool:
             n = int((m_oggi or m_stat).group(1) or 0)
             conti = leggi_conti(max(n, 10))
             telegram.send_message(messaggio_oggi(conti, n))
+        elif cmd in ("/pagina", "/link", "/cruscotto"):
+            from .grid_esercizio import messaggio_pagina
+            telegram.send_message(messaggio_pagina())
         elif cmd in ("/esercizio", "/claudetrade"):
             telegram.send_message(_messaggio_esercizio())
         elif cmd in ("/posizioni", "/positions"):

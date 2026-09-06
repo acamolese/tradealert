@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -26,6 +27,12 @@ log = logging.getLogger(__name__)
 DATA = Path(__file__).resolve().parent.parent / "data"
 
 CAPITALE_DEFAULT = 200.0
+
+# Cruscotto pubblicato (si apre da loggati su claude.ai con lo stesso account).
+# Sovrascrivibile con CLAUDETRADE_URL nel .env se la pagina cambia indirizzo.
+PAGINA_URL = os.environ.get(
+    "CLAUDETRADE_URL",
+    "https://claude.ai/code/artifact/32896d78-4edf-4ca7-add6-5d1f213d29e6")
 
 
 def _file(env: str) -> Path:
@@ -171,7 +178,9 @@ def avvia(env: str, capitale: float, capital, telegram=None,
            f"Capitale <b>{eur(capitale)}</b>, taglie le più piccole che il broker "
            f"accetta, su 8 strumenti, con al massimo 2 gradini per verso.\n"
            f"Obiettivo {eur(s['profit_stop'], True)}, stop {eur(-s['loss_stop'], True)}.\n"
-           f"Ogni sera alle 22:30 ti mando il resoconto della giornata.")
+           f"Ogni sera alle 22:30 ti mando il resoconto della giornata.\n\n"
+           f"Il quadro completo, sempre aggiornato: {PAGINA_URL}\n"
+           f"Tutti i comandi: /aiuto")
     if telegram:
         telegram.send_message(msg)
     return msg
@@ -280,4 +289,17 @@ def messaggio(c, st: dict, titolo: str = "") -> str:
                  f"{eur(max(0.0, s['profit_stop'] - tot))}")
     righe.append(f"• stop {eur(-s['loss_stop'], True)}: hai "
                  f"{eur(max(0.0, s['loss_stop'] + tot))} di margine")
+    righe += ["", f"<i>Il quadro completo: {PAGINA_URL}\n"
+                  f"Tutti i comandi: /aiuto</i>"]
     return "\n".join(righe)
+
+
+def messaggio_pagina() -> str:
+    """Il link al cruscotto, per il comando /pagina."""
+    st = leggi("demo")
+    cap = st.get("capitale")
+    testa = (f"📈 <b>ClaudeTrade</b>" + (f" · {eur(cap)} di capitale" if cap else ""))
+    return (f"{testa}\n{PAGINA_URL}\n\n"
+            f"<i>Si apre dal telefono o dal computer, basta essere collegati a "
+            f"claude.ai con il tuo account. Valore, posizioni, limiti e il "
+            f"registro di ogni giornata: si aggiorna da sola.</i>")

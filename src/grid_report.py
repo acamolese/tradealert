@@ -306,19 +306,24 @@ def messaggio_oggi(conti: list[Conto], n: int = 0) -> str:
 def messaggio_aiuto() -> str:
     from src.grid_esercizio import leggi
     st = leggi("demo")
-    esercizio = (f"/claudetrade · come va il conto da {eur(st['capitale'])}\n"
-                 if st.get("capitale") else "")
+    ct = st.get("capitale")
+    esercizio = (f"/claudetrade · come va il conto da {eur(ct)}\n"
+                 "/pagina · il link al cruscotto sempre aggiornato\n" if ct else "")
     coda_esercizio = (" Il resoconto di ClaudeTrade arriva ogni sera alle 22:30, "
-                      "dal lunedì al venerdì." if st.get("capitale") else "")
-    return ("ℹ️ <b>Comandi</b>\n"
+                      "dal lunedì al venerdì." if ct else "")
+    return ("ℹ️ <b>Cosa puoi chiedermi</b>\n\n"
+            "<b>Guardare</b>\n"
             "/stato · quanto ho e come sta andando, adesso\n"
             + esercizio +
             "/posizioni · le posizioni aperte, spiegate\n"
-            "/oggi · le operazioni chiuse oggi (/oggi10 = le ultime 10)\n"
+            "/oggi · le operazioni chiuse oggi (/oggi10 = le ultime 10)\n\n"
+            "<b>Intervenire</b>\n"
             "/ferma reale · chiude tutto sul conto reale e lo mette in pausa\n"
-            "/ferma prova · lo stesso sul conto di prova\n"
+            "/ferma prova · lo stesso sull'altro conto\n"
             "/riparti reale · fa ripartire il conto reale dalla cifra attuale\n"
-            "/riparti prova · lo stesso sul conto di prova\n\n"
+            "/riparti prova · lo stesso sull'altro conto\n\n"
+            "<b>Questo elenco</b>\n"
+            "/aiuto\n\n"
             "<i>Messaggi automatici: riepilogo ogni ora, buongiorno alle 8, "
             "riepilogo della settimana la domenica sera. Sabato e domenica, a "
             "mercati fermi, il riepilogo orario arriva solo se cambia qualcosa: "
