@@ -306,9 +306,9 @@ def messaggio_oggi(conti: list[Conto], n: int = 0) -> str:
 def messaggio_aiuto() -> str:
     from src.grid_esercizio import leggi
     st = leggi("demo")
-    esercizio = (f"/esercizio · come va la prova da {eur(st['capitale'])}\n"
+    esercizio = (f"/claudetrade · come va il conto da {eur(st['capitale'])}\n"
                  if st.get("capitale") else "")
-    coda_esercizio = (" Il resoconto dell'esercizio arriva ogni sera alle 22:30, "
+    coda_esercizio = (" Il resoconto di ClaudeTrade arriva ogni sera alle 22:30, "
                       "dal lunedì al venerdì." if st.get("capitale") else "")
     return ("ℹ️ <b>Comandi</b>\n"
             "/stato · quanto ho e come sta andando, adesso\n"

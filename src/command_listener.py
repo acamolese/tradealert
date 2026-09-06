@@ -33,7 +33,7 @@ log = logging.getLogger(__name__)
 
 # Comandi che leggono e basta. /stat, /statN, /conti restano come alias.
 GRID_COMMANDS = ("/stato", "/status", "/stat", "/conti", "/grid", "/posizioni",
-                 "/positions", "/oggi", "/aiuto", "/help", "/start", "/esercizio")
+                 "/positions", "/oggi", "/aiuto", "/help", "/start", "/esercizio", "/claudetrade")
 # Comandi che muovono denaro: /ferma <reale|prova>, /riparti <reale|prova>.
 GRID_ACTIONS = ("/ferma", "/riparti")
 KNOWN_COMMANDS = GRID_COMMANDS + GRID_ACTIONS
@@ -47,7 +47,7 @@ def _g2_soglie(env: str) -> tuple[float, float]:
 
 
 def _messaggio_esercizio(env: str = "demo") -> str:
-    """Il resoconto dell'esercizio a capitale dichiarato, su richiesta."""
+    """Il resoconto di ClaudeTrade, su richiesta."""
     import os
 
     from .grid_esercizio import leggi, messaggio
@@ -56,13 +56,13 @@ def _messaggio_esercizio(env: str = "demo") -> str:
 
     st = leggi(env)
     if not st.get("capitale"):
-        return ("Nessun esercizio in corso sul conto di prova. "
+        return ("ClaudeTrade non è ancora partito. "
                 "Si avvia dalla VM con <code>--avvia</code>.")
     originale = os.environ.get("CAPITAL_ENV")
     try:
         _, cap = _client(env)
         return messaggio(raccogli(cap, env, n_ultimi=0, con_valore=True), st,
-                         "Esercizio, situazione adesso")
+                         "ClaudeTrade, situazione adesso")
     finally:
         if originale is None:
             os.environ.pop("CAPITAL_ENV", None)
@@ -112,7 +112,7 @@ def _handle_grid_command(config: Config, text: str) -> bool:
             n = int((m_oggi or m_stat).group(1) or 0)
             conti = leggi_conti(max(n, 10))
             telegram.send_message(messaggio_oggi(conti, n))
-        elif cmd == "/esercizio":
+        elif cmd in ("/esercizio", "/claudetrade"):
             telegram.send_message(_messaggio_esercizio())
         elif cmd in ("/posizioni", "/positions"):
             conti = leggi_conti(con_valore=True)

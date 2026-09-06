@@ -1,10 +1,10 @@
-"""Esercizio a capitale DICHIARATO sul conto di prova.
+"""ClaudeTrade: il conto da 200 € a capitale dichiarato.
 
-Richiesta 2026-09-06: il conto di prova ha circa 980 €, ma l'esercizio che
-interessa e' "cosa succede con 200 €". Il capitale qui e' un numero dichiarato:
-le taglie sono calibrate su quello (otto strumenti a taglia minima, due gradini
-per verso, esposizione massima 644 € cioe' 3,2 volte il capitale) e ogni cifra
-del report e' riferita ai 200 €, non al saldo vero del conto.
+Richiesta 2026-09-06: gira sul conto di prova (che ne ha circa 980), ma si
+tratta come un conto normale da 200 €. Le taglie sono calibrate su quel numero
+(otto strumenti a taglia minima, due gradini per verso, esposizione massima
+644 € cioe' 3,2 volte il capitale) e ogni cifra del report e' riferita ai
+200 €, non al saldo vero del conto.
 
   valore dell'esercizio = capitale + (equity - equity all'avvio)
 
@@ -127,11 +127,10 @@ def avvia(env: str, capitale: float, capital, telegram=None,
 
     s = soglie_conto(env)
     coda = f" ({fallite} non si sono chiuse, controlla sull'app)" if fallite else ""
-    msg = (f"🧪 <b>Esercizio da {eur(capitale)}: si parte</b>\n"
+    msg = (f"🧪 <b>ClaudeTrade: si parte</b>\n"
            f"Ho chiuso {chiuse} posizioni{coda} e azzerato la memoria: "
            f"si riparte da zero.\n\n"
-           f"Da qui in avanti leggo il conto di prova come se avesse "
-           f"<b>{eur(capitale)}</b>: le taglie sono le più piccole che il broker "
+           f"Capitale <b>{eur(capitale)}</b>, taglie le più piccole che il broker "
            f"accetta, su 8 strumenti, con al massimo 2 gradini per verso.\n"
            f"Obiettivo {eur(s['profit_stop'], True)}, stop {eur(-s['loss_stop'], True)}.\n"
            f"Ogni sera alle 22:30 ti mando il resoconto della giornata.")
@@ -186,7 +185,7 @@ def messaggio(c, st: dict, titolo: str = "") -> str:
 
     cap = float(st["capitale"])
     if not c.ok:
-        return (f"🧪 <b>Esercizio da {eur(cap)}</b> · {data_estesa()}\n"
+        return (f"🧪 <b>ClaudeTrade</b> · {data_estesa()}\n"
                 "Il broker non risponde: niente resoconto per oggi.")
 
     val = valore(st, c.equity)
@@ -195,7 +194,7 @@ def messaggio(c, st: dict, titolo: str = "") -> str:
     s = soglie_conto(c.env)
     seg = "🟢" if oggi >= 0 else "🔴"
 
-    righe = [f"🧪 <b>{titolo or f'Esercizio da {eur(cap)}'}</b> · {data_estesa()}",
+    righe = [f"🧪 <b>{titolo or 'ClaudeTrade'}</b> · {data_estesa()}",
              "",
              f"<b>Valore: {eur(val)}</b>  ({eur(tot, True)}, {pct(tot, cap)})",
              f"Oggi: <b>{eur(oggi, True)}</b> ({pct(oggi, cap)})  {seg}"]
