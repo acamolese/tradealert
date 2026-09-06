@@ -28,6 +28,13 @@ TRADEALERT_HOME=/home/ubuntu/tradealert
 # domenica non parte: c'e' gia' la chiusura di giornata delle 22:30.
 30 22 * * 1-5        cd $TRADEALERT_HOME && python -m jobs.grid_esercizio --report >> logs/g2_esercizio.log 2>&1
 
+# UNA TANTUM: avvio dell'esercizio lunedi' 8 settembre 2026 alle 9:15, a mercati
+# aperti (sabato e domenica il broker rifiuta le chiusure). Chiude le posizioni
+# residue del giro precedente, azzera la memoria e fissa il capitale a 200 €.
+# DA RIMUOVERE dopo l'avvio: senza --forza un secondo giro non fa nulla, ma la
+# riga tornerebbe l'8 settembre dell'anno prossimo.
+15 9 8 9 *           cd $TRADEALERT_HOME && CAPITAL_ENV=demo python -m jobs.grid_esercizio --avvia --capitale 200 >> logs/g2_esercizio.log 2>&1
+
 # ---------- Grid2 REALE (ogni 30 minuti, sfalsati) ----------
 # Dal 2026-09-03: 30 minuti invece di 10. Misurato su 90 giorni a parita' di
 # finestre (jobs/grid_intraday_test.py --res): 5 min +0.24€/30gg, 15 min +0.35,
