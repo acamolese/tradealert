@@ -37,6 +37,13 @@ TRADEALERT_HOME=/home/ubuntu/tradealert
 # DA RIMUOVERE dopo l'avvio: la riga tornerebbe l'8 settembre dell'anno prossimo.
 8,18,28,38,48,58 0-9 8 9 *  cd $TRADEALERT_HOME && CAPITAL_ENV=demo python -m jobs.grid_esercizio --avvia --capitale 200 --se-possibile >> logs/g2_esercizio.log 2>&1
 
+# ---------- Pagina pubblica di ClaudeTrade ----------
+# File statico rigenerato con i dati dentro e servito da nginx sulla porta 80.
+# Feriali ogni mezz'ora (sfalsata rispetto ai grid), weekend ogni tre ore: a
+# mercati fermi non cambia nulla e ogni giro costa una decina di chiamate al broker.
+12,42 * * * 1-5      cd $TRADEALERT_HOME && python -m jobs.claudetrade_page >> logs/g2_pagina.log 2>&1
+12 */3 * * 6,0       cd $TRADEALERT_HOME && python -m jobs.claudetrade_page >> logs/g2_pagina.log 2>&1
+
 # ---------- Grid2 REALE (ogni 30 minuti, sfalsati) ----------
 # Dal 2026-09-03: 30 minuti invece di 10. Misurato su 90 giorni a parita' di
 # finestre (jobs/grid_intraday_test.py --res): 5 min +0.24€/30gg, 15 min +0.35,
