@@ -33,7 +33,7 @@ log = logging.getLogger(__name__)
 
 # Comandi che leggono e basta. /stat, /statN, /conti restano come alias.
 GRID_COMMANDS = ("/stato", "/status", "/stat", "/conti", "/grid", "/posizioni",
-                 "/positions", "/oggi", "/aiuto", "/help", "/start")
+                 "/positions", "/oggi", "/aiuto", "/help", "/start", "/esercizio")
 # Comandi che muovono denaro: /ferma <reale|prova>, /riparti <reale|prova>.
 GRID_ACTIONS = ("/ferma", "/riparti")
 KNOWN_COMMANDS = GRID_COMMANDS + GRID_ACTIONS
@@ -41,11 +41,33 @@ KNOWN_COMMANDS = GRID_COMMANDS + GRID_ACTIONS
 
 def _g2_soglie(env: str) -> tuple[float, float]:
     """Soglie di profitto del conto (stesse env del job grid2)."""
+    from .grid_control import soglie_conto
+    s = soglie_conto(env)
+    return s["profit_alert"], s["profit_stop"]
+
+
+def _messaggio_esercizio(env: str = "demo") -> str:
+    """Il resoconto dell'esercizio a capitale dichiarato, su richiesta."""
     import os
-    pref = "G2_"
-    a = float(os.environ.get(f"{pref}PROFIT_ALERT_EUR", "10"))
-    b = float(os.environ.get(f"{pref}PROFIT_STOP_EUR", "20"))
-    return a, b
+
+    from .grid_esercizio import leggi, messaggio
+    from .grid_report import raccogli
+    from jobs.grid_esercizio import _client
+
+    st = leggi(env)
+    if not st.get("capitale"):
+        return ("Nessun esercizio in corso sul conto di prova. "
+                "Si avvia dalla VM con <code>--avvia</code>.")
+    originale = os.environ.get("CAPITAL_ENV")
+    try:
+        _, cap = _client(env)
+        return messaggio(raccogli(cap, env, n_ultimi=0, con_valore=True), st,
+                         "Esercizio, situazione adesso")
+    finally:
+        if originale is None:
+            os.environ.pop("CAPITAL_ENV", None)
+        else:
+            os.environ["CAPITAL_ENV"] = originale
 
 
 def _handle_grid_command(config: Config, text: str) -> bool:
@@ -90,6 +112,8 @@ def _handle_grid_command(config: Config, text: str) -> bool:
             n = int((m_oggi or m_stat).group(1) or 0)
             conti = leggi_conti(max(n, 10))
             telegram.send_message(messaggio_oggi(conti, n))
+        elif cmd == "/esercizio":
+            telegram.send_message(_messaggio_esercizio())
         elif cmd in ("/posizioni", "/positions"):
             conti = leggi_conti(con_valore=True)
             telegram.send_message(messaggio_posizioni(conti))

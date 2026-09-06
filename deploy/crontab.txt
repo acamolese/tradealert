@@ -1,7 +1,7 @@
 # Crontab TradeAlert sulla VM Oracle (TZ Europe/Rome). Installare con:
 #   crontab deploy/crontab.txt
-# Stato al 2026-09-03: l'unico sistema vivo e' il grid2 bidirezionale (6 profili
-# reali + 8 di prova, ogni 10 minuti sfalsati). Scanner v1, v2, spinner, monitor,
+# Stato al 2026-09-06: l'unico sistema vivo e' il grid2 bidirezionale (6 profili
+# reali + 8 di prova, ogni 30 minuti sfalsati). Scanner v1, v2, spinner, monitor,
 # trailing, briefing, agenda: tutti SPENTI, i job restano nel repo.
 SHELL=/bin/bash
 PATH=/home/ubuntu/tradealert/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -23,6 +23,11 @@ TRADEALERT_HOME=/home/ubuntu/tradealert
 0 8 * * *            cd $TRADEALERT_HOME && python -m jobs.grid_hourly --mattina >> logs/g2_hourly.log 2>&1
 30 22 * * 6,0        cd $TRADEALERT_HOME && python -m jobs.grid_hourly --sera >> logs/g2_hourly.log 2>&1
 
+# Resoconto dell'esercizio a capitale dichiarato (conto di prova letto come se
+# avesse 200 €), dal 2026-09-06: ogni sera feriale a mercati chiusi. Sabato e
+# domenica non parte: c'e' gia' la chiusura di giornata delle 22:30.
+30 22 * * 1-5        cd $TRADEALERT_HOME && python -m jobs.grid_esercizio --report >> logs/g2_esercizio.log 2>&1
+
 # ---------- Grid2 REALE (ogni 30 minuti, sfalsati) ----------
 # Dal 2026-09-03: 30 minuti invece di 10. Misurato su 90 giorni a parita' di
 # finestre (jobs/grid_intraday_test.py --res): 5 min +0.24€/30gg, 15 min +0.35,
@@ -35,6 +40,10 @@ TRADEALERT_HOME=/home/ubuntu/tradealert
 5,35 * * * *         cd $TRADEALERT_HOME && python -m jobs.grid2 --profile RUS30 >> logs/g2r.log 2>&1
 
 # ---------- Grid2 DI PROVA (stessa logica, conto demo, ogni 30 minuti) ----------
+# Dal 2026-09-06 e' l'esercizio a capitale dichiarato: il conto ha ~980 € ma si
+# lavora e si misura come se ne avesse 200. Otto strumenti a taglia minima, due
+# gradini per verso: esposizione massima 644 € (3,2 volte il capitale), margine
+# 37 €. Soglie di conto in G2_DEMO_* (stop -40 €, obiettivo +40 €).
 0,30 * * * *         cd $TRADEALERT_HOME && sleep 20 && CAPITAL_ENV=demo python -m jobs.grid2 --profile DNAS >> logs/g2d.log 2>&1
 1,31 * * * *         cd $TRADEALERT_HOME && sleep 20 && CAPITAL_ENV=demo python -m jobs.grid2 --profile DJP >> logs/g2d.log 2>&1
 2,32 * * * *         cd $TRADEALERT_HOME && sleep 20 && CAPITAL_ENV=demo python -m jobs.grid2 --profile DORO >> logs/g2d.log 2>&1

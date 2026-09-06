@@ -33,11 +33,23 @@ from src.grid_control import (avvisa_lettura_fallita, eur, leggi_equity,
 log = logging.getLogger(__name__)
 DATA = Path(__file__).resolve().parent.parent / "data"
 PROFILO = ""
+CONTO = ""
 
 
 def _env(name: str, default: str) -> str:
+    """Parametro del grid: prima il profilo, poi il CONTO, poi il valore globale.
+
+    Il livello per conto (G2_DEMO_..., G2_LIVE_...) e' del 2026-09-06: le soglie
+    di conto sono per definizione uguali per tutti i grid dello stesso conto, e
+    duplicarle su ogni profilo (otto volte, sul conto di prova) le fa divergere
+    alla prima modifica dimenticata.
+    """
     if PROFILO:
         v = os.environ.get(f"G2_{PROFILO}_{name}")
+        if v is not None:
+            return v
+    if CONTO:
+        v = os.environ.get(f"G2_{CONTO.upper()}_{name}")
         if v is not None:
             return v
     return os.environ.get(f"G2_{name}", default)
@@ -54,7 +66,7 @@ def _esc(t):
 def main() -> int:
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    global PROFILO
+    global PROFILO, CONTO
     if "--profile" in sys.argv:
         PROFILO = sys.argv[sys.argv.index("--profile") + 1].upper()
     dry = "--dry-run" in sys.argv
@@ -66,6 +78,7 @@ def main() -> int:
     from src.executor import _market_meta
 
     v1 = load_config()
+    CONTO = v1.capital_env
     enabled = _env("ENABLED", "false").strip().lower() == "true"
     epic = _env("EPIC", "GOLD")
     step = _f("STEP", 0.002)

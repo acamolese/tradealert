@@ -304,8 +304,15 @@ def messaggio_oggi(conti: list[Conto], n: int = 0) -> str:
 
 
 def messaggio_aiuto() -> str:
+    from src.grid_esercizio import leggi
+    st = leggi("demo")
+    esercizio = (f"/esercizio · come va la prova da {eur(st['capitale'])}\n"
+                 if st.get("capitale") else "")
+    coda_esercizio = (" Il resoconto dell'esercizio arriva ogni sera alle 22:30, "
+                      "dal lunedì al venerdì." if st.get("capitale") else "")
     return ("ℹ️ <b>Comandi</b>\n"
             "/stato · quanto ho e come sta andando, adesso\n"
+            + esercizio +
             "/posizioni · le posizioni aperte, spiegate\n"
             "/oggi · le operazioni chiuse oggi (/oggi10 = le ultime 10)\n"
             "/ferma reale · chiude tutto sul conto reale e lo mette in pausa\n"
@@ -315,8 +322,9 @@ def messaggio_aiuto() -> str:
             "<i>Messaggi automatici: riepilogo ogni ora, buongiorno alle 8, "
             "riepilogo della settimana la domenica sera. Sabato e domenica, a "
             "mercati fermi, il riepilogo orario arriva solo se cambia qualcosa: "
-            "restano il buongiorno e la chiusura delle 22:30. "
-            "Gli avvisi importanti arrivano subito.</i>")
+            "restano il buongiorno e la chiusura delle 22:30."
+            + coda_esercizio +
+            " Gli avvisi importanti arrivano subito.</i>")
 
 
 # compatibilita' con i vecchi nomi (comandi /stat, /statN)

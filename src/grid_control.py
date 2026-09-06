@@ -187,3 +187,33 @@ def ferma(env: str, telegram) -> str:
            f"/riparti {parola_conto(env)}.")
     telegram.send_message(msg)
     return msg
+
+
+# ------------------------------------------------------- soglie per CONTO
+
+# Le soglie di conto (perdita e profitto) sono per definizione uguali per tutti
+# i grid dello stesso conto: duplicarle su ogni profilo (com'era per gli otto
+# profili di prova) le fa divergere alla prima modifica dimenticata. Ordine di
+# ricerca, lo stesso di jobs/grid2.py: profilo, poi CONTO, poi globale.
+SOGLIE_DEFAULT = {"LOSS_ALERT_EUR": 5.0, "LOSS_STOP_EUR": 10.0,
+                  "PROFIT_ALERT_EUR": 10.0, "PROFIT_STOP_EUR": 20.0}
+
+
+def soglia_conto(env: str, nome: str, default: float | None = None) -> float:
+    """Valore di G2_<ENV>_<nome>, altrimenti G2_<nome>, altrimenti il default."""
+    if default is None:
+        default = SOGLIE_DEFAULT.get(nome, 0.0)
+    for chiave in (f"G2_{env.upper()}_{nome}", f"G2_{nome}"):
+        v = os.environ.get(chiave)
+        if v is not None:
+            try:
+                return float(v)
+            except ValueError:
+                log.error("%s non numerico: %r", chiave, v)
+    return float(default)
+
+
+def soglie_conto(env: str) -> dict:
+    """Le quattro soglie del conto, in euro: avviso e stop, perdita e profitto."""
+    return {n.lower().replace("_eur", ""): soglia_conto(env, n)
+            for n in SOGLIE_DEFAULT}
