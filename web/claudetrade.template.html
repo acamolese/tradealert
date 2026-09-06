@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="ClaudeTrade: un conto da 200 euro gestito da un grid bidirezionale su otto indici. Valore, posizioni e registro giornaliero.">
+<meta name="robots" content="noindex">
+<style>
+:root{color-scheme:light dark}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none !important}
+</style>
+<title>ClaudeTrade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Petrona:ital,wght@0,500;0,700;1,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --ground:#EDF1F2; --panel:#FBFCFC; --panel-2:#F4F7F8;
+  --ink:#132029; --muted:#5A6C77; --faint:#8496A0;
+  --line:#D5DEE2; --line-strong:#BECBD1;
+  --accent:#175E72; --accent-soft:#DCEAEE;
+  --pos:#2E7A52; --neg:#AF4A2E; --warn:#8A6A16;
+  --pos-soft:#E2EFE7; --neg-soft:#F6E5DE;
+  --shadow:0 1px 2px rgba(19,32,41,.05), 0 8px 24px -16px rgba(19,32,41,.35);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0D1418; --panel:#141D22; --panel-2:#18232A;
+    --ink:#E4EDF0; --muted:#93A5AE; --faint:#71858F;
+    --line:#233038; --line-strong:#31434C;
+    --accent:#63B7CC; --accent-soft:#17303A;
+    --pos:#69C08D; --neg:#E28A6A; --warn:#D8B45A;
+    --pos-soft:#162A21; --neg-soft:#2E1D17;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0D1418; --panel:#141D22; --panel-2:#18232A;
+  --ink:#E4EDF0; --muted:#93A5AE; --faint:#71858F;
+  --line:#233038; --line-strong:#31434C;
+  --accent:#63B7CC; --accent-soft:#17303A;
+  --pos:#69C08D; --neg:#E28A6A; --warn:#D8B45A;
+  --pos-soft:#162A21; --neg-soft:#2E1D17;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--ground); color:var(--ink);
+  font-family:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size:15px; line-height:1.55; margin:0;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1080px; margin:0 auto; padding:40px 24px 72px; display:flex; flex-direction:column; gap:34px}
+h1,h2,h3{margin:0; text-wrap:balance}
+p{margin:0}
+
+/* ---------- testata ---------- */
+.head{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:20px}
+.eyebrow{
+  font:500 11px/1 "IBM Plex Mono", ui-monospace, monospace;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--faint);
+}
+h1{font-family:Petrona, Georgia, serif; font-weight:700; font-size:clamp(34px,5vw,50px); line-height:1.02; letter-spacing:-.015em; margin-top:10px}
+.sub{color:var(--muted); max-width:60ch; margin-top:12px}
+.pill{
+  display:inline-flex; align-items:center; gap:8px; white-space:nowrap;
+  border:1px solid var(--line-strong); border-radius:999px; padding:7px 14px;
+  font:500 12px/1 "IBM Plex Mono", monospace; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--muted); background:var(--panel);
+}
+.dot{width:7px; height:7px; border-radius:50%; background:var(--faint)}
+.pill.attesa .dot{background:var(--warn)}
+.pill.corso{color:var(--pos); border-color:var(--pos)}
+.pill.corso .dot{background:var(--pos)}
+.pill.fermo{color:var(--neg); border-color:var(--neg)}
+.pill.fermo .dot{background:var(--neg)}
+
+/* ---------- tile di misura ---------- */
+.tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:4px; overflow:hidden}
+.tile{background:var(--panel); padding:22px 24px 24px; display:flex; flex-direction:column; gap:6px}
+.tile .lab{font:500 11px/1 "IBM Plex Mono", monospace; letter-spacing:.12em; text-transform:uppercase; color:var(--faint)}
+.tile .big{font-family:Petrona, Georgia, serif; font-weight:700; font-size:38px; line-height:1.05; letter-spacing:-.02em; font-variant-numeric:tabular-nums}
+.tile .note{font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums}
+.pos{color:var(--pos)} .neg{color:var(--neg)}
+
+/* ---------- sezioni ---------- */
+section{display:flex; flex-direction:column; gap:14px}
+.sec-head{display:flex; align-items:baseline; justify-content:space-between; gap:16px; border-bottom:1px solid var(--line); padding-bottom:8px}
+h2{font-family:Petrona, Georgia, serif; font-weight:600; font-size:21px; letter-spacing:-.01em}
+.sec-head .hint{font-size:12.5px; color:var(--faint); font-variant-numeric:tabular-nums}
+
+.cols{display:grid; grid-template-columns:1.35fr 1fr; gap:26px; align-items:start}
+@media (max-width:760px){ .cols{grid-template-columns:1fr} }
+
+/* ---------- grafico ---------- */
+.chart-box{background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:18px 18px 10px}
+svg{display:block; width:100%; height:auto; overflow:visible}
+.vuoto{
+  color:var(--muted); font-size:14px; background:var(--panel-2); border:1px dashed var(--line-strong);
+  border-radius:4px; padding:26px 22px; text-align:center;
+}
+.vuoto strong{color:var(--ink); font-weight:600}
+
+/* ---------- tabelle ---------- */
+.tab-scroll{overflow-x:auto}
+table{width:100%; border-collapse:collapse; font-size:14px}
+th{
+  font:500 10.5px/1 "IBM Plex Mono", monospace; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--faint); text-align:right; padding:0 0 9px; border-bottom:1px solid var(--line); white-space:nowrap;
+}
+th:first-child, td:first-child{text-align:left}
+td{padding:10px 0; border-bottom:1px solid var(--line); text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
+td:first-child{white-space:normal}
+tbody tr:last-child td{border-bottom:none}
+th+th, td+td{padding-left:18px}
+.strum{font-weight:500}
+.epic{font:400 11.5px/1 "IBM Plex Mono", monospace; color:var(--faint); margin-left:7px}
+.verso{font:500 10.5px/1 "IBM Plex Mono", monospace; letter-spacing:.06em; text-transform:uppercase; padding:3px 7px; border-radius:3px}
+.verso.long{background:var(--pos-soft); color:var(--pos)}
+.verso.short{background:var(--neg-soft); color:var(--neg)}
+
+/* ---------- soglie ---------- */
+.soglie{background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:20px 22px; display:flex; flex-direction:column; gap:16px}
+.scala{position:relative; height:46px; margin-top:4px}
+.barra{position:absolute; top:18px; left:0; right:0; height:6px; background:var(--panel-2); border:1px solid var(--line); border-radius:3px}
+.zero{position:absolute; top:10px; width:1px; height:22px; background:var(--line-strong)}
+.marker{position:absolute; top:12px; width:3px; height:18px; border-radius:2px; background:var(--accent)}
+.scala .cap{position:absolute; top:30px; font:400 11px/1 "IBM Plex Mono", monospace; color:var(--faint)}
+.scala .cap.sx{left:0} .scala .cap.dx{right:0} .scala .cap.mid{left:50%; transform:translateX(-50%)}
+.kv{display:flex; flex-direction:column; gap:9px; font-size:14px}
+.kv div{display:flex; justify-content:space-between; gap:16px; align-items:baseline}
+.kv span:last-child{font-variant-numeric:tabular-nums; font-weight:500}
+.kv .k{color:var(--muted)}
+
+/* ---------- regole ---------- */
+.regole{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:4px; overflow:hidden}
+.regola{background:var(--panel); padding:16px 18px; display:flex; flex-direction:column; gap:3px}
+.regola dt{font:500 10.5px/1 "IBM Plex Mono", monospace; letter-spacing:.1em; text-transform:uppercase; color:var(--faint)}
+.regola dd{margin:0; font-size:15px; font-weight:500; font-variant-numeric:tabular-nums}
+.regola .why{font-size:12.5px; color:var(--muted); font-weight:400}
+
+.formula{
+  background:var(--accent-soft); border-left:3px solid var(--accent); border-radius:0 4px 4px 0;
+  padding:16px 20px; font-size:14px; color:var(--ink); display:flex; flex-direction:column; gap:6px;
+}
+.formula code{font-family:"IBM Plex Mono", monospace; font-size:13.5px; color:var(--accent); font-weight:500}
+
+/* ---------- confronto ---------- */
+.conti{display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:4px; overflow:hidden}
+@media (max-width:560px){ .conti{grid-template-columns:1fr} }
+.conto{background:var(--panel); padding:18px 20px; display:flex; flex-direction:column; gap:8px}
+.conto h3{font-family:"IBM Plex Sans", sans-serif; font-size:13px; font-weight:600; letter-spacing:.01em}
+.conto .riga{display:flex; justify-content:space-between; font-size:13.5px; color:var(--muted); font-variant-numeric:tabular-nums}
+.conto .riga b{color:var(--ink); font-weight:500}
+
+footer{border-top:1px solid var(--line); padding-top:18px; color:var(--muted); font-size:13px; display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between}
+footer code{font-family:"IBM Plex Mono", monospace; font-size:12.5px; color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+@media (prefers-reduced-motion: reduce){ *{transition:none !important; animation:none !important} }
+.live{transition:opacity .25s ease}
+.attesa-dati{opacity:.45}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="head">
+    <div>
+      <div class="eyebrow">Grid bidirezionale · otto indici</div>
+      <h1>ClaudeTrade</h1>
+      <p class="sub">Un conto da 200 euro che compra quando il prezzo scende sotto la sua media
+        e vende quando risale, sempre alla taglia più piccola che il broker accetta.
+        Questa pagina lo segue giorno per giorno: quanto vale, cosa ha in mano, quanto rischia.</p>
+    </div>
+    <div class="pill attesa" id="stato-pill"><span class="dot"></span><span id="stato-testo">in attesa di partenza</span></div>
+  </header>
+
+  <div class="tiles" id="tiles">
+    <div class="tile">
+      <div class="lab">Valore</div>
+      <div class="big" id="t-valore">200,00 €</div>
+      <div class="note" id="t-valore-nota">capitale iniziale, non ancora avviato</div>
+    </div>
+    <div class="tile">
+      <div class="lab">Giornata</div>
+      <div class="big" id="t-oggi">—</div>
+      <div class="note" id="t-oggi-nota">la prima giornata è lunedì 8 settembre</div>
+    </div>
+    <div class="tile">
+      <div class="lab">Esposizione</div>
+      <div class="big" id="t-esposto">—</div>
+      <div class="note" id="t-esposto-nota">quanto è a mercato in questo momento</div>
+    </div>
+  </div>
+
+  <section>
+    <div class="sec-head">
+      <h2>Andamento</h2>
+      <span class="hint" id="hint-grafico">un punto per ogni sera feriale</span>
+    </div>
+    <div id="grafico-slot">
+      <div class="vuoto"><strong>Il primo punto arriva lunedì sera.</strong><br>
+        ClaudeTrade parte nella notte tra domenica 7 e lunedì 8 settembre, al primo momento in cui i mercati tornano negoziabili: liquidare all'apertura europea vorrebbe dire vendere dentro le oscillazioni.</div>
+    </div>
+  </section>
+
+  <div class="cols">
+    <section>
+      <div class="sec-head">
+        <h2>Posizioni aperte</h2>
+        <span class="hint" id="hint-posizioni"></span>
+      </div>
+      <div class="tab-scroll">
+        <table>
+          <thead><tr><th>Strumento</th><th>Verso</th><th>Taglia</th><th>Valore</th><th>Per ora</th></tr></thead>
+          <tbody id="tb-posizioni"><tr><td colspan="5" style="color:var(--muted);text-align:left">In attesa dei dati del conto.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="sec-head"><h2>Limiti</h2></div>
+      <div class="soglie">
+        <div class="scala">
+          <div class="barra"></div>
+          <div class="zero" style="left:50%"></div>
+          <div class="marker" id="marker" style="left:calc(50% - 1.5px)"></div>
+          <span class="cap sx" id="cap-stop">−40 €</span>
+          <span class="cap mid">200 €</span>
+          <span class="cap dx" id="cap-obiettivo">+40 €</span>
+        </div>
+        <div class="kv">
+          <div><span class="k">Stop di perdita</span><span id="k-stop">−40,00 €  (−20%)</span></div>
+          <div><span class="k">Obiettivo</span><span id="k-obiettivo">+40,00 €  (+20%)</span></div>
+          <div><span class="k">Avvisi</span><span id="k-avvisi">±20,00 €</span></div>
+          <div><span class="k">Per strumento</span><span id="k-kill">8,00 €</span></div>
+        </div>
+        <p style="font-size:13px;color:var(--muted);margin:0">
+          Allo stop il sistema chiude tutto e si ferma da solo. All'obiettivo pure: serve una
+          decisione, incassare o rimettere in gioco.</p>
+      </div>
+    </section>
+  </div>
+
+  <section>
+    <div class="sec-head">
+      <h2>Come è costruito</h2>
+      <span class="hint">grid bidirezionale, passo 3%, ancoraggio a media mobile 5 giorni</span>
+    </div>
+    <dl class="regole" id="regole">
+      <div class="regola"><dt>Capitale</dt><dd>200,00 €</dd><dd class="why">tutto quello che c'è sul conto</dd></div>
+      <div class="regola"><dt>Strumenti</dt><dd>8 indici e oro</dd><dd class="why">nessuna cripto, spread troppo largo</dd></div>
+      <div class="regola"><dt>Gradini per verso</dt><dd>2</dd><dd class="why">da −2 a +2 taglie minime</dd></div>
+      <div class="regola"><dt>Controllo</dt><dd>ogni 30 minuti</dd><dd class="why">misurato meglio di 5 e 15</dd></div>
+      <div class="regola"><dt>Esposizione massima</dt><dd id="r-esposizione">644 €</dd><dd class="why">3,2 volte il capitale</dd></div>
+      <div class="regola"><dt>Margine massimo</dt><dd id="r-margine">37 €</dd><dd class="why">18% del capitale</dd></div>
+    </dl>
+
+    <div class="formula">
+      <div><strong>Come guadagna.</strong> Non prova a indovinare la direzione. Ogni 30 minuti
+        guarda quanto il prezzo si è allontanato dalla sua media a 5 giorni: ogni 3% di distanza
+        è un gradino, e la posizione va nel verso opposto. Guadagna sulla strada percorsa avanti
+        e indietro, non sulla tendenza.</div>
+      <code>posizione = −gradini × taglia minima, mai oltre ±2</code>
+    </div>
+
+    <div class="tab-scroll" style="margin-top:6px">
+      <table>
+        <thead><tr><th>Il paniere</th><th>Taglia minima</th><th>Vale</th><th>Margine</th><th>Massimo esposto</th></tr></thead>
+        <tbody id="tb-strumenti"><tr><td colspan="5" style="color:var(--muted);text-align:left">In attesa dei dati del broker.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Registro</h2>
+      <span class="hint" id="hint-registro">una riga per sera, come il messaggio delle 22:30</span>
+    </div>
+    <div class="tab-scroll">
+      <table>
+        <thead><tr><th>Giorno</th><th>Valore</th><th>Variazione</th><th>Operazioni</th><th>Incassato</th><th>Costi</th></tr></thead>
+        <tbody id="tb-giorni"><tr><td colspan="6" style="color:var(--muted);text-align:left">Nessuna giornata registrata: si parte lunedì.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <span>I numeri arrivano dal broker. La pagina si riscrive da sola ogni mezz'ora, a mercati aperti.</span>
+    <span id="aggiornato">in attesa di dati</span>
+  </footer>
+</div>
+
+<!--DATI-->
+<script>
+(function(){
+  "use strict";
+
+  var NOMI = {US100:"Nasdaq", US30:"Dow Jones", US500:"S&P 500", DE40:"DAX",
+              NL25:"AEX Olanda", J225:"Nikkei", HK50:"Hang Seng", GOLD:"Oro"};
+  var $ = function(id){ return document.getElementById(id); };
+
+  function eur(x, segno){
+    if (x === null || x === undefined || isNaN(x)) return "—";
+    var s = (segno && x >= 0 ? "+" : "") + Number(x).toFixed(2);
+    return s.replace(".", ",") + " €";
+  }
+  function num(x, d){
+    if (x === null || x === undefined || isNaN(x)) return "—";
+    return Number(x).toFixed(d === undefined ? 2 : d).replace(".", ",");
+  }
+  function pct(x, base){
+    if (!base || x === null || x === undefined || isNaN(x)) return "";
+    return "(" + (x >= 0 ? "+" : "") + (x / base * 100).toFixed(2).replace(".", ",") + "%)";
+  }
+  function segnoClasse(x){ return x > 0 ? "pos" : (x < 0 ? "neg" : ""); }
+  function nome(epic){ return NOMI[epic] || epic; }
+  function giornoEsteso(iso){
+    var G = ["domenica","lunedì","martedì","mercoledì","giovedì","venerdì","sabato"];
+    var M = ["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio",
+             "agosto","settembre","ottobre","novembre","dicembre"];
+    var p = String(iso).split("-");
+    if (p.length !== 3) return String(iso);
+    var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+    return G[d.getUTCDay()] + " " + d.getUTCDate() + " " + M[d.getUTCMonth()];
+  }
+  function svuota(el){ while (el.firstChild) el.removeChild(el.firstChild); }
+  function cella(testo, classe){
+    var td = document.createElement("td");
+    td.textContent = testo;
+    if (classe) td.className = classe;
+    return td;
+  }
+  function messaggio(tbody, colonne, testo){
+    svuota(tbody);
+    var tr = document.createElement("tr"), td = document.createElement("td");
+    td.colSpan = colonne; td.textContent = testo;
+    td.style.color = "var(--muted)"; td.style.textAlign = "left";
+    tr.appendChild(td); tbody.appendChild(tr);
+  }
+
+  // ---------------------------------------------------------------- stato
+  function rendiStato(s){
+    var cap = s.capitale || 200;
+    var valore = (s.valore === undefined || s.valore === null) ? cap : s.valore;
+    var tot = valore - cap;
+
+    var pill = $("stato-pill"), testo = $("stato-testo");
+    pill.className = "pill " + (s.fase || "attesa");
+    testo.textContent = s.fase === "corso" ? "in corso"
+      : (s.fase === "fermo" ? "fermo" : "in attesa di partenza");
+
+    $("t-valore").textContent = eur(valore);
+    $("t-valore").className = "big " + segnoClasse(tot);
+    $("t-valore-nota").textContent = s.avviato
+      ? eur(tot, true) + " " + pct(tot, cap) + " dall'avvio"
+      : "capitale iniziale, non ancora avviato";
+
+    if (s.avviato){
+      $("t-oggi").textContent = eur(s.delta_oggi, true);
+      $("t-oggi").className = "big " + segnoClasse(s.delta_oggi);
+      $("t-oggi-nota").textContent = pct(s.delta_oggi, cap) + " del capitale";
+    } else if (s.avvio_previsto){
+      $("t-oggi").textContent = "—";
+      $("t-oggi-nota").textContent = "parte " + s.avvio_previsto;
+    }
+
+    if (s.esposto !== undefined && s.esposto !== null){
+      $("t-esposto").textContent = eur(s.esposto);
+      $("t-esposto-nota").textContent = num(s.esposto / cap, 1) + " volte il capitale, "
+        + (s.posizioni ? s.posizioni.length : 0) + " posizioni";
+    }
+
+    // posizioni
+    var tb = $("tb-posizioni");
+    var pos = s.posizioni || [];
+    if (!pos.length){
+      messaggio(tb, 5, s.avviato ? "Nessuna posizione aperta: tutto liquido."
+                                 : "Nessuna posizione: si parte da qui.");
+    } else {
+      svuota(tb);
+      pos.forEach(function(p){
+        var tr = document.createElement("tr");
+        var td1 = document.createElement("td");
+        var b = document.createElement("span");
+        b.className = "strum"; b.textContent = nome(p.epic);
+        var e = document.createElement("span");
+        e.className = "epic"; e.textContent = p.epic;
+        td1.appendChild(b); td1.appendChild(e);
+        var td2 = document.createElement("td");
+        var v = document.createElement("span");
+        v.className = "verso " + (p.size >= 0 ? "long" : "short");
+        v.textContent = p.size >= 0 ? "comprato" : "venduto";
+        td2.appendChild(v);
+        tr.appendChild(td1); tr.appendChild(td2);
+        tr.appendChild(cella(num(Math.abs(p.size), 3)));
+        tr.appendChild(cella(p.valore ? eur(p.valore) : "—"));
+        tr.appendChild(cella(eur(p.pnl, true), segnoClasse(p.pnl)));
+        tb.appendChild(tr);
+      });
+    }
+    $("hint-posizioni").textContent = pos.length
+      ? pos.length + (pos.length === 1 ? " strumento a mercato" : " strumenti a mercato") : "";
+
+    // soglie
+    var so = s.soglie || {};
+    var stop = so.stop || 40, obb = so.obiettivo || 40;
+    $("k-stop").textContent = eur(-stop, true) + "  " + pct(-stop, cap);
+    $("k-obiettivo").textContent = eur(obb, true) + "  " + pct(obb, cap);
+    $("cap-stop").textContent = "−" + num(stop, 0) + " €";
+    $("cap-obiettivo").textContent = "+" + num(obb, 0) + " €";
+    if (so.avviso_perdita) $("k-avvisi").textContent = "±" + eur(so.avviso_perdita);
+    if (so.kill_strumento) $("k-kill").textContent = eur(so.kill_strumento);
+    var frazione = Math.max(-1, Math.min(1, tot / (tot < 0 ? stop : obb)));
+    $("marker").style.left = "calc(" + (50 + frazione * 50) + "% - 1.5px)";
+    $("marker").style.background = tot === 0 ? "var(--accent)"
+      : (tot > 0 ? "var(--pos)" : "var(--neg)");
+
+    if (s.aggiornato){
+      var d = new Date(s.aggiornato);
+      if (!isNaN(d)) $("aggiornato").textContent = "dati del " + d.toLocaleDateString("it-IT",
+        {day:"numeric", month:"long"}) + " alle " + d.toLocaleTimeString("it-IT",
+        {hour:"2-digit", minute:"2-digit"});
+    }
+  }
+
+  // ------------------------------------------------------------- paniere
+  function rendiRegole(r){
+    var tb = $("tb-strumenti");
+    var st = r.strumenti || [];
+    if (!st.length) return;
+    svuota(tb);
+    var totNoz = 0, totMarg = 0;
+    st.forEach(function(s){
+      var max = s.nozionale * (r.max_unita || 2);
+      totNoz += max; totMarg += s.margine * (r.max_unita || 2);
+      var tr = document.createElement("tr");
+      var td1 = document.createElement("td");
+      var b = document.createElement("span");
+      b.className = "strum"; b.textContent = nome(s.epic);
+      var e = document.createElement("span");
+      e.className = "epic"; e.textContent = s.epic;
+      td1.appendChild(b); td1.appendChild(e);
+      tr.appendChild(td1);
+      tr.appendChild(cella(num(s.min_size, 3)));
+      tr.appendChild(cella(eur(s.nozionale)));
+      tr.appendChild(cella(eur(s.margine)));
+      tr.appendChild(cella(eur(max)));
+      tb.appendChild(tr);
+    });
+    $("r-esposizione").textContent = eur(totNoz);
+    $("r-margine").textContent = eur(totMarg);
+    var cap = r.capitale || 200;
+    $("r-esposizione").parentNode.querySelector(".why").textContent =
+      num(totNoz / cap, 1) + " volte il capitale";
+    $("r-margine").parentNode.querySelector(".why").textContent =
+      Math.round(totMarg / cap * 100) + "% del capitale";
+  }
+
+  // ------------------------------------------------------------- grafico
+  function rendiGrafico(giorni, cap){
+    var slot = $("grafico-slot");
+    if (!giorni.length) return;
+    var W = 900, H = 260, ML = 58, MR = 52, MT = 22, MB = 30;
+    var valori = giorni.map(function(g){ return g.valore; });
+    var min = Math.min.apply(null, valori.concat([cap]));
+    var max = Math.max.apply(null, valori.concat([cap]));
+    var span = Math.max(max - min, 1.5);
+    min -= span * 0.18; max += span * 0.18;
+    var x = function(i){
+      return giorni.length === 1 ? ML + (W - ML - MR) / 2
+        : ML + i * (W - ML - MR) / (giorni.length - 1);
+    };
+    var y = function(v){ return MT + (max - v) * (H - MT - MB) / (max - min); };
+
+    var ns = "http://www.w3.org/2000/svg";
+    var svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Andamento del valore del conto");
+
+    function linea(x1, y1, x2, y2, colore, tratteggio){
+      var l = document.createElementNS(ns, "line");
+      l.setAttribute("x1", x1); l.setAttribute("y1", y1);
+      l.setAttribute("x2", x2); l.setAttribute("y2", y2);
+      l.setAttribute("stroke", colore); l.setAttribute("stroke-width", "1");
+      if (tratteggio) l.setAttribute("stroke-dasharray", tratteggio);
+      svg.appendChild(l);
+    }
+    function testo(tx, ty, s, anchor, colore, peso){
+      var t = document.createElementNS(ns, "text");
+      t.setAttribute("x", tx); t.setAttribute("y", ty);
+      t.setAttribute("text-anchor", anchor || "start");
+      t.setAttribute("fill", colore);
+      t.setAttribute("font-family", "IBM Plex Mono, monospace");
+      t.setAttribute("font-size", "11.5");
+      if (peso) t.setAttribute("font-weight", peso);
+      t.textContent = s;
+      svg.appendChild(t);
+    }
+
+    // riferimento: il capitale di partenza
+    linea(ML, y(cap), W - MR, y(cap), "var(--line-strong)", "3 3");
+    testo(ML - 8, y(cap) + 4, num(cap, 0) + " €", "end", "var(--faint)");
+
+    // estremi della scala, saltati se cadono addosso alla riga del capitale
+    if (Math.abs(y(max) - y(cap)) > 14) testo(ML - 8, y(max) + 4, num(max, 1), "end", "var(--faint)");
+    if (Math.abs(y(min) - y(cap)) > 14) testo(ML - 8, y(min) + 4, num(min, 1), "end", "var(--faint)");
+
+    // area e linea
+    var d = "", area = "M " + x(0) + " " + y(cap);
+    giorni.forEach(function(g, i){
+      d += (i ? " L " : "M ") + x(i) + " " + y(g.valore);
+      area += " L " + x(i) + " " + y(g.valore);
+    });
+    area += " L " + x(giorni.length - 1) + " " + y(cap) + " Z";
+    var ultimo = giorni[giorni.length - 1].valore;
+    var colore = ultimo >= cap ? "var(--pos)" : "var(--neg)";
+
+    var a = document.createElementNS(ns, "path");
+    a.setAttribute("d", area); a.setAttribute("fill", colore);
+    a.setAttribute("fill-opacity", "0.10"); a.setAttribute("stroke", "none");
+    svg.appendChild(a);
+
+    var p = document.createElementNS(ns, "path");
+    p.setAttribute("d", d); p.setAttribute("fill", "none");
+    p.setAttribute("stroke", colore); p.setAttribute("stroke-width", "2");
+    p.setAttribute("stroke-linejoin", "round"); p.setAttribute("stroke-linecap", "round");
+    svg.appendChild(p);
+
+    // punto finale
+    var c = document.createElementNS(ns, "circle");
+    c.setAttribute("cx", x(giorni.length - 1)); c.setAttribute("cy", y(ultimo));
+    c.setAttribute("r", "4"); c.setAttribute("fill", colore);
+    svg.appendChild(c);
+    testo(x(giorni.length - 1) + 9, y(ultimo) + 4, eur(ultimo), "start", colore, "500");
+
+    // date agli estremi
+    testo(x(0), H - 8, String(giorni[0].data).slice(8) + "/" + String(giorni[0].data).slice(5, 7),
+      "middle", "var(--faint)");
+    if (giorni.length > 1){
+      var u = giorni[giorni.length - 1].data;
+      testo(x(giorni.length - 1), H - 8, String(u).slice(8) + "/" + String(u).slice(5, 7),
+        "middle", "var(--faint)");
+    }
+
+    svuota(slot);
+    var box = document.createElement("div");
+    box.className = "chart-box";
+    box.appendChild(svg);
+    slot.appendChild(box);
+    $("hint-grafico").textContent = giorni.length + (giorni.length === 1 ? " giornata" : " giornate");
+  }
+
+  function rendiGiorni(giorni, cap){
+    var tb = $("tb-giorni");
+    if (!giorni.length) return;
+    svuota(tb);
+    giorni.slice().reverse().forEach(function(g){
+      var tr = document.createElement("tr");
+      tr.appendChild(cella(giornoEsteso(g.data)));
+      tr.appendChild(cella(eur(g.valore)));
+      tr.appendChild(cella(eur(g.delta, true), segnoClasse(g.delta)));
+      tr.appendChild(cella(g.movimenti === undefined ? "—" : String(g.movimenti)));
+      tr.appendChild(cella(g.realizzato === undefined ? "—" : eur(g.realizzato, true)));
+      tr.appendChild(cella(g.costi === undefined ? "—" : eur(g.costi, true)));
+      tb.appendChild(tr);
+    });
+    var somma = giorni.reduce(function(a, g){ return a + (g.delta || 0); }, 0);
+    $("hint-registro").textContent = giorni.length + " giornate, "
+      + eur(somma, true) + " in tutto";
+    rendiGrafico(giorni, cap);
+  }
+
+  // ------------------------------------------------------------- dati
+  // Scritti dentro la pagina da jobs/claudetrade_page.py a ogni generazione.
+  var D = window.CLAUDETRADE || {};
+  var capitale = (D.stato && D.stato.capitale) || 200;
+  try { if (D.stato) rendiStato(D.stato); } catch (e){ console.error("stato", e); }
+  try { if (D.regole) rendiRegole(D.regole); } catch (e){ console.error("regole", e); }
+  try { if (D.giorni && D.giorni.length) rendiGiorni(D.giorni, capitale); }
+  catch (e){ console.error("giorni", e); }
+
+})();
+</script>
+
+</body>
+</html>
