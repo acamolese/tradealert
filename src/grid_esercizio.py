@@ -211,6 +211,23 @@ def registra_giorno(env: str, st: dict, riga: dict) -> dict:
     return st
 
 
+def attivita(c, st: dict) -> dict:
+    """Operazioni e costi da quando ClaudeTrade e' partito, non da mezzanotte.
+
+    Il primo giorno la giornata del broker contiene anche le chiusure del giro
+    precedente e quello che i grid avevano fatto prima dell'avvio: roba di un
+    altro conto, che qui non va raccontata.
+    """
+    avvio = str(st.get("avvio") or "")
+    dopo = [t for t in (c.oggi or []) if str(t.get("dateUtc") or "") >= avvio]
+    realizzato = sum(float(t.get("size") or 0) for t in dopo)
+    # i costi non sono per riga: se qualcosa e' stato tagliato via, meglio non
+    # attribuire a ClaudeTrade costi maturati prima che esistesse
+    costi = c.costi_oggi if len(dopo) == len(c.oggi or []) else 0.0
+    return {"lista": dopo, "movimenti": len(dopo),
+            "realizzato": realizzato, "costi": costi}
+
+
 def _per_strumento(transazioni: list) -> list[tuple[str, float, int]]:
     """Somma delle operazioni chiuse oggi, strumento per strumento."""
     agg: dict[str, list] = {}
@@ -263,17 +280,18 @@ def messaggio(c, st: dict, titolo: str = "") -> str:
         righe.append(f"⏸ <b>Fermo.</b> {c.pausa} Per ripartire: /riparti prova")
 
     # --- la giornata
+    att = attivita(c, st)
     righe += ["", "<b>Cosa è successo oggi</b>"]
-    if c.movimenti_oggi:
-        righe.append(f"• {c.movimenti_oggi} operazioni chiuse, "
-                     f"{eur(c.realizzato_oggi, True)} in tutto")
-        for nome, imp, n in _per_strumento(c.oggi):
+    if att["movimenti"]:
+        righe.append(f"• {att['movimenti']} operazioni chiuse, "
+                     f"{eur(att['realizzato'], True)} in tutto")
+        for nome, imp, n in _per_strumento(att["lista"]):
             righe.append(f"   {nome_strumento(nome)}: {eur(imp, True)} ({n})")
     else:
         righe.append("• nessuna operazione chiusa")
-    if c.costi_oggi:
-        righe.append(f"• costi del broker: {eur(c.costi_oggi, True)}")
-    non_incassato = oggi - c.realizzato_oggi - c.costi_oggi
+    if att["costi"]:
+        righe.append(f"• costi del broker: {eur(att['costi'], True)}")
+    non_incassato = oggi - att["realizzato"] - att["costi"]
     if abs(non_incassato) >= 0.01:
         righe.append(f"• posizioni ancora aperte: {eur(non_incassato, True)} "
                      f"di valore che si muove")

@@ -23,8 +23,8 @@ import sys
 from datetime import datetime
 
 from src.config import load_config
-from src.grid_esercizio import (CAPITALE_DEFAULT, avvia, leggi, messaggio,
-                                registra_giorno, valore)
+from src.grid_esercizio import (CAPITALE_DEFAULT, attivita, avvia, leggi,
+                                messaggio, registra_giorno, valore)
 from src.grid_report import ROMA, raccogli
 
 log = logging.getLogger(__name__)
@@ -85,12 +85,13 @@ def main() -> int:
     testo = messaggio(c, st)
     if c.ok and not solo_stampa:
         oggi = datetime.now(ROMA).date().isoformat()
+        att = attivita(c, st)
         registra_giorno(env, st, {
             "data": oggi, "valore": round(valore(st, c.equity), 2),
             "delta": round(c.guadagno_oggi, 2),
-            "movimenti": c.movimenti_oggi,
-            "realizzato": round(c.realizzato_oggi, 2),
-            "costi": round(c.costi_oggi, 2)})
+            "movimenti": att["movimenti"],
+            "realizzato": round(att["realizzato"], 2),
+            "costi": round(att["costi"], 2)})
 
     if solo_stampa:
         print(re.sub(r"<[^>]+>", "", testo))
