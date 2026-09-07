@@ -157,6 +157,17 @@ th+th, td+td{padding-left:18px}
 .conto .riga{display:flex; justify-content:space-between; font-size:13.5px; color:var(--muted); font-variant-numeric:tabular-nums}
 .conto .riga b{color:var(--ink); font-weight:500}
 
+/* ---------- diario ---------- */
+.diario{display:flex; flex-direction:column; gap:0}
+.voce{display:grid; grid-template-columns:120px 1fr; gap:0 24px; padding:20px 0; border-bottom:1px solid var(--line)}
+.voce:last-child{border-bottom:none}
+.voce time{font:500 11.5px/1.6 "IBM Plex Mono", monospace; color:var(--faint); letter-spacing:.03em; white-space:nowrap}
+.voce h3{font-family:Petrona, Georgia, serif; font-weight:600; font-size:17.5px; letter-spacing:-.005em; margin-bottom:5px}
+.voce p{color:var(--muted); max-width:68ch}
+@media (max-width:620px){
+  .voce{grid-template-columns:1fr; gap:6px}
+}
+
 footer{border-top:1px solid var(--line); padding-top:18px; color:var(--muted); font-size:13px; display:flex; flex-wrap:wrap; gap:16px 28px; justify-content:space-between; align-items:baseline}
 footer .nota{max-width:60ch}
 .testa-stato{display:flex; flex-direction:column; align-items:flex-end; gap:9px}
@@ -303,6 +314,14 @@ footer code{font-family:"IBM Plex Mono", monospace; font-size:12.5px; color:var(
         <tbody id="tb-giorni"><tr><td colspan="6" style="color:var(--muted);text-align:left">Nessuna giornata registrata: si parte lunedì.</td></tr></tbody>
       </table>
     </div>
+  </section>
+
+  <section id="sez-diario" hidden>
+    <div class="sec-head">
+      <h2>Diario</h2>
+      <span class="hint">cosa abbiamo cambiato, e perché</span>
+    </div>
+    <div class="diario" id="diario"></div>
   </section>
 
   <footer>
@@ -491,6 +510,37 @@ footer code{font-family:"IBM Plex Mono", monospace; font-size:12.5px; color:var(
     $("aggiornato").textContent = t + " · " + quandoFa(ULTIMO);
   }, 60000);
 
+  // -------------------------------------------------------------- diario
+  function dataEstesa(iso){
+    var M = ["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio",
+             "agosto","settembre","ottobre","novembre","dicembre"];
+    var p = String(iso).split("-");
+    if (p.length !== 3) return String(iso);
+    return Number(p[2]) + " " + M[Number(p[1]) - 1] + " " + p[0];
+  }
+
+  function rendiDiario(voci){
+    if (!voci || !voci.length) return;
+    var box = $("diario");
+    svuota(box);
+    voci.forEach(function(v){
+      var art = document.createElement("article");
+      art.className = "voce";
+      var t = document.createElement("time");
+      t.setAttribute("datetime", v.data);
+      t.textContent = dataEstesa(v.data);
+      var corpo = document.createElement("div");
+      var h = document.createElement("h3");
+      h.textContent = v.titolo;
+      var p = document.createElement("p");
+      p.textContent = v.testo;
+      corpo.appendChild(h); corpo.appendChild(p);
+      art.appendChild(t); art.appendChild(corpo);
+      box.appendChild(art);
+    });
+    $("sez-diario").hidden = false;
+  }
+
   // ------------------------------------------------------------- paniere
   function rendiRegole(r){
     var tb = $("tb-strumenti");
@@ -647,6 +697,7 @@ footer code{font-family:"IBM Plex Mono", monospace; font-size:12.5px; color:var(
   try { if (D.regole) rendiRegole(D.regole); } catch (e){ console.error("regole", e); }
   try { if (D.giorni && D.giorni.length) rendiGiorni(D.giorni, capitale); }
   catch (e){ console.error("giorni", e); }
+  try { rendiDiario(D.diario); } catch (e){ console.error("diario", e); }
 
 })();
 </script>

@@ -1,0 +1,27 @@
+[
+  {
+    "data": "2026-09-07",
+    "titolo": "Il sistema comprava soltanto",
+    "testo": "Controllando 28.774 decisioni prese dal 22 agosto è emerso che il sistema non ha mai venduto allo scoperto, nemmeno una volta: comprava e basta. Non era voluto. La soglia per vendere era così lontana da non essere mai raggiunta. Abbiamo provato a correggerla e a misurare il risultato su sei mesi di dati: la versione corretta rende meno di quella attuale, quindi per ora non la adottiamo. Sapere che il sistema è di fatto un compratore cambia però il modo di leggere i suoi risultati."
+  },
+  {
+    "data": "2026-09-07",
+    "titolo": "ClaudeTrade è partito",
+    "testo": "Chiuse tutte le posizioni del giro precedente e azzerata la memoria, il conto riparte da 200 euro puliti. Da qui in avanti ogni cifra di questa pagina si conta da quel punto."
+  },
+  {
+    "data": "2026-09-06",
+    "titolo": "Un conto da 200 euro",
+    "testo": "Deciso di trattare il conto come se contenesse 200 euro: otto indici, le taglie più piccole che il broker accetta, al massimo due gradini per verso. Prima le operazioni erano di dimensione doppia e i limiti di sicurezza erano scritti su misure che non corrispondevano al capitale."
+  },
+  {
+    "data": "2026-09-03",
+    "titolo": "Un controllo generale, e un errore trovato",
+    "testo": "Il sistema si era fermato da solo per una perdita che non era mai avvenuta: quando il broker non rispondeva, il saldo veniva letto come zero e scattava lo stop. Corretto. Nella stessa occasione abbiamo ridotto i controlli da uno ogni dieci minuti a uno ogni mezz'ora: guardare più spesso non migliorava le decisioni, faceva solo pagare più spese."
+  },
+  {
+    "data": "2026-08-19",
+    "titolo": "Una posizione sola che cambia verso",
+    "testo": "Il conto è passato a una modalità in cui esiste una sola posizione per strumento, che può girarsi da acquisto a vendita invece di aprirne una seconda. In teoria permette di guadagnare sia quando il prezzo sale sia quando scende."
+  }
+]

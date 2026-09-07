@@ -30,6 +30,7 @@ from src.grid_report import raccogli
 log = logging.getLogger(__name__)
 RADICE = Path(__file__).resolve().parent.parent
 TEMPLATE = RADICE / "web" / "claudetrade.template.html"
+JOURNAL = RADICE / "web" / "journal.json"
 USCITA = Path(os.environ.get("CLAUDETRADE_OUT", "/var/www/claudetrade/index.html"))
 PANIERE = ["NL25", "US100", "DE40", "HK50", "J225", "GOLD", "US30", "US500"]
 ROMA = ZoneInfo("Europe/Rome")
@@ -117,7 +118,13 @@ def dati(capital, env: str = "demo") -> dict:
                        "avviso_profitto": s["profit_alert"],
                        "kill_strumento": float(os.environ.get("G2_DNAS_KILL_PNL_EUR", 8))}
 
-    return {"stato": stato,
+    try:
+        diario = json.loads(JOURNAL.read_text())
+    except Exception:
+        log.exception("diario non leggibile")
+        diario = []
+
+    return {"stato": stato, "diario": diario,
             "regole": {"capitale": cap, "max_unita": 2, "passo": 0.03,
                        "ema_giorni": 5, "cadenza_minuti": 30,
                        "strumenti": paniere(capital)},
