@@ -158,8 +158,13 @@ th+th, td+td{padding-left:18px}
 .conto .riga b{color:var(--ink); font-weight:500}
 
 footer{border-top:1px solid var(--line); padding-top:18px; color:var(--muted); font-size:13px; display:flex; flex-wrap:wrap; gap:16px 28px; justify-content:space-between; align-items:baseline}
-footer .nota{max-width:46ch}
-.tempi{display:flex; flex-direction:column; gap:3px; text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
+footer .nota{max-width:60ch}
+.testa-stato{display:flex; flex-direction:column; align-items:flex-end; gap:9px}
+.tempi{display:flex; flex-direction:column; gap:3px; text-align:right; font-size:12.5px; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap}
+@media (max-width:620px){
+  .testa-stato{align-items:flex-start}
+  .tempi{text-align:left}
+}
 .tempi b{color:var(--ink); font-weight:500}
 .tempi .fa{color:var(--faint)}
 footer code{font-family:"IBM Plex Mono", monospace; font-size:12.5px; color:var(--accent)}
@@ -181,7 +186,13 @@ footer code{font-family:"IBM Plex Mono", monospace; font-size:12.5px; color:var(
         e vende quando risale, sempre alla taglia più piccola che il broker accetta.
         Questa pagina lo segue giorno per giorno: quanto vale, cosa ha in mano, quanto rischia.</p>
     </div>
-    <div class="pill attesa" id="stato-pill"><span class="dot"></span><span id="stato-testo">in attesa di partenza</span></div>
+    <div class="testa-stato">
+      <div class="pill attesa" id="stato-pill"><span class="dot"></span><span id="stato-testo">in attesa di partenza</span></div>
+      <div class="tempi">
+        <b id="aggiornato">in attesa di dati</b>
+        <span id="prossimo"></span>
+      </div>
+    </div>
   </header>
 
   <div class="tiles" id="tiles">
@@ -295,12 +306,8 @@ footer code{font-family:"IBM Plex Mono", monospace; font-size:12.5px; color:var(
   </section>
 
   <footer>
-    <span class="nota">I numeri arrivano dal broker. La pagina si riscrive da sola:
-      non c'è nulla da ricaricare a mano.</span>
-    <span class="tempi">
-      <b id="aggiornato">in attesa di dati</b>
-      <span id="prossimo"></span>
-    </span>
+    <span class="nota">I numeri arrivano dal broker a ogni giro. La pagina si
+      riscrive da sola: non c'è nulla da ricaricare a mano.</span>
   </footer>
 </div>
 
