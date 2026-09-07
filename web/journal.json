@@ -1,6 +1,11 @@
 [
   {
     "data": "2026-09-07",
+    "titolo": "Cercato un campo da gioco migliore, non c'è",
+    "testo": "Un sistema che compra e vende vive del rapporto tra quanto il prezzo si muove in una giornata e quanto costa entrare e uscire. Abbiamo misurato quel rapporto su 1.248 strumenti disponibili, tenendo solo quelli comprabili con un capitale di 200 euro: sette degli otto che già usiamo sono nei primi dieci posti. Il migliore, il Nasdaq, si muove in un giorno quanto 256 volte il costo di un'operazione. Quindi né gli strumenti scelti né le spese sono il problema: lo spazio per guadagnare c'è, quello che manca è una regola capace di sfruttarlo."
+  },
+  {
+    "data": "2026-09-07",
     "titolo": "Il sistema comprava soltanto",
     "testo": "Controllando 28.774 decisioni prese dal 22 agosto è emerso che il sistema non ha mai venduto allo scoperto, nemmeno una volta: comprava e basta. Non era voluto. La soglia per vendere era così lontana da non essere mai raggiunta. Abbiamo provato a correggerla e a misurare il risultato su sei mesi di dati: la versione corretta rende meno di quella attuale, quindi per ora non la adottiamo. Sapere che il sistema è di fatto un compratore cambia però il modo di leggere i suoi risultati."
   },
