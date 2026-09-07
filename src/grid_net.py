@@ -76,6 +76,48 @@ def target_unita(prezzo: float, p0: float, step: float, max_unita: int) -> int:
     return max(-max_unita, min(max_unita, -k))
 
 
+def target_banda(prezzo: float, p0: float, entrata: float, uscita: float,
+                 passo: float, unita_correnti: float, max_unita: int) -> int:
+    """Zona morta, passo e isteresi come TRE parametri distinti (2026-09-07).
+
+    Nelle versioni precedenti erano lo stesso numero, e la banda del gradino
+    zero partiva dall'ancoraggio invece di stare a cavallo: misurato sui log dal
+    22/08, 28.774 rilevamenti, il sistema e' stato LONG il 59% del tempo e SHORT
+    lo 0,00%, perche' per andare short serviva un prezzo del 3% sopra la media a
+    5 giorni, che non e' mai accaduto (99esimo percentile: +2,25%).
+
+    Qui:
+      - dentro +-``entrata`` si sta fermi (zona morta, simmetrica);
+      - oltre, si prende posizione CONTRO lo scostamento, una unita' in piu'
+        ogni ``passo``;
+      - si torna flat solo quando il prezzo rientra oltre ``uscita``, che e'
+        piu' vicino all'ancora dell'entrata: senza questa distanza il sistema
+        entra ed esce sul confine pagando solo spread (79-83% dei fill reali
+        distava meno dello 0,15% dal precedente).
+
+    ``entrata``, ``uscita`` e ``passo`` sono frazioni (0.0075 = 0,75%).
+    """
+    if prezzo <= 0 or p0 <= 0 or entrata <= 0 or passo <= 0:
+        return 0
+    x = prezzo / p0 - 1.0
+    u = int(round(unita_correnti))
+
+    if u > 0:                                   # long: si esce risalendo
+        if x >= -uscita:
+            return 0
+        return min(max_unita, 1 + int((-x - entrata) / passo)) if x <= -entrata else u
+    if u < 0:                                   # short: si esce scendendo
+        if x <= uscita:
+            return 0
+        return -min(max_unita, 1 + int((x - entrata) / passo)) if x >= entrata else u
+
+    if x <= -entrata:
+        return min(max_unita, 1 + int((-x - entrata) / passo))
+    if x >= entrata:
+        return -min(max_unita, 1 + int((x - entrata) / passo))
+    return 0
+
+
 def target_isteresi(prezzo: float, p0: float, step: float,
                     unita_correnti: float, max_unita: int) -> int:
     """Unita' nette desiderate con ISTERESI da grid classico (fix 2026-09-03).

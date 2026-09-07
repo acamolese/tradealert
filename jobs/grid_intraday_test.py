@@ -28,7 +28,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from src.config import load_config
-from src.grid_net import ancora_mobile, target_isteresi, target_unita
+from src.grid_net import (ancora_mobile, target_banda, target_isteresi,
+                          target_unita)
 
 CACHE = Path(__file__).resolve().parent.parent / "data" / "cache"
 EPICS = ["US100", "US30", "US500", "DE40", "NL25", "J225", "HK50", "GOLD"]
@@ -122,8 +123,10 @@ def ema_per_giorno(day: list[dict], periodo: int) -> dict[str, float]:
     return out
 
 
-def simula(barre: list[dict], ema_chiusa: dict, *, step: float, isteresi: bool,
-           ema_corrente: bool, max_unita: int, periodo: int) -> dict:
+def simula(barre: list[dict], ema_chiusa: dict, *, step: float = 0.03,
+           isteresi: bool = False, ema_corrente: bool = True, max_unita: int = 2,
+           periodo: int = 5, banda: tuple | None = None,
+           sempre_long: bool = False) -> dict:
     """Ritorna curva equity (in punti per 1 unita') e statistiche fill."""
     k = 2.0 / (periodo + 1.0)
     u = 0
@@ -150,8 +153,14 @@ def simula(barre: list[dict], ema_chiusa: dict, *, step: float, isteresi: bool,
         if giorno_prev is not None and d != giorno_prev and u != 0:
             costi_on += abs(u) * mid * OVERNIGHT
         giorno_prev = d
-        tgt = (target_isteresi(mid, p0, step, u, max_unita) if isteresi
-               else target_unita(mid, p0, step, max_unita))
+        if sempre_long:
+            tgt = 1                      # pietra di paragone: comprato e tenuto
+        elif banda:
+            tgt = target_banda(mid, p0, banda[0], banda[1], banda[2], u, max_unita)
+        elif isteresi:
+            tgt = target_isteresi(mid, p0, step, u, max_unita)
+        else:
+            tgt = target_unita(mid, p0, step, max_unita)
         if tgt != u:
             delta = tgt - u
             px = b["ask"] if delta > 0 else b["bid"]
@@ -198,6 +207,15 @@ CONFIGS = {
     "D isteresi, EMA chiusa, 2%":                   dict(step=0.02, isteresi=True, ema_corrente=False),
     "E isteresi, EMA chiusa, 1.5%":                 dict(step=0.015, isteresi=True, ema_corrente=False),
     "F isteresi, EMA chiusa, 1%":                   dict(step=0.01, isteresi=True, ema_corrente=False),
+    # Banda simmetrica con zona morta, passo e isteresi separati (2026-09-07):
+    # (entrata, uscita, passo). Nasce dall'osservazione che in 28.774
+    # rilevamenti il sistema non e' mai andato short.
+    "H banda 0.50 / 0.10, passo 0.50%":             dict(banda=(0.005, 0.001, 0.005)),
+    "I banda 0.75 / 0.10, passo 0.75%":             dict(banda=(0.0075, 0.001, 0.0075)),
+    "L banda 1.00 / 0.10, passo 1.00%":             dict(banda=(0.010, 0.001, 0.010)),
+    "M banda 0.75 / 0.25, passo 0.75%":             dict(banda=(0.0075, 0.0025, 0.0075)),
+    "N banda 0.75 / 0.10, EMA chiusa":              dict(banda=(0.0075, 0.001, 0.0075), ema_corrente=False),
+    "Z riferimento: comprato e tenuto":             dict(sempre_long=True),
 }
 
 
