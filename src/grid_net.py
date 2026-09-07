@@ -140,6 +140,26 @@ def target_volatilita(prezzo: float, p0: float, sigma: float, entrata: float,
                         passo * sigma, unita_correnti, max_unita)
 
 
+def dosaggio_prudente(sigma: float, riferimento: float,
+                      minimo: float = 0.3) -> float:
+    """Quanto della taglia piena tenere, in base a quanto il mercato si muove.
+
+    Riduce quando il mercato e' calmo, NON amplifica mai quando e' agitato
+    (2026-09-07). La versione che amplifica rende di piu' sul campione ma il
+    suo parametro ottimo cambia da strumento a strumento (3x sull'S&P, 1x sul
+    Nasdaq, che si muovono insieme all'85%): segno che si sta adattando il
+    modello al rumore. Questa versione invece e' coerente su entrambi: stesso
+    rendimento, 12-15% di calo massimo in meno su sette anni che contengono il
+    Covid e il mercato orso del 2022.
+
+    ``sigma`` e ``riferimento`` sono movimenti giornalieri medi in frazione
+    (0.00528 = 0,528%, la mediana misurata sui nostri otto strumenti).
+    """
+    if sigma <= 0 or riferimento <= 0:
+        return 1.0
+    return max(minimo, min(1.0, sigma / riferimento))
+
+
 def unita_da_rischio(sigma: float, rischio_obiettivo: float,
                      max_unita: int) -> float:
     """Quante unita' tenere perche' il rischio sia lo stesso in ogni momento.

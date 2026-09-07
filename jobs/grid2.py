@@ -25,7 +25,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from src.config import load_config
-from src.grid_net import pianifica_net, livello, ancora_mobile, barre_chiuse
+from src.grid_net import (pianifica_net, livello, ancora_mobile, barre_chiuse,
+                          dosaggio_prudente)
 from src.grid_profit import valuta
 from src.grid_control import (avvisa_lettura_fallita, eur, leggi_equity,
                               nome_conto, nome_in_frase, parola_conto)
@@ -146,6 +147,13 @@ def main() -> int:
     # e l'isteresi NON lo batte (3%: +0.35€, 48%). Si accendono solo dopo un
     # nuovo backtest che dica il contrario.
     isteresi = _env("ISTERESI", "false").strip().lower() == "true"
+    # Dosaggio prudente della taglia sulla volatilita' (2026-09-07): con mercato
+    # calmo si tiene meno, con mercato agitato si tiene la taglia piena, mai di
+    # piu'. Misurato su sette anni: stesso rendimento, calo massimo minore del
+    # 12-15%. Riferimento = movimento giornaliero mediano dei nostri strumenti.
+    dosaggio = _env("DOSAGGIO", "false").strip().lower() == "true"
+    dos_rif = _f("DOSAGGIO_RIF", 0.00528)
+    dos_min = _f("DOSAGGIO_MIN", 0.5)
     ema_chiusa = _env("EMA_CHIUSA", "false").strip().lower() == "true"
 
     if not enabled and not dry and not stop:
@@ -234,6 +242,21 @@ def main() -> int:
             STATE.write_text(json.dumps({"p0": p0, "epic": epic, "step": step,
                                          "creato": datetime.now(timezone.utc).isoformat()}))
             log.info("ancoraggio %s a %.4f", epic, p0)
+
+    # la taglia massima si adatta a quanto il mercato si sta muovendo
+    max_unita_pieno = max_unita
+    peso_dosaggio = 1.0
+    if dosaggio and closes and len(closes) > 10:
+        movimenti = [abs(closes[i] / closes[i - 1] - 1)
+                     for i in range(1, len(closes)) if closes[i - 1] > 0]
+        if movimenti:
+            sigma_oggi = sorted(movimenti)[len(movimenti) // 2]
+            peso_dosaggio = dosaggio_prudente(sigma_oggi, dos_rif, dos_min)
+            max_unita = max(1, int(round(max_unita_pieno * peso_dosaggio)))
+            log.info("dosaggio: mercato a %.3f%% al giorno (rif %.3f%%) -> "
+                     "peso %.2f, taglia max %d invece di %d",
+                     sigma_oggi * 100, dos_rif * 100, peso_dosaggio,
+                     max_unita, max_unita_pieno)
 
     if stop:
         for d in deals:

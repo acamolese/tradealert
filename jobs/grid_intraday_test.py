@@ -128,7 +128,7 @@ def simula(barre: list[dict], ema_chiusa: dict, *, step: float = 0.03,
            periodo: int = 5, banda: tuple | None = None,
            sempre_long: bool = False, vol: tuple | None = None,
            ancora_ore: int = 0, rischio: float = 0.0, centro: int = 0,
-           chiudi_la_notte: bool = False) -> dict:
+           chiudi_la_notte: bool = False, peso_vol: float = 0.0) -> dict:
     """Ritorna curva equity (in punti per 1 unita') e statistiche fill."""
     k = 2.0 / (periodo + 1.0)
     u = 0
@@ -142,9 +142,10 @@ def simula(barre: list[dict], ema_chiusa: dict, *, step: float = 0.03,
     giorni_ema = sorted(ema_chiusa)
     import bisect
     # ancoraggio corto e volatilita' sulla stessa scala: servono a vol/ancora_ore
-    n_corte = max(2, ancora_ore * 4) if ancora_ore else 0
+    n_corte = max(2, ancora_ore * 4) if ancora_ore else (32 if peso_vol else 0)
     finestra_px: list[float] = []
     p0_corta = None
+    peso_corr = None
     for b in barre:
         d = b["t"][:10]
         mid = (b["bid"] + b["ask"]) / 2
@@ -196,6 +197,24 @@ def simula(barre: list[dict], ema_chiusa: dict, *, step: float = 0.03,
         # Va applicata per ultima, altrimenti il centro la annulla subito.
         if chiudi_la_notte and (int(b["t"][11:13]) >= 20 or int(b["t"][11:13]) < 7):
             tgt = 0
+        if peso_vol and len(finestra_px) > 20:
+            # esposizione inversamente proporzionale a quanto il mercato si
+            # muove. Il peso si aggiorna solo quando cambia di piu' di un
+            # quarto: ribilanciare a ogni barra costa 63 operazioni al giorno
+            # e le spese si mangiano tutto (misurato).
+            r = [abs(finestra_px[j] / finestra_px[j - 1] - 1)
+                 for j in range(1, len(finestra_px))]
+            sig = (sum(r) / len(r)) if r else 0.0
+            if sig > 0:
+                # peso_vol negativo = esposizione PROPORZIONALE alla volatilita':
+                # coerente col premio al rischio misurato sul VIX (piu' paura,
+                # piu' rendimento atteso), opposto alla gestione del rischio classica
+                nuovo = (max(0.2, min(3.0, sig / abs(peso_vol))) if peso_vol < 0
+                         else max(0.2, min(3.0, peso_vol / sig)))
+                if peso_corr is None or abs(nuovo / peso_corr - 1) > 0.25:
+                    peso_corr = nuovo
+            if peso_corr:
+                tgt = tgt * peso_corr
         if tgt != u:
             delta = tgt - u
             px = b["ask"] if delta > 0 else b["bid"]
@@ -276,6 +295,21 @@ CONFIGS = {
                                              centro=1, chiudi_la_notte=True),
     "AC 8h 2 sigma, chiude la notte":   dict(vol=(2.0, 0.3, 2.0), ancora_ore=8,
                                              chiudi_la_notte=True),
+    # Esposizione dosata sulla volatilita', in continuo: si riduce quando il
+    # mercato e' agitato e si alza quando e' calmo. Non prevede la direzione.
+    "BA comprato e tenuto, dosato":  dict(sempre_long=True, peso_vol=0.0008),
+    "BB attuale, dosato":            dict(step=0.03, isteresi=False, ema_corrente=True,
+                                          peso_vol=0.0008),
+    "BC attorno a +1, dosato":       dict(step=0.03, isteresi=False, ema_corrente=True,
+                                          centro=1, peso_vol=0.0008),
+    "BD comprato e tenuto, dosato forte": dict(sempre_long=True, peso_vol=0.0005),
+    # L'opposto: piu' il mercato e' agitato, piu' si sta esposti
+    "CA comprato e tenuto, esposto alla paura": dict(sempre_long=True, peso_vol=-0.0008),
+    "CB attuale + esposto alla paura":  dict(step=0.03, isteresi=False, ema_corrente=True,
+                                             peso_vol=-0.0008),
+    "CC attorno a +1 + esposto alla paura": dict(step=0.03, isteresi=False,
+                                                 ema_corrente=True, centro=1,
+                                                 peso_vol=-0.0008),
 }
 
 
