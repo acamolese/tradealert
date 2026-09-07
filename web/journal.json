@@ -1,6 +1,11 @@
 [
   {
     "data": "2026-09-07",
+    "titolo": "Provato a inseguire i movimenti, non funziona",
+    "testo": "L'idea era semplice: se un prezzo comincia a scendere probabilmente scenderà ancora, quindi conviene entrare nella direzione del movimento invece che contro. Su tre strumenti e quaranta giorni sembrava vero. Allargando la misura a 66 strumenti e a un anno e mezzo di storia il segnale sparisce: cambia verso a seconda che si guardi a quattro ore o a cinque giorni, e solo il 15% degli strumenti mantiene la stessa direzione. È il comportamento del caso, non di un effetto reale. Il paniere resta quello che è."
+  },
+  {
+    "data": "2026-09-07",
     "titolo": "Cercato un campo da gioco migliore, non c'è",
     "testo": "Un sistema che compra e vende vive del rapporto tra quanto il prezzo si muove in una giornata e quanto costa entrare e uscire. Abbiamo misurato quel rapporto su 1.248 strumenti disponibili, tenendo solo quelli comprabili con un capitale di 200 euro: sette degli otto che già usiamo sono nei primi dieci posti. Il migliore, il Nasdaq, si muove in un giorno quanto 256 volte il costo di un'operazione. Quindi né gli strumenti scelti né le spese sono il problema: lo spazio per guadagnare c'è, quello che manca è una regola capace di sfruttarlo."
   },
