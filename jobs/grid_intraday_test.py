@@ -29,7 +29,7 @@ from pathlib import Path
 
 from src.config import load_config
 from src.grid_net import (ancora_mobile, target_banda, target_isteresi,
-                          target_unita)
+                          target_unita, target_volatilita, unita_da_rischio)
 
 CACHE = Path(__file__).resolve().parent.parent / "data" / "cache"
 EPICS = ["US100", "US30", "US500", "DE40", "NL25", "J225", "HK50", "GOLD"]
@@ -126,7 +126,8 @@ def ema_per_giorno(day: list[dict], periodo: int) -> dict[str, float]:
 def simula(barre: list[dict], ema_chiusa: dict, *, step: float = 0.03,
            isteresi: bool = False, ema_corrente: bool = True, max_unita: int = 2,
            periodo: int = 5, banda: tuple | None = None,
-           sempre_long: bool = False) -> dict:
+           sempre_long: bool = False, vol: tuple | None = None,
+           ancora_ore: int = 0, rischio: float = 0.0, centro: int = 0) -> dict:
     """Ritorna curva equity (in punti per 1 unita') e statistiche fill."""
     k = 2.0 / (periodo + 1.0)
     u = 0
@@ -139,6 +140,10 @@ def simula(barre: list[dict], ema_chiusa: dict, *, step: float = 0.03,
     cash_at_zero = 0.0
     giorni_ema = sorted(ema_chiusa)
     import bisect
+    # ancoraggio corto e volatilita' sulla stessa scala: servono a vol/ancora_ore
+    n_corte = max(2, ancora_ore * 4) if ancora_ore else 0
+    finestra_px: list[float] = []
+    p0_corta = None
     for b in barre:
         d = b["t"][:10]
         mid = (b["bid"] + b["ask"]) / 2
@@ -153,14 +158,36 @@ def simula(barre: list[dict], ema_chiusa: dict, *, step: float = 0.03,
         if giorno_prev is not None and d != giorno_prev and u != 0:
             costi_on += abs(u) * mid * OVERNIGHT
         giorno_prev = d
+        if n_corte:
+            finestra_px.append(mid)
+            if len(finestra_px) > n_corte * 3:
+                finestra_px.pop(0)
+            k2 = 2.0 / (n_corte + 1.0)
+            p0_corta = mid * k2 + (p0_corta if p0_corta else mid) * (1 - k2)
+        sigma = 0.0
+        if vol and len(finestra_px) > n_corte:
+            r = [abs(finestra_px[j] / finestra_px[j - 1] - 1)
+                 for j in range(1, len(finestra_px))]
+            sigma = (sum(r) / len(r)) * (n_corte ** 0.5) if r else 0.0
+
         if sempre_long:
             tgt = 1                      # pietra di paragone: comprato e tenuto
+        elif vol:
+            rif = p0_corta if p0_corta else p0
+            cap_u = max_unita
+            if rischio:
+                cap_u = max(1, int(round(unita_da_rischio(sigma, rischio, max_unita))))
+            tgt = target_volatilita(mid, rif, sigma, vol[0], vol[1], vol[2], u, cap_u)
         elif banda:
             tgt = target_banda(mid, p0, banda[0], banda[1], banda[2], u, max_unita)
         elif isteresi:
             tgt = target_isteresi(mid, p0, step, u, max_unita)
         else:
             tgt = target_unita(mid, p0, step, max_unita)
+        if centro and not sempre_long:
+            # il grid non oscilla piu' attorno allo zero ma attorno a una
+            # posizione lunga: cattura la deriva del mercato E le oscillazioni
+            tgt = max(-max_unita, min(max_unita, tgt + centro))
         if tgt != u:
             delta = tgt - u
             px = b["ask"] if delta > 0 else b["bid"]
@@ -216,6 +243,24 @@ CONFIGS = {
     "M banda 0.75 / 0.25, passo 0.75%":             dict(banda=(0.0075, 0.0025, 0.0075)),
     "N banda 0.75 / 0.10, EMA chiusa":              dict(banda=(0.0075, 0.001, 0.0075), ema_corrente=False),
     "Z riferimento: comprato e tenuto":             dict(sempre_long=True),
+    # Calibrate sulla finestra dove il segnale batte il costo (2026-09-07):
+    # ancoraggio a poche ore invece che 5 giorni, soglie in multipli della
+    # volatilita' corrente invece che al 3% fisso.
+    "P 4h, soglie 1.5 sigma":     dict(vol=(1.5, 0.2, 1.5), ancora_ore=4),
+    "Q 4h, soglie 1.0 sigma":     dict(vol=(1.0, 0.2, 1.0), ancora_ore=4),
+    "R 8h, soglie 1.5 sigma":     dict(vol=(1.5, 0.2, 1.5), ancora_ore=8),
+    "S 8h, soglie 2.0 sigma":     dict(vol=(2.0, 0.3, 2.0), ancora_ore=8),
+    "T 4h, 1.5 sigma + taglia a rischio costante":
+                                  dict(vol=(1.5, 0.2, 1.5), ancora_ore=4, rischio=0.006),
+    "U 8h, 1.5 sigma + taglia a rischio costante":
+                                  dict(vol=(1.5, 0.2, 1.5), ancora_ore=8, rischio=0.006),
+    # Il grid attorno a una posizione lunga invece che attorno allo zero:
+    # prende la deriva del mercato come il comprato-e-tenuto, e in piu' compra
+    # sui cali e alleggerisce sui rialzi.
+    "V attuale 3% attorno a +1":  dict(step=0.03, isteresi=False, ema_corrente=True, centro=1),
+    "W isteresi 3% attorno a +1": dict(step=0.03, isteresi=True, ema_corrente=True, centro=1),
+    "X 8h 2 sigma attorno a +1":  dict(vol=(2.0, 0.3, 2.0), ancora_ore=8, centro=1),
+    "Y banda 0.75 attorno a +1":  dict(banda=(0.0075, 0.001, 0.0075), centro=1),
 }
 
 

@@ -118,6 +118,43 @@ def target_banda(prezzo: float, p0: float, entrata: float, uscita: float,
     return 0
 
 
+def target_volatilita(prezzo: float, p0: float, sigma: float, entrata: float,
+                      uscita: float, passo: float, unita_correnti: float,
+                      max_unita: int) -> int:
+    """Come target_banda, ma le soglie sono in unita' di VOLATILITA', non in
+    percentuali fisse (2026-09-07).
+
+    Motivo: una soglia del 3% significa cose diverse su mercati diversi e sullo
+    stesso mercato in settimane diverse. Misurato su barre da 15 minuti, il
+    rapporto tra segnale e costo e' massimo a 4-8 ore (1,93 volte) e scende a
+    0,06 al minuto e a 1,47 sul giorno: la finestra utile e' stretta e va
+    inseguita con soglie che si adattano, non con un numero fisso.
+
+    ``sigma`` e' l'oscillazione tipica del prezzo sulla scala di riferimento;
+    ``entrata``, ``uscita`` e ``passo`` sono suoi multipli (1.5 = un'oscillazione
+    e mezza). Con sigma costante il comportamento e' identico a target_banda.
+    """
+    if sigma <= 0:
+        return int(round(unita_correnti))
+    return target_banda(prezzo, p0, entrata * sigma, uscita * sigma,
+                        passo * sigma, unita_correnti, max_unita)
+
+
+def unita_da_rischio(sigma: float, rischio_obiettivo: float,
+                     max_unita: int) -> float:
+    """Quante unita' tenere perche' il rischio sia lo stesso in ogni momento.
+
+    La volatilita' e' l'unica cosa che si e' dimostrata prevedibile (dopo la
+    calma il movimento resta piccolo, misurato 0,35-0,86 volte). Tenerne conto
+    non aumenta il guadagno atteso: rende costante quanto si rischia, che e'
+    la condizione per poter aumentare il capitale senza aumentare la
+    probabilita' di rovina.
+    """
+    if sigma <= 0:
+        return 1.0
+    return max(0.25, min(float(max_unita), rischio_obiettivo / sigma))
+
+
 def target_isteresi(prezzo: float, p0: float, step: float,
                     unita_correnti: float, max_unita: int) -> int:
     """Unita' nette desiderate con ISTERESI da grid classico (fix 2026-09-03).

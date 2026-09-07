@@ -59,6 +59,35 @@ def _f(name, default):
     return float(_env(name, str(default)))
 
 
+def _registra_decisione(env, profilo, epic, prezzo, p0, step, unita, equity, mk):
+    """Una riga per ogni decisione, con il contesto che servira' a giudicarla.
+
+    Motivo (2026-09-07): a quattro ore il rumore di una singola operazione e'
+    47 volte il segnale medio, quindi servono migliaia di osservazioni prima di
+    poter dire se una regola funziona. I log di testo non bastano: qui si scrive
+    un tracciato leggibile da un foglio di calcolo, con lo spread pagato e lo
+    scostamento dall'ancoraggio, cosi' fra mesi si potra' rispondere a domande
+    che oggi non sappiamo ancora di volere fare.
+    """
+    try:
+        sn = mk.get("snapshot") or {}
+        bid, ask = float(sn.get("bid") or 0), float(sn.get("offer") or 0)
+        spread = (ask - bid) / prezzo * 100 if bid and ask and prezzo else 0.0
+        f = DATA / f"decisioni_{env}.csv"
+        nuovo = not f.exists()
+        DATA.mkdir(parents=True, exist_ok=True)
+        with open(f, "a") as fh:
+            if nuovo:
+                fh.write("quando,profilo,epic,prezzo,ancoraggio,scostamento_pct,"
+                         "passo_pct,unita,equity,spread_pct\n")
+            fh.write(f"{datetime.now(timezone.utc).isoformat(timespec='seconds')},"
+                     f"{profilo},{epic},{prezzo:.5f},{p0:.5f},"
+                     f"{(prezzo / p0 - 1) * 100 if p0 else 0:.4f},{step * 100:.3f},"
+                     f"{unita:+.2f},{equity:.2f},{spread:.4f}\n")
+    except Exception:
+        log.exception("registro decisioni non scritto")
+
+
 def _esc(t):
     return str(t).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
@@ -319,6 +348,9 @@ def main() -> int:
             f"<i>Finché non scegli, nessun grid apre posizioni.</i>")
         log.warning("BLOCCO profitto: %s, chiuse %d posizioni", v.messaggio, chiuse)
         return 0
+
+    _registra_decisione(v1.capital_env, PROFILO, epic, prezzo, p0, step,
+                        unita_correnti, equity, mk)
 
     piano = pianifica_net(prezzo, p0, step, unita_correnti, max_unita=max_unita,
                           pnl_aperto=pnl, kill_pnl_eur=kill_pnl, equity=equity,
