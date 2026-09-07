@@ -19,7 +19,8 @@ import json
 import logging
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 from src.config import load_config
@@ -31,6 +32,25 @@ RADICE = Path(__file__).resolve().parent.parent
 TEMPLATE = RADICE / "web" / "claudetrade.template.html"
 USCITA = Path(os.environ.get("CLAUDETRADE_OUT", "/var/www/claudetrade/index.html"))
 PANIERE = ["NL25", "US100", "DE40", "HK50", "J225", "GOLD", "US30", "US500"]
+ROMA = ZoneInfo("Europe/Rome")
+
+
+def prossimo_giro(adesso: datetime | None = None) -> str:
+    """Quando il cron rigenerera' questa pagina.
+
+    Le regole stanno in deploy/crontab.txt: nei feriali ai minuti 12 e 42 di
+    ogni ora, nel weekend solo al minuto 12 delle ore divisibili per tre. Si
+    cerca il primo istante futuro che le soddisfa, invece di riscrivere qui la
+    stessa aritmetica del cron.
+    """
+    t = (adesso or datetime.now(ROMA)).astimezone(ROMA).replace(second=0, microsecond=0)
+    for _ in range(3 * 24 * 60):
+        t += timedelta(minutes=1)
+        feriale = t.weekday() < 5
+        if (feriale and t.minute in (12, 42)) or (
+                not feriale and t.minute == 12 and t.hour % 3 == 0):
+            return t.isoformat(timespec="minutes")
+    return ""
 
 
 def _arg(nome, default):
@@ -75,6 +95,7 @@ def dati(capital, env: str = "demo") -> dict:
     c = raccogli(capital, env, n_ultimi=0, con_valore=True)
 
     stato = {"aggiornato": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+             "prossimo": prossimo_giro(),
              "capitale": cap, "avviato": avviato, "soglie": {},
              "fase": ("fermo" if c.bloccato else "corso") if avviato else "attesa"}
     if not avviato:

@@ -157,7 +157,11 @@ th+th, td+td{padding-left:18px}
 .conto .riga{display:flex; justify-content:space-between; font-size:13.5px; color:var(--muted); font-variant-numeric:tabular-nums}
 .conto .riga b{color:var(--ink); font-weight:500}
 
-footer{border-top:1px solid var(--line); padding-top:18px; color:var(--muted); font-size:13px; display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between}
+footer{border-top:1px solid var(--line); padding-top:18px; color:var(--muted); font-size:13px; display:flex; flex-wrap:wrap; gap:16px 28px; justify-content:space-between; align-items:baseline}
+footer .nota{max-width:46ch}
+.tempi{display:flex; flex-direction:column; gap:3px; text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
+.tempi b{color:var(--ink); font-weight:500}
+.tempi .fa{color:var(--faint)}
 footer code{font-family:"IBM Plex Mono", monospace; font-size:12.5px; color:var(--accent)}
 :focus-visible{outline:2px solid var(--accent); outline-offset:2px}
 @media (prefers-reduced-motion: reduce){ *{transition:none !important; animation:none !important} }
@@ -291,8 +295,12 @@ footer code{font-family:"IBM Plex Mono", monospace; font-size:12.5px; color:var(
   </section>
 
   <footer>
-    <span>I numeri arrivano dal broker. La pagina si riscrive da sola ogni mezz'ora, a mercati aperti.</span>
-    <span id="aggiornato">in attesa di dati</span>
+    <span class="nota">I numeri arrivano dal broker. La pagina si riscrive da sola:
+      non c'è nulla da ricaricare a mano.</span>
+    <span class="tempi">
+      <b id="aggiornato">in attesa di dati</b>
+      <span id="prossimo"></span>
+    </span>
   </footer>
 </div>
 
@@ -421,13 +429,60 @@ footer code{font-family:"IBM Plex Mono", monospace; font-size:12.5px; color:var(
     $("marker").style.background = tot === 0 ? "var(--accent)"
       : (tot > 0 ? "var(--pos)" : "var(--neg)");
 
+    rendiTempi(s);
+  }
+
+  // --------------------------------------------------------------- tempi
+  var ULTIMO = null;
+
+  function quandoFa(d){
+    var min = Math.round((Date.now() - d.getTime()) / 60000);
+    if (min < 1) return "proprio ora";
+    if (min === 1) return "un minuto fa";
+    if (min < 60) return min + " minuti fa";
+    var ore = Math.round(min / 60);
+    return ore === 1 ? "un'ora fa" : ore + " ore fa";
+  }
+
+  function stessoGiorno(a, b){
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth()
+        && a.getDate() === b.getDate();
+  }
+
+  function orario(d){
+    return d.toLocaleTimeString("it-IT", {hour:"2-digit", minute:"2-digit"});
+  }
+
+  function giornoBreve(d){
+    return d.toLocaleDateString("it-IT", {weekday:"long", day:"numeric", month:"long"});
+  }
+
+  function rendiTempi(s){
+    var ora = new Date();
     if (s.aggiornato){
       var d = new Date(s.aggiornato);
-      if (!isNaN(d)) $("aggiornato").textContent = "dati del " + d.toLocaleDateString("it-IT",
-        {day:"numeric", month:"long"}) + " alle " + d.toLocaleTimeString("it-IT",
-        {hour:"2-digit", minute:"2-digit"});
+      if (!isNaN(d)){
+        ULTIMO = d;
+        $("aggiornato").textContent = "Aggiornato alle " + orario(d)
+          + (stessoGiorno(d, ora) ? "" : " di " + giornoBreve(d))
+          + " · " + quandoFa(d);
+      }
+    }
+    if (s.prossimo){
+      var p = new Date(s.prossimo);
+      if (!isNaN(p)){
+        $("prossimo").textContent = "prossimo aggiornamento alle " + orario(p)
+          + (stessoGiorno(p, ora) ? "" : ", " + giornoBreve(p));
+      }
     }
   }
+
+  // il "quanto fa" invecchia mentre la pagina resta aperta: si riscrive da solo
+  setInterval(function(){
+    if (!ULTIMO) return;
+    var t = $("aggiornato").textContent.split(" · ")[0];
+    $("aggiornato").textContent = t + " · " + quandoFa(ULTIMO);
+  }, 60000);
 
   // ------------------------------------------------------------- paniere
   function rendiRegole(r){
