@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -150,15 +151,25 @@ def avvia(env: str, capitale: float, capital, telegram=None,
                 fallite += 1
                 log.error("chiusura %s fallita: %s", d, exc)
 
-    # se qualcosa e' rimasto aperto non si parte: il punto zero deve essere
-    # un conto pulito, non un conto con l'eredita' del giro precedente
-    if chiudi and capital.get_open_positions():
-        msg = ("Non sono riuscito a chiudere tutto: non fisso la partenza, "
-               "riprovo al prossimo giro.")
-        log.warning(msg)
-        if telegram and not silenzioso:
-            telegram.send_message(msg)
-        return msg
+    # Il punto zero deve essere un conto pulito. Attenzione: Capital accetta la
+    # chiusura e la lavora dopo, quindi subito dopo la richiesta le posizioni
+    # risultano ancora aperte: si guarda piu' volte prima di rinunciare.
+    if chiudi:
+        rimaste = capital.get_open_positions()
+        for _ in range(6):
+            if not rimaste:
+                break
+            time.sleep(5)
+            rimaste = capital.get_open_positions()
+        if rimaste:
+            epics = ", ".join(sorted({(p.get("market") or {}).get("epic") or "?"
+                                      for p in rimaste}))
+            msg = (f"Non sono riuscito a chiudere tutto ({epics}): non fisso la "
+                   f"partenza, riprovo al prossimo giro.")
+            log.warning(msg)
+            if telegram and not silenzioso:
+                telegram.send_message(msg)
+            return msg
 
     # dopo le chiusure il saldo cambia: la base e' quello che resta adesso
     eq_dopo = leggi_equity(capital)
