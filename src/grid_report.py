@@ -75,9 +75,32 @@ class Conto:
     costi_oggi: float = 0.0
     oggi: list = field(default_factory=list)
     ultimi: list = field(default_factory=list)
+    esercizio: dict = field(default_factory=dict)
+
+    @property
+    def in_esercizio(self) -> bool:
+        """Su questo conto gira ClaudeTrade, con un capitale dichiarato."""
+        return bool(self.esercizio.get("capitale"))
+
+    @property
+    def attesa(self) -> bool:
+        """Conto destinato a ClaudeTrade ma non ancora avviato: raccontare il
+        saldo vero qui confonderebbe, il capitale sara' un altro."""
+        return self.env == "demo" and not self.in_esercizio
+
+    @property
+    def valore(self) -> float:
+        """Quanto vale il conto per come lo si racconta: il capitale dichiarato
+        piu' quello che ha guadagnato, oppure il saldo vero."""
+        if self.in_esercizio:
+            return (float(self.esercizio["capitale"])
+                    + (self.equity - float(self.esercizio["equity_avvio"])))
+        return self.equity
 
     @property
     def guadagno(self) -> float:
+        if self.in_esercizio:
+            return self.valore - float(self.esercizio["capitale"])
         return (self.equity - self.baseline) if self.baseline else 0.0
 
     @property
@@ -134,6 +157,8 @@ def raccogli(capital, env: str, nome: str = "", n_ultimi: int = 10,
         except Exception:
             pass
     c.equity_giorno = _baseline_giorno(env, c.equity)
+    from src.grid_esercizio import leggi as leggi_esercizio
+    c.esercizio = leggi_esercizio(env)
 
     # aggregate per strumento: il broker tiene righe separate per ogni ordine
     # nella stessa direzione, ma per il grid conta la posizione NETTA.
@@ -192,11 +217,17 @@ def _blocco_conto(c: Conto, con_posizioni: bool = True) -> str:
     if not c.ok:
         return (f"{_icona(c)} <b>{c.nome}</b>: il broker non risponde, "
                 f"riprovo più tardi.")
+    if c.attesa:
+        return (f"{_icona(c)} <b>{c.nome}</b>: non è ancora partito.\n"
+                f"   Parte alla riapertura dei mercati, con {eur(200)} di capitale.")
     seg = "🟢" if c.guadagno_oggi >= 0 else "🔴"
-    righe = [f"{_icona(c)} <b>{c.nome}: {eur(c.equity)}</b>"
+    righe = [f"{_icona(c)} <b>{c.nome}: {eur(c.valore)}</b>"
              + ("  ⏸ FERMO" if c.bloccato else ""),
              f"   oggi: <b>{eur(c.guadagno_oggi, True)}</b>  {seg}"]
-    if c.baseline:
+    if c.in_esercizio:
+        righe.append(f"   dall'avvio: {eur(c.guadagno, True)} "
+                     f"su {eur(float(c.esercizio['capitale']))} di capitale")
+    elif c.baseline:
         avvio = f" ({c.baseline_data})" if c.baseline_data else ""
         righe.append(f"   da quando è partito{avvio}: {eur(c.guadagno, True)}")
     if c.bloccato:
@@ -238,9 +269,13 @@ def messaggio_mattina(conti: list[Conto], sistema_ok: bool | None = None) -> str
         if not c.ok:
             righe.append(f"{_icona(c)} {c.nome}: il broker non risponde.")
             continue
+        if c.attesa:
+            righe.append(f"{_icona(c)} {c.nome}: non ancora partito.")
+            continue
         stato = " (fermo)" if c.bloccato else ""
-        righe.append(f"{_icona(c)} {c.nome}: {eur(c.equity)}{stato}"
-                     + (f", da quando è partito {eur(c.guadagno, True)}" if c.baseline else ""))
+        parte = c.in_esercizio or c.baseline
+        righe.append(f"{_icona(c)} {c.nome}: {eur(c.valore)}{stato}"
+                     + (f", dall'avvio {eur(c.guadagno, True)}" if parte else ""))
     if sistema_ok is True:
         righe.append("Sistema: ✅ tutto regolare.")
     elif sistema_ok is False:

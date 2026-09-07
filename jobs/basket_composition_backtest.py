@@ -28,9 +28,17 @@ IS_END = datetime(2024, 1, 1)
 
 ATTUALE_11 = ["GOLD", "OIL_BRENT", "US500", "US100", "BTCUSD",
               "COPPER", "HK50", "J225", "EURUSD", "AUDUSD", "GBPUSD"]
-PLUS_INDICI = ATTUALE_11 + ["DE40", "US30"]
-SOLO_INDICI = ["US500", "US100", "DE40", "US30", "GOLD"]
-BASKETS = {"attuale_11": ATTUALE_11, "+indici_13": PLUS_INDICI, "solo_indici_5": SOLO_INDICI}
+INDICI_CORE = ["US500", "US100", "DE40", "US30", "GOLD"]         # robusti backtest+reali
+INDICI_LARGO = INDICI_CORE + ["UK100", "FR40", "EU50", "AU200"]  # + nuovi indici da testare
+INDICI_BTC = INDICI_CORE + ["BTCUSD"]                            # core + Bitcoin (reale ottimo)
+INDICI_LARGO_BTC = INDICI_LARGO + ["BTCUSD"]
+BASKETS = {
+    "attuale_11": ATTUALE_11,
+    "indici_core_5": INDICI_CORE,
+    "indici_largo_9": INDICI_LARGO,
+    "core+btc_6": INDICI_BTC,
+    "largo+btc_10": INDICI_LARGO_BTC,
+}
 SOGLIE = {"7.0": 0.5, "7.2": 2.0}   # soglia score -> |dpc| minimo
 
 

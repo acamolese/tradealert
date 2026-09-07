@@ -17,7 +17,8 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 DATA = Path(__file__).resolve().parent.parent / "data"
 
-ENV_DA_PAROLA = {"reale": "live", "live": "live", "prova": "demo", "demo": "demo"}
+ENV_DA_PAROLA = {"reale": "live", "live": "live", "prova": "demo", "demo": "demo",
+                 "claudetrade": "demo", "ct": "demo"}
 
 EPIC_NOMI = {
     "US100": "Nasdaq", "US30": "Dow Jones", "US500": "S&P 500", "DE40": "DAX",
@@ -27,11 +28,19 @@ EPIC_NOMI = {
 
 
 def nome_conto(env: str) -> str:
-    return "Conto reale" if env == "live" else "Conto di prova"
+    """Come si chiama il conto quando apre una riga o un titolo."""
+    return "Conto reale" if env == "live" else "ClaudeTrade"
+
+
+def nome_in_frase(env: str) -> str:
+    """Lo stesso nome dentro una frase: il conto reale si scrive minuscolo,
+    ClaudeTrade e' un nome proprio e resta com'e'."""
+    return "conto reale" if env == "live" else "ClaudeTrade"
 
 
 def parola_conto(env: str) -> str:
-    return "reale" if env == "live" else "prova"
+    """La parola da scrivere dopo /ferma e /riparti."""
+    return "reale" if env == "live" else "claudetrade"
 
 
 def nome_strumento(epic: str) -> str:
@@ -90,7 +99,7 @@ def avvisa_lettura_fallita(telegram, env: str, ore: float = 1.0) -> None:
         pass
     try:
         telegram.send_message(
-            f"⚠️ Non riesco a leggere il {nome_conto(env).lower()} (il broker non "
+            f"⚠️ Non riesco a leggere {nome_in_frase(env)} (il broker non "
             f"risponde).\nNon tocco nulla e riprovo al prossimo giro. Ti avviso di "
             f"nuovo solo se dura più di un'ora.")
     except Exception:
@@ -144,7 +153,7 @@ def riparti(env: str, telegram, profit_alert: float, profit_stop: float) -> str:
     cap = _client(env)
     eq = leggi_equity(cap)
     if eq is None:
-        msg = (f"Non riesco a leggere il {nome_conto(env).lower()} adesso, "
+        msg = (f"Non riesco a leggere {nome_in_frase(env)} adesso, "
                f"non ho cambiato nulla. Riprova tra qualche minuto.")
         telegram.send_message(msg)
         return msg

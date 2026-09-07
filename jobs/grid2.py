@@ -28,7 +28,7 @@ from src.config import load_config
 from src.grid_net import pianifica_net, livello, ancora_mobile, barre_chiuse
 from src.grid_profit import valuta
 from src.grid_control import (avvisa_lettura_fallita, eur, leggi_equity,
-                              nome_conto, parola_conto)
+                              nome_conto, nome_in_frase, parola_conto)
 
 log = logging.getLogger(__name__)
 DATA = Path(__file__).resolve().parent.parent / "data"
@@ -264,7 +264,7 @@ def main() -> int:
         if not dry:
             PSTATE.write_text(json.dumps(ps, indent=1))
             telegram.send_message(
-                f"🛑 <b>Stop di perdita sul {nome_conto(v1.capital_env).lower()}</b>\n"
+                f"🛑 <b>Stop di perdita su {nome_in_frase(v1.capital_env)}</b>\n"
                 f"Il conto è sceso da {eur(float(ps['baseline']))} a "
                 f"<b>{eur(equity)}</b> ({eur(-perdita, True)}).\n"
                 f"Ho chiuso {chiuse} posizioni e fermato tutti i grid di questo conto.\n"

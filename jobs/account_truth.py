@@ -129,12 +129,12 @@ def weekly_snapshot(capital, db, telegram=None) -> dict:
     }
 
     if telegram:
-        from src.grid_control import eur, nome_conto
+        from src.grid_control import eur, nome_in_frase
         seg = "prima settimana, ancora niente da confrontare" if snap["delta_equity"] is None else \
               f"{eur(snap['delta_equity'], True)} ({snap['pct']:+.1f}%)".replace(".", ",")
         costo_anno = snap["financing"] / 7 * 365
         telegram.send_message(
-            f"📅 <b>La settimana del {nome_conto(capital.config.capital_env).lower()}</b>\n"
+            f"📅 <b>La settimana di {nome_in_frase(capital.config.capital_env)}</b>\n"
             f"Conto: <b>{eur(snap['equity'])}</b>, questa settimana <b>{seg}</b>\n\n"
             f"Da cosa viene:\n"
             f"• operazioni chiuse: {eur(snap['trade'], True)}\n"

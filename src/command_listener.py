@@ -75,7 +75,7 @@ def _handle_grid_command(config: Config, text: str) -> bool:
     """Comandi dei grid. Ritorna True se il comando e' stato gestito."""
     import re
 
-    from .grid_control import ENV_DA_PAROLA, nome_conto
+    from .grid_control import ENV_DA_PAROLA, nome_in_frase
     from .grid_report import (messaggio_aiuto, messaggio_oggi,
                               messaggio_posizioni, messaggio_stato)
     from jobs.grid_hourly import leggi_conti
@@ -99,11 +99,11 @@ def _handle_grid_command(config: Config, text: str) -> bool:
                 return True
             azione = cmd[1:]
             if azione == "ferma":
-                testo = (f"Vuoi davvero <b>fermare il {nome_conto(env).lower()}</b>?\n"
+                testo = (f"Vuoi davvero <b>fermare {nome_in_frase(env)}</b>?\n"
                          f"Chiudo tutte le posizioni aperte e nessun grid riapre "
                          f"finché non scrivi /riparti.")
             else:
-                testo = (f"Vuoi <b>far ripartire il {nome_conto(env).lower()}</b>?\n"
+                testo = (f"Vuoi <b>far ripartire {nome_in_frase(env)}</b>?\n"
                          f"La cifra attuale diventa la nuova base da cui contare "
                          f"guadagni e perdite.")
             telegram.send_message_with_buttons(testo, [[
