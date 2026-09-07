@@ -127,7 +127,8 @@ def simula(barre: list[dict], ema_chiusa: dict, *, step: float = 0.03,
            isteresi: bool = False, ema_corrente: bool = True, max_unita: int = 2,
            periodo: int = 5, banda: tuple | None = None,
            sempre_long: bool = False, vol: tuple | None = None,
-           ancora_ore: int = 0, rischio: float = 0.0, centro: int = 0) -> dict:
+           ancora_ore: int = 0, rischio: float = 0.0, centro: int = 0,
+           chiudi_la_notte: bool = False) -> dict:
     """Ritorna curva equity (in punti per 1 unita') e statistiche fill."""
     k = 2.0 / (periodo + 1.0)
     u = 0
@@ -184,10 +185,17 @@ def simula(barre: list[dict], ema_chiusa: dict, *, step: float = 0.03,
             tgt = target_isteresi(mid, p0, step, u, max_unita)
         else:
             tgt = target_unita(mid, p0, step, max_unita)
+        # Niente posizioni quando il broker addebita il finanziamento (21:00 UTC).
+        # Misurato: evitare una notte risparmia lo 0,0216% sugli indici USA e
+        # costa uno spread, che a quell'ora il broker allarga ma non abbastanza.
         if centro and not sempre_long:
             # il grid non oscilla piu' attorno allo zero ma attorno a una
             # posizione lunga: cattura la deriva del mercato E le oscillazioni
             tgt = max(-max_unita, min(max_unita, tgt + centro))
+        # Niente posizioni quando il broker addebita il finanziamento (21:00 UTC).
+        # Va applicata per ultima, altrimenti il centro la annulla subito.
+        if chiudi_la_notte and (int(b["t"][11:13]) >= 20 or int(b["t"][11:13]) < 7):
+            tgt = 0
         if tgt != u:
             delta = tgt - u
             px = b["ask"] if delta > 0 else b["bid"]
@@ -261,6 +269,13 @@ CONFIGS = {
     "W isteresi 3% attorno a +1": dict(step=0.03, isteresi=True, ema_corrente=True, centro=1),
     "X 8h 2 sigma attorno a +1":  dict(vol=(2.0, 0.3, 2.0), ancora_ore=8, centro=1),
     "Y banda 0.75 attorno a +1":  dict(banda=(0.0075, 0.001, 0.0075), centro=1),
+    # Senza posizioni nella notte: non paga il finanziamento, paga uno spread
+    "AA attuale, ma chiude la notte":   dict(step=0.03, isteresi=False, ema_corrente=True,
+                                             chiudi_la_notte=True),
+    "AB attorno a +1, chiude la notte": dict(step=0.03, isteresi=False, ema_corrente=True,
+                                             centro=1, chiudi_la_notte=True),
+    "AC 8h 2 sigma, chiude la notte":   dict(vol=(2.0, 0.3, 2.0), ancora_ore=8,
+                                             chiudi_la_notte=True),
 }
 
 

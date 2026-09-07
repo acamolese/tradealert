@@ -1,6 +1,11 @@
 [
   {
     "data": "2026-09-07",
+    "titolo": "Trovato un segnale che regge: la paura si paga",
+    "testo": "Dopo aver scartato dodici idee costruite sui soli prezzi, abbiamo provato a usare un'informazione esterna: l'indice della paura, il VIX, che misura quanta agitazione c'è sui mercati. Il risultato è chiaro e ha una spiegazione semplice: quando la paura è alta, chi accetta di comprare viene pagato di più. Nelle quattro settimane successive a un picco di paura gli indici hanno reso in media il 3,2% contro lo 0,5% dei periodi normali, e questo vale su tutti e quattro gli indici, in sei anni su sei, anche togliendo il Covid dal conto. Il prezzo da pagare è che nel frattempo si soffre: in media si vede scendere del 2,7% prima di risalire, e nel caso peggiore del 22%. Oggi il VIX è a 17,7, quindi il segnale non è attivo e non c'è niente da fare: è un'occasione che si presenta circa dieci volte l'anno."
+  },
+  {
+    "data": "2026-09-07",
     "titolo": "Perché i piccoli guadagni frequenti non funzionano",
     "testo": "Abbiamo cercato un modo di fare tante piccole operazioni rapide, scendendo fino alla scala del minuto con dodici giorni di dati secondo per secondo. Il risultato è una regola geometrica: il costo di un'operazione è sempre lo stesso, mentre quanto il prezzo si muove in modo prevedibile cresce con il tempo che aspetti. A un minuto quello che si riesce a prevedere vale il 6% di quello che costa prenderlo, a un'ora il 34%, e solo dalle quattro ore in avanti supera il costo. Sotto quella soglia non è questione di trovare la regola giusta: non c'è abbastanza movimento prevedibile per pagare il pedaggio."
   },
