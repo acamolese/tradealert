@@ -29,6 +29,12 @@ TRADEALERT_HOME=/home/ubuntu/tradealert
 30 22 * * 1-5        cd $TRADEALERT_HOME && python -m jobs.grid_esercizio --report >> logs/g2_esercizio.log 2>&1
 
 
+# ---------- Assicurazione sulla volatilita' (conto di prova) ----------
+# Sta corto su UVXY, che perde valore per costruzione (-79,8%/anno su 15 anni).
+# Non prevede niente: incassa il premio di chi vende protezione. Gira una volta
+# al giorno a mercato USA aperto; a mercato chiuso il job esce da solo.
+0 16 * * 1-5         cd $TRADEALERT_HOME && python -m jobs.paura_esegui >> logs/paura.log 2>&1
+
 # ---------- Pagina pubblica di ClaudeTrade ----------
 # File statico rigenerato con i dati dentro e servito da nginx sulla porta 80.
 # Feriali ogni mezz'ora (sfalsata rispetto ai grid), weekend ogni tre ore: a
