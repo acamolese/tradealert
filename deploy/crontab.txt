@@ -28,14 +28,6 @@ TRADEALERT_HOME=/home/ubuntu/tradealert
 # domenica non parte: c'e' gia' la chiusura di giornata delle 22:30.
 30 22 * * 1-5        cd $TRADEALERT_HOME && python -m jobs.grid_esercizio --report >> logs/g2_esercizio.log 2>&1
 
-# UNA TANTUM: avvio di ClaudeTrade nella notte tra domenica 7 e lunedi' 8
-# settembre 2026. Si prova ogni dieci minuti dalla mezzanotte e si parte al PRIMO
-# momento in cui gli strumenti con posizioni aperte sono negoziabili: liquidare
-# alle 9:15 vorrebbe dire vendere dentro le oscillazioni dell'apertura europea
-# (scelta utente). Se i mercati sono chiusi il job tace e rimanda; quando parte
-# manda il messaggio di avvio e i giri successivi non fanno piu' nulla.
-# DA RIMUOVERE dopo l'avvio: la riga tornerebbe l'8 settembre dell'anno prossimo.
-8,18,28,38,48,58 0-9 8 9 *  cd $TRADEALERT_HOME && CAPITAL_ENV=demo python -m jobs.grid_esercizio --avvia --capitale 200 --se-possibile >> logs/g2_esercizio.log 2>&1
 
 # ---------- Pagina pubblica di ClaudeTrade ----------
 # File statico rigenerato con i dati dentro e servito da nginx sulla porta 80.
@@ -55,7 +47,7 @@ TRADEALERT_HOME=/home/ubuntu/tradealert
 4,34 * * * *         cd $TRADEALERT_HOME && python -m jobs.grid2 --profile RHK >> logs/g2r.log 2>&1
 5,35 * * * *         cd $TRADEALERT_HOME && python -m jobs.grid2 --profile RUS30 >> logs/g2r.log 2>&1
 
-# ---------- Grid2 DI PROVA (stessa logica, conto demo, ogni 30 minuti) ----------
+# ---------- ClaudeTrade: il conto da 200 € (ogni 30 minuti) ----------
 # Dal 2026-09-06 e' l'esercizio a capitale dichiarato: il conto ha ~980 € ma si
 # lavora e si misura come se ne avesse 200. Otto strumenti a taglia minima, due
 # gradini per verso: esposizione massima 644 € (3,2 volte il capitale), margine
