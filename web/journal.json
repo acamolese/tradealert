@@ -1,6 +1,11 @@
 [
   {
     "data": "2026-09-07",
+    "titolo": "Perché i piccoli guadagni frequenti non funzionano",
+    "testo": "Abbiamo cercato un modo di fare tante piccole operazioni rapide, scendendo fino alla scala del minuto con dodici giorni di dati secondo per secondo. Il risultato è una regola geometrica: il costo di un'operazione è sempre lo stesso, mentre quanto il prezzo si muove in modo prevedibile cresce con il tempo che aspetti. A un minuto quello che si riesce a prevedere vale il 6% di quello che costa prenderlo, a un'ora il 34%, e solo dalle quattro ore in avanti supera il costo. Sotto quella soglia non è questione di trovare la regola giusta: non c'è abbastanza movimento prevedibile per pagare il pedaggio."
+  },
+  {
+    "data": "2026-09-07",
     "titolo": "Provato a inseguire i movimenti, non funziona",
     "testo": "L'idea era semplice: se un prezzo comincia a scendere probabilmente scenderà ancora, quindi conviene entrare nella direzione del movimento invece che contro. Su tre strumenti e quaranta giorni sembrava vero. Allargando la misura a 66 strumenti e a un anno e mezzo di storia il segnale sparisce: cambia verso a seconda che si guardi a quattro ore o a cinque giorni, e solo il 15% degli strumenti mantiene la stessa direzione. È il comportamento del caso, non di un effetto reale. Il paniere resta quello che è."
   },
