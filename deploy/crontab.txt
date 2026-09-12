@@ -33,6 +33,9 @@ TRADEALERT_HOME=/home/ubuntu/tradealert
 # Sta corto su UVXY, che perde valore per costruzione (-79,8%/anno su 15 anni).
 # Non prevede niente: incassa il premio di chi vende protezione. Gira una volta
 # al giorno a mercato USA aperto; a mercato chiuso il job esce da solo.
+# Cinque minuti prima: registra il segnale e cosa avrebbero fatto le tre
+# politiche di esposizione (fissa, scala, spinta). Non esegue nulla.
+55 15 * * 1-5        cd $TRADEALERT_HOME && python -m jobs.vol_shadow >> logs/paura.log 2>&1
 0 16 * * 1-5         cd $TRADEALERT_HOME && python -m jobs.paura_esegui >> logs/paura.log 2>&1
 
 # ---------- Pagina pubblica di ClaudeTrade ----------

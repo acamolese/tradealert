@@ -1,0 +1,35 @@
+{
+  "_commento": "Parametri della vendita di assicurazione sulla volatilita' (jobs/paura_esegui.py). Versionato apposta: fino al 2026-09-12 stavano in variabili d'ambiente sulla VM, quindi la configurazione che girava davvero non era ricostruibile da qui. Le variabili PAURA_* continuano a funzionare e vincono su questo file, per poter intervenire sulla VM senza un deploy. Formato JSON e non YAML per coerenza con config/critical_events.json e per non aggiungere una dipendenza.",
+
+  "epic": "UVXY",
+  "capitale_default": 200.0,
+
+  "_scala": "Quanta esposizione tenere, in frazione del capitale dichiarato. Si sale solo a condizioni verificate (curva, VIX, storia del conto), si scende subito quando cadono. Nessun gradino supera il tetto.",
+  "frazione_base": 0.15,
+  "frazione_favorevole": 0.20,
+  "frazione_piena": 0.25,
+  "tetto": 0.25,
+
+  "_condizioni_mercato": "La pendenza e' RELATIVA: il rapporto VIXM/VIX diviso la sua mediana dell'ultimo anno. VIXM e' un ETF e il suo prezzo scivola nel tempo (mediana del rapporto 1.79 nel 2021, 0.77 nel 2026), quindi una soglia fissa misurerebbe il decadimento dell'ETF invece dello stato della curva. 1.00 = come al solito. Soglie tarate sui dati settimanali Capital 2025-2026: nelle settimane con VIX oltre 24 il valore sta fra 0.74 e 0.87, nelle settimane calme fra 0.94 e 1.02. Campione corto e con un solo episodio di stress moderato: da rivedere al gate.",
+  "pendenza_min_favorevole": 0.93,
+  "pendenza_min_piena": 0.97,
+  "vix_max_favorevole": 25.0,
+  "vix_max_pieno": 20.0,
+  "percentile_max": 60.0,
+
+  "_condizioni_conto": "Non si sale di gradino su un sistema giovane, reduce da uno stop o in perdita.",
+  "giorni_min_favorevole": 20,
+  "giorni_min_pieno": 40,
+  "giorni_min_da_stop": 30,
+  "risultato_min_eur": 0.0,
+
+  "_ritirata": "Hanno la precedenza su tutto: portano l'esposizione a zero. Quando la parte corta della curva corre piu' della lunga il premio si spegne e resta solo il rischio.",
+  "vix_allarme": 30.0,
+  "pendenza_ritirata": 0.85,
+
+  "_gestione": "stop_eur e' il limite di perdita vero. La banda evita di pagare spread per ritocchi da poco.",
+  "stop_eur": 15.0,
+  "pausa_giorni": 5,
+  "banda_ribilancio": 0.40,
+  "stop_broker_max": 0.60
+}
