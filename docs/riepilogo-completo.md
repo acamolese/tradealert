@@ -2,6 +2,10 @@
 
 *Documento di riferimento. Aggiornato: 2026-07-26.*
 
+
+> **Nota (2026-09-12)**: questo documento si ferma al 26 luglio 2026 e descrive la v2,
+> oggi spenta. Per lo stato attuale e la storia aggiornata vedi [`storia-completa.md`](storia-completa.md).
+
 Questo documento raccoglie tutto: la storia, i test, la transizione dalla versione 1
 alla versione 2, la configurazione attualmente in produzione, i file, i backup e
 cosa aspettarsi. È il punto della situazione definitivo.

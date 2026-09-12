@@ -1,0 +1,1993 @@
+========================================================================
+EXPORT SETUP TRADEALERT  (48 setup, importi in EURO)
+========================================================================
+
+------------------------------------------------------------------------
+#1  trade id=1  signal id=11  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Bitcoin  (long)
+  Aperto:       2026-04-18T09:31:24.616371+00:00
+  Chiuso:       2026-04-21T22:22:31.689319+00:00
+  Size:         0.0001
+  Entry:        76 623.10 EUR
+  Stop loss:    73 534.18 EUR
+  Take profit:  83 874.92 EUR
+  Prezzo uscita:n/d
+  Motivo uscita:reconcile:no_match
+  P&L:          n/d  (n/d)
+
+  -- Setup originario (signal) --
+  Score:        7.2
+  Costo atteso: n/d
+  Stato signal: executed
+  Creato:       2026-04-18T09:30:43.412389+00:00
+  Tesi:
+    BTC in uptrend con slope +0.239% e RSI 63.5 (non ipercomprato). Posizionato -1.59% dal high 20gg, con momentum positivo e ATR 1.26% che permette gestione volatilità. Weekend offre finestra operativa con crypto come asset principale. Invalidazione: rottura sotto 74.800 (supporto 4h).
+
+  -- Eventi (1) --
+    [2026-04-18T09:31:24.790443+00:00] opened  Esecuzione automatica da signal  {"size": 0.0001, "deal_id": "000940dd-0055-311e-0000-0000833b2b3d", "notional": 7.659810000000001, "fill_level": 76623.1, "margin_budget": 8.0, "risk_estimate": 0.30639240000000006, "deal_reference": "o_b226a185-cb06-40f0-bea6-32bfdf3a3b5d", "margin_estimate": 7.659810000000001}
+
+------------------------------------------------------------------------
+#2  trade id=2  signal id=13  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Bitcoin  (long)
+  Aperto:       2026-04-18T09:41:38.683333+00:00
+  Chiuso:       2026-04-21T22:22:31.654889+00:00
+  Size:         0.0001
+  Entry:        76 682.05 EUR
+  Stop loss:    73 590.82 EUR
+  Take profit:  78 573.53 EUR
+  Prezzo uscita:n/d
+  Motivo uscita:reconcile:no_match
+  P&L:          n/d  (n/d)
+
+  -- Setup originario (signal) --
+  Score:        7.2
+  Costo atteso: n/d
+  Stato signal: executed
+  Creato:       2026-04-18T09:41:02.900166+00:00
+  Tesi:
+    BTC in uptrend con trend_slope +0.239% e RSI 63.9 (momentum positivo non ipercomprato). Prezzo -1.54% dal massimo 20gg suggerisce ritracciamento su supporti affidabili. Setup favorito nel weekend quando crypto hanno priorità. Entry su rottura di resistenza locale attorno 77000 con target verso 78500-79000.
+
+  -- Eventi (1) --
+    [2026-04-18T09:41:38.791088+00:00] opened  Esecuzione automatica da signal  {"size": 0.0001, "deal_id": "000940dd-0055-311e-0000-0000833b2b99", "notional": 7.665710000000001, "fill_level": 76682.05, "margin_budget": 10.0, "risk_estimate": 0.3066284, "deal_reference": "o_f5a537a1-4719-4ff4-b39d-555dcd6b8197", "margin_estimate": 7.665710000000001}
+
+------------------------------------------------------------------------
+#3  trade id=3  signal id=14  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Bitcoin  (long)
+  Aperto:       2026-04-18T10:05:25.163389+00:00
+  Chiuso:       2026-04-21T22:22:31.622736+00:00
+  Size:         0.0003
+  Entry:        76 432.30 EUR
+  Stop loss:    73 351.01 EUR
+  Take profit:  83 665.99 EUR
+  Prezzo uscita:n/d
+  Motivo uscita:reconcile:no_match
+  P&L:          n/d  (n/d)
+
+  -- Setup originario (signal) --
+  Score:        7.2
+  Costo atteso: n/d
+  Stato signal: executed
+  Creato:       2026-04-18T10:05:11.605819+00:00
+  Tesi:
+    Bitcoin in uptrend (trend_slope +0.236%), RSI 62.2 (momentum positivo senza ipercomprato), solo 1.75% sotto i 20-day high. Setup long su breakout dei 77.8k con consolidamento costruttivo. Invalidazione sotto 73.7k (support 20d).
+
+  -- Eventi (1) --
+    [2026-04-18T10:05:25.266421+00:00] opened  Esecuzione automatica da signal  {"size": 0.00030000000000000003, "deal_id": "000940dd-0055-311e-0000-0000833b2c84", "notional": 22.922190000000004, "fill_level": 76432.3, "risk_estimate": 0.9168876000000001, "deal_reference": "o_96ecc3b8-f5cd-4046-b6df-a56d65ee533d", "exposure_budget": 25.0, "margin_estimate": 22.922190000000004}
+
+------------------------------------------------------------------------
+#4  trade id=4  signal id=20  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Polkadot  (long)
+  Aperto:       2026-04-18T11:44:18.52451+00:00
+  Chiuso:       2026-04-19T07:01:02.325054+00:00
+  Size:         19
+  Entry:        1.29 EUR
+  Stop loss:    1.23 EUR
+  Take profit:  1.41 EUR
+  Prezzo uscita:1.26 EUR
+  Motivo uscita:manual:Richiesta utente da monitor
+  P&L:          -0.47 EUR  (-1.93%)
+
+  -- Setup originario (signal) --
+  Score:        7.2
+  Costo atteso: n/d
+  Stato signal: executed
+  Creato:       2026-04-18T11:43:51.621721+00:00
+  Tesi:
+    Polkadot mostra il trend slope più aggressivo dell'universo (+0.757%) con RSI 61.6 ancora in zona momentum positivo senza eccesso. Il prezzo è 4.94% sotto i massimi 20gg, offrendo spazio di recupero in un contesto weekend dove le crypto hanno priorità. La volatilità elevata (BB width 21.1%) è gestibile con stop appropriato e il momentum direzionale è chiaro. Setup lungo con asimmetria rischio/rendimento favorevole su orizzonte 2-5 giorni.
+
+  -- Eventi (2) --
+    [2026-04-18T11:44:18.656404+00:00] opened  Esecuzione automatica da signal  {"size": 19.0, "deal_id": "0010f51d-0055-311e-0000-000080901891", "notional": 24.4055, "fill_level": 1.2877, "risk_estimate": 1.0982475, "deal_reference": "o_9200551f-bad8-4cd9-9b9b-e1bae16d4fa8", "exposure_budget": 25.0, "margin_estimate": 24.4055}
+    [2026-04-19T07:01:02.454868+00:00] manual_close  Richiesta utente da monitor  {"pnl": -0.47, "close_level": 1.2629}
+
+------------------------------------------------------------------------
+#5  trade id=5  signal id=24  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Ripple  (long)
+  Aperto:       2026-04-18T12:12:35.730115+00:00
+  Chiuso:       2026-04-19T07:01:06.170165+00:00
+  Size:         10
+  Entry:        1.44 EUR
+  Stop loss:    1.39 EUR
+  Take profit:  1.54 EUR
+  Prezzo uscita:1.43 EUR
+  Motivo uscita:manual:Richiesta utente da monitor
+  P&L:          -0.15 EUR  (-1.02%)
+
+  -- Setup originario (signal) --
+  Score:        7.2
+  Costo atteso: n/d
+  Stato signal: executed
+  Creato:       2026-04-18T12:12:28.818196+00:00
+  Tesi:
+    XRP in forte trend rialzista (slope +0.342%) con momentum positivo (RSI 56.9 neutro ma saliente). News recente conferma breakout settimanale con 8% outperformance vs majors; integrazione su Solana amplia utilità. Weekend offre opportunità crypto con asimmetria favorevole. Ancora 3.4% sotto high 20gg, spazio di ritracciamento limitato prima di resistenza.
+
+  -- Eventi (2) --
+    [2026-04-18T12:12:35.872243+00:00] opened  Esecuzione automatica da signal  {"size": 10.0, "deal_id": "0061241d-0055-311e-0000-000081586b97", "notional": 14.3698, "fill_level": 1.44057, "margin_budget": 15.0, "risk_estimate": 0.502943, "deal_reference": "o_56bbc6f2-e2be-4cc0-9d57-bfe311e89616", "margin_estimate": 14.3698}
+    [2026-04-19T07:01:06.262938+00:00] manual_close  Richiesta utente da monitor  {"pnl": -0.15, "close_level": 1.4259}
+
+------------------------------------------------------------------------
+#6  trade id=6  signal id=26  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Ripple  (long)
+  Aperto:       2026-04-18T13:05:58.927704+00:00
+  Chiuso:       2026-04-19T07:01:03.663601+00:00
+  Size:         21
+  Entry:        1.44 EUR
+  Stop loss:    1.39 EUR
+  Take profit:  1.54 EUR
+  Prezzo uscita:1.43 EUR
+  Motivo uscita:manual:Richiesta utente da monitor
+  P&L:          -0.30 EUR  (-0.99%)
+
+  -- Setup originario (signal) --
+  Score:        7.5
+  Costo atteso: n/d
+  Stato signal: executed
+  Creato:       2026-04-18T13:05:32.133397+00:00
+  Tesi:
+    XRP in trend rialzista forte (+34.1% slope) su momentum positivo e catalizzatore tecnico-fondamentale. News stamattina: Wrapped XRP live su Solana allarga accesso DeFi e uso case. RSI 56.8 neutro non estremo, -3.46% da high recente offre entry razionale. Finestra weekend favorevole per crypto (tradeable_count=12). Breakout sopra 1.48 confermerebbe continuazione rialzista con target 1.52-1.55.
+
+  -- Eventi (2) --
+    [2026-04-18T13:05:59.031977+00:00] opened  Esecuzione automatica da signal  {"size": 21.0, "deal_id": "0061241d-0055-311e-0000-000081586d15", "notional": 30.17007, "fill_level": 1.44026, "margin_budget": 30.0, "risk_estimate": 1.05595245, "deal_reference": "o_de560d1b-ace3-4df3-91b9-cc6abeb5ba4f", "margin_estimate": 30.17007}
+    [2026-04-19T07:01:03.750803+00:00] manual_close  Richiesta utente da monitor  {"pnl": -0.3, "close_level": 1.42595}
+
+------------------------------------------------------------------------
+#7  trade id=7  signal id=34  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        GTC/USD  (long)
+  Aperto:       2026-04-19T11:32:50.926932+00:00
+  Chiuso:       2026-04-21T22:22:31.589802+00:00
+  Size:         230
+  Entry:        0.13 EUR
+  Stop loss:    0.12 EUR
+  Take profit:  0.14 EUR
+  Prezzo uscita:n/d
+  Motivo uscita:reconcile:no_match
+  P&L:          n/d  (n/d)
+
+  -- Setup originario (signal) --
+  Score:        7.8
+  Costo atteso: n/d
+  Stato signal: expired
+  Creato:       2026-04-19T11:25:34.651011+00:00
+  Tesi:
+    GTC in movimento esplosivo con daily_pct_change +39.21%, RSI 69.9 in zona di forza. Trend slope 1.827 mostra momentum rialzista strutturale. Sebbene overbought su 1H, il breakout è autenticamente forte e non ancora esaurito. Weekend con crypto tradeable: setup eccellente con asimmetria rischio/rendimento favorevole. Consolidamento attorno a 0.1286 potrebbe spingere ulteriormente verso resistenza.
+
+  -- Eventi (1) --
+    [2026-04-19T11:32:51.044748+00:00] opened  Esecuzione automatica da signal  {"size": 230.0, "deal_id": "001d40dd-0055-311e-0000-0000806f0015", "notional": 29.969, "fill_level": 0.1336, "margin_budget": 30.0, "risk_estimate": 1.348605, "deal_reference": "o_ba20ddd4-3609-428f-b12d-5121ef118cfe", "margin_estimate": 29.969}
+
+------------------------------------------------------------------------
+#8  trade id=8  signal id=37  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        BOME/USD  (long)
+  Aperto:       2026-04-19T13:06:26.206528+00:00
+  Chiuso:       2026-04-21T22:22:31.556926+00:00
+  Size:         17050
+  Entry:        0.00 EUR
+  Stop loss:    0.00 EUR
+  Take profit:  0.00 EUR
+  Prezzo uscita:n/d
+  Motivo uscita:reconcile:no_match
+  P&L:          n/d  (n/d)
+
+  -- Setup originario (signal) --
+  Score:        6.5
+  Costo atteso: n/d
+  Stato signal: executed
+  Creato:       2026-04-19T13:05:40.928117+00:00
+  Tesi:
+    BOME registra +17.92% nella sessione odierna con un range del 23.08%, confermando un momentum rialzista significativo. Il trend slope 4H è positivo (0.077) e l'RSI a 64.6 indica forza senza essere ancora in zona di ipercomprato critico. Il ritracciamento dal massimo giornaliero è limitato (-6.49%), suggerendo che il movimento è sostenuto. In contesto domenicale con mercati tradizionali chiusi, questo setup crypto di momentum è valutabile. Lo invaliderebbe un crollo sotto il low_20 a 0.00048.
+
+  -- Eventi (1) --
+    [2026-04-19T13:06:26.371217+00:00] opened  Esecuzione automatica da signal  {"size": 17050.0, "deal_id": "023cd15d-0001-54c4-0000-000080bd0022", "notional": 9.999825, "fill_level": 0.0005865, "margin_budget": 10.0, "risk_estimate": 0.49999125, "deal_reference": "o_0c632387-7bd1-4f3e-b8ee-91a2ce685295", "margin_estimate": 9.999825}
+
+------------------------------------------------------------------------
+#9  trade id=9  signal id=39  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        MERL/USD  (long)
+  Aperto:       2026-04-19T15:36:55.315052+00:00
+  Chiuso:       2026-04-19T18:00:47.165497+00:00
+  Size:         386
+  Entry:        0.04 EUR
+  Stop loss:    0.04 EUR
+  Take profit:  0.05 EUR
+  Prezzo uscita:0.04 EUR
+  Motivo uscita:manual:Richiesta utente da monitor (rebuild_from_activity)
+  P&L:          -0.74 EUR  (-4.94%)
+
+  -- Setup originario (signal) --
+  Score:        6.5
+  Costo atteso: n/d
+  Stato signal: executed
+  Creato:       2026-04-19T15:35:44.902106+00:00
+  Tesi:
+    MERL/USD segna +17.34% oggi con il prezzo ancora sopra il daily high (pct_from_daily_high +1.76%), indicando forza persistente e assenza di distribuzione intraday — segnale raro e bullish. Il RSI 4H è neutro a 51.6, lontano dall'ipercomprato, lasciando spazio di salita senza segnali di esaurimento tecnico immediato. Il prezzo si trova al 4.76% dal massimo delle ultime 20 candele, con il breakout del range ancora possibile. La struttura è di un asset che sta recuperando da un trend discendente (slope -0.393%) grazie a un catalizzatore di momentum giornaliero. Il setup è invalidato se il prezzo rompe il minimo del range 4H attuale.
+
+  -- Eventi (2) --
+    [2026-04-19T15:36:55.441247+00:00] opened  Esecuzione automatica da signal  {"size": 386.0, "deal_id": "0d15231d-0001-54c4-0000-000080bd0065", "notional": 14.996099999999998, "fill_level": 0.038849999999999996, "margin_budget": 15.0, "risk_estimate": 1.1996879999999999, "deal_reference": "o_ff7d8406-adca-4f42-bb48-34f9b2693b7e", "margin_estimate": 14.996099999999998}
+    [2026-04-19T18:00:47.28901+00:00] manual_close  Richiesta utente da monitor  {"pnl": null, "close_level": 0.03902}
+
+------------------------------------------------------------------------
+#10  trade id=10  signal id=40  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        GUN/USD  (long)
+  Aperto:       2026-04-19T18:06:55.677832+00:00
+  Chiuso:       2026-04-21T22:22:31.527653+00:00
+  Size:         822
+  Entry:        0.02 EUR
+  Stop loss:    0.02 EUR
+  Take profit:  0.02 EUR
+  Prezzo uscita:n/d
+  Motivo uscita:reconcile:no_match
+  P&L:          n/d  (n/d)
+
+  -- Setup originario (signal) --
+  Score:        7
+  Costo atteso: n/d
+  Stato signal: executed
+  Creato:       2026-04-19T18:05:42.934931+00:00
+  Tesi:
+    GUN/USD registra un daily_pct_change di +27.36% con un range giornaliero del 25.87% e si trova al massimo delle ultime 20 candele (pct_from_high_20 = 0.0%), segnalando forza breakout genuina. Il prezzo è attualmente solo -5.17% dal massimo intraday, indicando che il momentum non si è ancora esaurito. RSI 4H a 53.4 è neutro, non in ipercomprato, lasciando spazio alla continuazione. Il trend slope 4H è negativo (-0.368) su base multi-settimana ma il breakout odierno potrebbe anticipare un cambio di regime. È domenica, mercati tradizionali chiusi: il contesto weekend favorisce le crypto. Setup invalidato se il prezzo cede il supporto intraday con forte volume in vendita.
+
+  -- Eventi (1) --
+    [2026-04-19T18:06:55.784318+00:00] opened  Esecuzione automatica da signal  {"size": 822.0, "deal_id": "001d539d-0001-54c4-0000-000080cc000a", "notional": 14.997389999999998, "fill_level": 0.01834, "margin_budget": 15.0, "risk_estimate": 1.0498173, "deal_reference": "o_7e557761-23cc-4968-9981-80e895be95a2", "margin_estimate": 14.997389999999998}
+
+------------------------------------------------------------------------
+#11  trade id=11  signal id=41  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        CPOOL/USD  (long)
+  Aperto:       2026-04-19T19:12:27.438268+00:00
+  Chiuso:       2026-04-21T22:22:31.456758+00:00
+  Size:         348
+  Entry:        0.03 EUR
+  Stop loss:    0.03 EUR
+  Take profit:  0.03 EUR
+  Prezzo uscita:n/d
+  Motivo uscita:reconcile:no_match
+  P&L:          n/d  (n/d)
+
+  -- Setup originario (signal) --
+  Score:        7
+  Costo atteso: n/d
+  Stato signal: executed
+  Creato:       2026-04-19T19:05:43.620458+00:00
+  Tesi:
+    CPOOL/USD registra un +14.59% intraday con il prezzo praticamente al massimo delle ultime 20 candele (pct_from_high_20 = -0.02%), indicando un breakout pulito su resistenza chiave. RSI a 68.8 mostra momentum forte ma ancora non in zona di ipercomprato estremo. Il trend slope positivo (+0.338) e la BB width al 14.86% confermano un'espansione ordinata, meno caotica degli altri spike della giornata. In contesto domenicale con mercati tradizionali chiusi, questo setup offre una delle migliori asimmetrie rischio/rendimento tra le crypto con movimento forte oggi. Lo spread all'1% è gestibile rispetto alla volatilità attesa.
+
+  -- Eventi (1) --
+    [2026-04-19T19:12:27.575231+00:00] opened  Backfill: confirm_deal 404 ma posizione aperta comunque  {"size": 348.0, "entry": 0.028899, "deal_id": "0340f3dd-0001-54c4-0000-000081290017"}
+
+------------------------------------------------------------------------
+#12  trade id=12  signal id=44  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Viridien  (long)
+  Aperto:       2026-04-20T08:07:01.201425+00:00
+  Chiuso:       2026-04-22T07:15:05.588823+00:00
+  Size:         0.108
+  Entry:        139.64 EUR
+  Stop loss:    134.33 EUR
+  Take profit:  149.64 EUR
+  Prezzo uscita:n/d
+  Motivo uscita:reconcile:no_match
+  P&L:          n/d  (n/d)
+
+  -- Setup originario (signal) --
+  Score:        7
+  Costo atteso: n/d
+  Stato signal: executed
+  Creato:       2026-04-20T07:35:48.538858+00:00
+  Tesi:
+    Viridien (CGG) mostra un momentum eccezionale con daily_pct_change di +10.87%, che porta il prezzo esattamente al massimo delle ultime 20 candele (pct_from_high_20 = 0.0%), segnalando un breakout in atto su resistenza chiave. Il trend slope 4H è positivo (+0.20%) e il RSI a 58.9 è in zona rialzista ma non ancora ipercomprato. L'ATR_pct del 2.83% indica volatilità sufficiente per un trade con buona ampiezza. Trattandosi di un titolo azionario tradizionale in giornata feriale, ha priorità rispetto alle crypto. La tesi si invalida se il prezzo rientra sotto il precedente massimo 20 periodi con chiusura daily negativa.
+
+  -- Eventi (6) --
+    [2026-04-20T08:07:01.341704+00:00] opened  Esecuzione automatica da signal  {"size": 0.108, "deal_id": "000031c7-0000-5552-0000-000080aa00a2", "notional": 15.033599999999998, "fill_level": 139.6392, "margin_budget": 15.0, "risk_estimate": 0.526176, "deal_reference": "o_a46498b5-6194-4bc1-ad29-976ec4cc19ff", "margin_estimate": 15.033599999999998}
+    [2026-04-20T15:00:05.97715+00:00] trailing_sl  Profit 0.54R, SL -0.5R dall'entry  {"new_sl": 137.19551, "old_sl": 134.328, "offset_r": -0.5, "profit_r": 0.5444234652078915, "r_distance": 4.887372, "current_price": 142.3}
+    [2026-04-20T15:00:10.9281+00:00] trailing_sl  Profit 0.54R, SL -0.5R dall'entry  {"new_sl": 137.19551, "old_sl": 137.1955, "offset_r": -0.5, "profit_r": 0.5444234652078915, "r_distance": 4.887372, "current_price": 142.3}
+    [2026-04-20T15:05:13.351578+00:00] trailing_sl  Profit 0.66R, SL -0.5R dall'entry  {"new_sl": 137.19551, "old_sl": 137.1955, "offset_r": -0.5, "profit_r": 0.6569583817233486, "r_distance": 4.887372, "current_price": 142.85}
+    [2026-04-20T15:10:04.718792+00:00] trailing_sl  Profit 0.54R, SL -0.5R dall'entry  {"new_sl": 137.19551, "old_sl": 137.1955, "offset_r": -0.5, "profit_r": 0.5444234652078915, "r_distance": 4.887372, "current_price": 142.3}
+    [2026-04-21T07:05:06.063918+00:00] trailing_sl  Profit 1.21R, SL +0R dall'entry  {"new_sl": 139.6392, "old_sl": 137.2318, "offset_r": 0, "profit_r": 1.2094025173447045, "r_distance": 4.887372, "current_price": 145.55}
+
+------------------------------------------------------------------------
+#13  trade id=13  signal id=None  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Silver  (long)
+  Aperto:       2026-04-21T22:12:56.563093+00:00
+  Chiuso:       2026-04-22T16:15:07.42638+00:00
+  Size:         2
+  Entry:        76.60 EUR
+  Stop loss:    75.00 EUR
+  Take profit:  79.00 EUR
+  Prezzo uscita:n/d
+  Motivo uscita:reconcile:no_match
+  P&L:          n/d  (n/d)
+
+  -- Setup originario non disponibile (signal_id assente) --
+
+  -- Eventi (2) --
+    [2026-04-22T05:00:07.068627+00:00] trailing_sl  Profit 0.89R, SL -0.5R dall'entry  {"new_sl": 75.7985, "old_sl": 75.0, "offset_r": -0.5, "profit_r": 0.8929242329367608, "r_distance": 1.5969999999999942, "current_price": 78.023}
+    [2026-04-22T05:20:04.574704+00:00] trailing_sl  Profit 1.21R, SL +0R dall'entry  {"new_sl": 76.597, "old_sl": 75.799, "offset_r": 0, "profit_r": 1.2053850970569844, "r_distance": 1.5969999999999942, "current_price": 78.52199999999999}
+
+------------------------------------------------------------------------
+#14  trade id=14  signal id=51  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Nasdaq 100  (long)
+  Aperto:       2026-04-22T09:06:15.8394+00:00
+  Chiuso:       2026-04-22T09:15:05.699955+00:00
+  Size:         0.001
+  Entry:        26 690.40 EUR
+  Stop loss:    26 488.70 EUR
+  Take profit:  27 169.30 EUR
+  Prezzo uscita:n/d
+  Motivo uscita:reconcile:no_match
+  P&L:          n/d  (n/d)
+
+  -- Setup originario (signal) --
+  Score:        7
+  Costo atteso: n/d
+  Stato signal: executed
+  Creato:       2026-04-22T08:05:51.983863+00:00
+  Tesi:
+    Il Nasdaq 100 mostra il setup tecnico più pulito tra gli indici: trend slope positivo, RSI 60.3 in territorio neutro-rialzista con spazio prima dell'ipercomprato, e prezzo a soli -0.13% dal massimo delle ultime 20 candele. Le Bollinger Bands strette (bb_width 1.248%) segnalano compressione di volatilità propedeutica a un breakout. Il contesto macro è supportato dalla tregua USA-Iran che riduce il rischio geopolitico acuto. L'evento critico Iran entro ~4h rappresenta il principale rischio a breve: scenario risk_off_if_fails potrebbe pesare sugli indici, ma la direzione attuale è costruttiva se la tregua regge.
+
+  -- Eventi (1) --
+    [2026-04-22T09:06:15.969018+00:00] opened  Esecuzione automatica da signal  {"size": 0.001, "deal_id": "00384627-0001-54c4-0000-000088fb74c3", "notional": 26.6889, "fill_level": 26690.4, "margin_budget": 27.0, "risk_estimate": 0.20016675, "deal_reference": "o_d3bc54fb-d304-4793-b465-dc9d84077833", "margin_estimate": 26.6889}
+
+------------------------------------------------------------------------
+#15  trade id=15  signal id=52  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Mobileye Global Inc  (long)
+  Aperto:       2026-04-23T11:36:04.422483+00:00
+  Chiuso:       2026-04-23T13:15:07.376215+00:00
+  Size:         2
+  Entry:        8.81 EUR
+  Stop loss:    8.38 EUR
+  Take profit:  9.60 EUR
+  Prezzo uscita:n/d
+  Motivo uscita:reconcile:no_match
+  P&L:          n/d  (n/d)
+
+  -- Setup originario (signal) --
+  Score:        7.5
+  Costo atteso: n/d
+  Stato signal: executed
+  Creato:       2026-04-23T11:35:47.544633+00:00
+  Tesi:
+    Mobileye ha registrato un movimento intraday eccezionale di +12.65% con range giornaliero del 14%, catalizzato da risultati Q1 2026 positivi e dall'annuncio di un programma di riacquisto azioni da 250 milioni di dollari. Il titolo è al massimo degli ultimi 20 giorni (pct_from_high_20 = 0%), confermando forza tecnica strutturale con trend_slope positivo. RSI a 72.3 segnala momentum rialzista sostenuto senza essere ancora in zona di esaurimento critica su base swing. Le news confermano pienamente il driver fondamentale: earnings beat + buyback = doppio catalizzatore. Il setup è valido per un continuation long dopo la prima sessione di rottura, con possibile proseguimento nelle 48-72h.
+
+  -- Eventi (6) --
+    [2026-04-23T11:36:04.526003+00:00] opened  Esecuzione automatica da signal  {"size": 2.0, "deal_id": "00342319-0001-54c4-0000-000082220017", "notional": 17.54, "fill_level": 8.81, "margin_budget": 15.0, "risk_estimate": 0.7892999999999999, "deal_reference": "o_e40900f7-c662-464a-bce5-4f85f19552bb", "margin_estimate": 17.54}
+    [2026-04-23T11:55:04.754226+00:00] trailing_sl  Profit 0.53R, SL -0.50R dall'entry  {"new_sl": 8.61177, "old_sl": 8.38, "offset_r": -0.5, "profit_r": 0.5297010972379848, "r_distance": 0.39645, "current_price": 9.02}
+    [2026-04-23T12:00:06.673265+00:00] trailing_sl  Profit 0.74R, SL -0.50R dall'entry  {"new_sl": 8.61177, "old_sl": 8.61, "offset_r": -0.5, "profit_r": 0.7441039223105055, "r_distance": 0.39645, "current_price": 9.105}
+    [2026-04-23T12:00:11.262303+00:00] trailing_sl  Profit 0.76R, SL -0.50R dall'entry  {"new_sl": 8.61177, "old_sl": 8.61, "offset_r": -0.5, "profit_r": 0.7567158531971218, "r_distance": 0.39645, "current_price": 9.11}
+    [2026-04-23T12:05:08.158699+00:00] trailing_sl  Profit 1.27R, SL +0.00R dall'entry  {"new_sl": 8.81, "old_sl": 8.61, "offset_r": 0.0, "profit_r": 1.2738050195484947, "r_distance": 0.39645, "current_price": 9.315000000000001}
+    [2026-04-23T12:10:04.524657+00:00] trailing_sl  Profit 1.60R, SL +0.50R dall'entry  {"new_sl": 9.00823, "old_sl": 8.81, "offset_r": 0.5, "profit_r": 1.6017152226005795, "r_distance": 0.39645, "current_price": 9.445}
+
+------------------------------------------------------------------------
+#16  trade id=16  signal id=54  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Nasdaq 100  (long)
+  Aperto:       2026-04-24T06:06:02.331739+00:00
+  Chiuso:       2026-04-24T17:01:50.146915+00:00
+  Size:         0.001
+  Entry:        26 948.10 EUR
+  Stop loss:    26 677.80 EUR
+  Take profit:  27 540.10 EUR
+  Prezzo uscita:27 272.70 EUR
+  Motivo uscita:manual:Richiesta utente da monitor (rebuild_from_activity)
+  P&L:          +0.32 EUR  (+1.20%)
+
+  -- Setup originario (signal) --
+  Score:        7
+  Costo atteso: n/d
+  Stato signal: executed
+  Creato:       2026-04-24T06:05:50.587544+00:00
+  Tesi:
+    Il Nasdaq 100 si trova esattamente sui massimi degli ultimi 20 periodi (pct_from_high_20 = 0.0%), un segnale di breakout tecnico significativo con RSI 64.5 in zona positiva ma non overbought. Il trend slope è positivo (+0.072%) e il daily_pct_change di +0.59% conferma momentum rialzista intraday. La BB width al 2.06% su 4H indica volatilità contenuta con potenziale espansione direzionale. Il critical event US-EU mineral deal (risk_on, 29.9h) è un catalizzatore macro favorevole per gli indici tech. Setup di breakout con continuazione.
+
+  -- Eventi (4) --
+    [2026-04-24T06:06:02.410841+00:00] opened  Esecuzione automatica da signal  {"size": 0.001, "deal_id": "00384627-0001-54c4-0000-000088fed917", "notional": 26.947300000000002, "fill_level": 26948.1, "margin_budget": 27.0, "risk_estimate": 0.269473, "deal_reference": "o_4e1d01d7-aea6-4b04-9292-bdd1b24f2555", "margin_estimate": 26.947300000000002}
+    [2026-04-24T11:05:07.693829+00:00] trailing_sl  Profit 0.52R, SL -0.50R dall'entry  {"new_sl": 26813.3595, "old_sl": 26677.8, "offset_r": -0.5, "profit_r": 0.5169195601916384, "r_distance": 269.481, "current_price": 27087.4}
+    [2026-04-24T11:30:07.291547+00:00] trailing_sl  Profit 1.01R, SL +0.00R dall'entry  {"new_sl": 26948.1, "old_sl": 26813.4, "offset_r": 0.0, "profit_r": 1.014913852924696, "r_distance": 269.481, "current_price": 27221.6}
+    [2026-04-24T17:01:50.262987+00:00] manual_close  Richiesta utente da monitor  {"pnl": 0.32, "close_level": 27272.7}
+
+------------------------------------------------------------------------
+#17  trade id=17  signal id=55  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        API3/USD  (long)
+  Aperto:       2026-04-25T07:14:44.034747+00:00
+  Chiuso:       2026-04-25T08:15:07.009276+00:00
+  Size:         32.4
+  Entry:        0.47 EUR
+  Stop loss:    0.43 EUR
+  Take profit:  0.55 EUR
+  Prezzo uscita:n/d
+  Motivo uscita:reconcile:no_match
+  P&L:          n/d  (n/d)
+
+  -- Setup originario (signal) --
+  Score:        7
+  Costo atteso: n/d
+  Stato signal: executed
+  Creato:       2026-04-25T07:05:40.896125+00:00
+  Tesi:
+    API3 mostra un momentum intraday eccezionale con +35.29% oggi, il più forte dell'universo analizzato. Il trend slope 4H è positivo (+1.56%) e il prezzo è solo -4.45% dal massimo a 20 periodi, segnalando forza relativa. È sabato, quindi le crypto sono l'opzione principale. Il rischio principale è l'RSI 14 a 85.8, fortemente in ipercomprato, che suggerisce possibile consolidazione o pullback nel breve; tuttavia la distanza dal daily high (-5.75%) offre un potenziale punto di ingresso su ritracciamento. Si invalida se il prezzo rompe sotto il 50% del range odierno.
+
+  -- Eventi (1) --
+    [2026-04-25T07:14:44.129327+00:00] opened  Esecuzione automatica da signal  {"size": 32.4, "deal_id": "01409e1d-0001-54c4-0000-000080f60042", "notional": 15.012540000000001, "fill_level": 0.4657, "margin_budget": 15.0, "risk_estimate": 1.2010032000000002, "deal_reference": "o_d1c3773f-9c29-42ff-96b2-f3537deefc13", "margin_estimate": 15.012540000000001}
+
+------------------------------------------------------------------------
+#18  trade id=18  signal id=56  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        AXS/USD  (long)
+  Aperto:       2026-04-25T08:05:47.65961+00:00
+  Chiuso:       2026-04-25T08:15:06.933769+00:00
+  Size:         10
+  Entry:        1.46 EUR
+  Stop loss:    1.38 EUR
+  Take profit:  1.63 EUR
+  Prezzo uscita:n/d
+  Motivo uscita:reconcile:no_match
+  P&L:          n/d  (n/d)
+
+  -- Setup originario (signal) --
+  Score:        7
+  Costo atteso: n/d
+  Stato signal: executed
+  Creato:       2026-04-25T08:05:36.713584+00:00
+  Tesi:
+    AXS registra un daily_pct_change di +28.32%, il maggiore movimento rialzista dell'universo analizzato oggi, con trend slope positivo e prezzo quasi ai massimi delle ultime 20 candele (solo -0.68% dal high_20). È sabato, quindi le crypto sono l'opzione principale. Il setup mostra momentum eccezionale con breakout imminente dei massimi recenti. Il principale rischio è l'RSI 4H a 92.9, che segnala ipercomprato estremo: ideale attendere un piccolo pullback o consolidamento prima dell'entrata, oppure gestire una posizione ridotta con stop stretto.
+
+  -- Eventi (1) --
+    [2026-04-25T08:05:47.758421+00:00] opened  Esecuzione automatica da signal  {"size": 10.0, "deal_id": "000584dd-0001-54c4-0000-000080f6002d", "notional": 14.55, "fill_level": 1.46, "margin_budget": 15.0, "risk_estimate": 0.7275, "deal_reference": "o_619d062a-5696-4b5f-9c8d-30421aed6f6c", "margin_estimate": 14.55}
+
+------------------------------------------------------------------------
+#19  trade id=19  signal id=58  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Brent Oil  (long)
+  Aperto:       2026-04-27T14:05:58.044451+00:00
+  Chiuso:       2026-04-28T08:05:29.34359+00:00
+  Size:         1.9
+  Entry:        101.42 EUR
+  Stop loss:    98.84 EUR
+  Take profit:  106.44 EUR
+  Prezzo uscita:104.64 EUR
+  Motivo uscita:manual:Richiesta utente da monitor (close_price corretto da activity)
+  P&L:          +6.12 EUR  (+3.18%)
+
+  -- Setup originario (signal) --
+  Score:        7
+  Costo atteso: n/d
+  Stato signal: executed
+  Creato:       2026-04-27T14:04:43.093232+00:00
+  Tesi:
+    Il Brent mostra il setup più solido del gruppo: trend_slope_pct positivo a +0.23 su 4H, RSI 4H a 63.4 non ancora in ipercomprato, e il prezzo si trova a soli -0.7% dal massimo delle ultime 20 candele, segnalando forza strutturale. La bb_width_pct espansa a 6.38 è coerente con un regime di trend in atto piuttosto che compressione. La news 'US-Iran talks stall' fornisce un catalyst geopolitico concreto che supporta la pressione rialzista sul petrolio. Il rischio principale è la BoJ in arrivo entro 12-13 ore che potrebbe generare volatilità cross-asset e drenare risk appetite, e il Fed decision atteso entro ~52h che potrebbe pesare sulle commodity denominate in USD.
+  Feature alla decisione:
+    epic: OIL_BRENT
+    news: [{'source': 'BBC Business', 'datetime': '2026-04-27T13:51:42+00:00', 'headline': 'Oil prices rise as US-Iran peace talks stall'}]
+    atr_4h: 2.08071
+    low_20: 97.035
+    rsi_14: 63.4
+    high_20: 102.209
+    leverage: 20.0
+    min_size: 1.0
+    size_step: 0.1
+    last_price: 101.496
+    spread_pct: 0.0887
+    asset_class: energy
+    bb_width_pct: 6.379
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 2.56
+    trend_slope_pct: 0.227
+    atr_pct_of_price: 2.05
+    daily_pct_change: 0.77
+    pct_from_high_20: -0.7
+    pct_from_daily_high: -0.98
+
+  -- Eventi (29) --
+    [2026-04-27T14:05:58.13438+00:00] opened  Esecuzione automatica da signal  {"size": 1.9000000000000001, "deal_id": "00018092-0001-54c4-0000-000082a1487f", "notional": 192.6125, "fill_level": 101.42, "margin_budget": 15.0, "risk_estimate": 4.8153125, "deal_reference": "o_0ad5c1a3-63f3-4fdf-815c-7befcd032280", "margin_estimate": 9.630625000000002}
+    [2026-04-27T18:05:12.248224+00:00] trailing_sl  Profit 0.52R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 98.841, "offset_r": -0.5, "profit_r": 0.5245513705383547, "r_distance": 2.5355000000000003, "current_price": 102.75}
+    [2026-04-28T01:05:04.719839+00:00] trailing_sl  Profit 0.51R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.5083809899428126, "r_distance": 2.5355000000000003, "current_price": 102.709}
+    [2026-04-28T02:00:04.263716+00:00] trailing_sl  Profit 0.53R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.5308617629658858, "r_distance": 2.5355000000000003, "current_price": 102.766}
+    [2026-04-28T02:05:05.229787+00:00] trailing_sl  Profit 0.52R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.5221849733780312, "r_distance": 2.5355000000000003, "current_price": 102.744}
+    [2026-04-28T02:10:04.956349+00:00] trailing_sl  Profit 0.53R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.5304673634391633, "r_distance": 2.5355000000000003, "current_price": 102.765}
+    [2026-04-28T02:15:06.914455+00:00] trailing_sl  Profit 0.53R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.5284953658055623, "r_distance": 2.5355000000000003, "current_price": 102.76}
+    [2026-04-28T02:20:04.617117+00:00] trailing_sl  Profit 0.53R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.5284953658055623, "r_distance": 2.5355000000000003, "current_price": 102.76}
+    [2026-04-28T02:25:04.43526+00:00] trailing_sl  Profit 0.56R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.5568921317294386, "r_distance": 2.5355000000000003, "current_price": 102.832}
+    [2026-04-28T02:30:04.259564+00:00] trailing_sl  Profit 0.54R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.5352001577598103, "r_distance": 2.5355000000000003, "current_price": 102.777}
+    [2026-04-28T02:35:05.202828+00:00] trailing_sl  Profit 0.53R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.534411358706371, "r_distance": 2.5355000000000003, "current_price": 102.775}
+    [2026-04-28T02:40:04.818406+00:00] trailing_sl  Profit 0.54R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.5419049497140584, "r_distance": 2.5355000000000003, "current_price": 102.794}
+    [2026-04-28T02:50:04.842266+00:00] trailing_sl  Profit 0.51R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.5068033918359284, "r_distance": 2.5355000000000003, "current_price": 102.705}
+    [2026-04-28T03:00:04.402213+00:00] trailing_sl  Profit 0.52R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.5170577795306617, "r_distance": 2.5355000000000003, "current_price": 102.731}
+    [2026-04-28T03:55:04.731873+00:00] trailing_sl  Profit 0.53R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.5292841648590016, "r_distance": 2.5355000000000003, "current_price": 102.762}
+    [2026-04-28T04:00:05.087921+00:00] trailing_sl  Profit 0.59R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.5931768881877361, "r_distance": 2.5355000000000003, "current_price": 102.924}
+    [2026-04-28T04:05:05.113585+00:00] trailing_sl  Profit 0.65R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.653914415302702, "r_distance": 2.5355000000000003, "current_price": 103.078}
+    [2026-04-28T04:10:05.009704+00:00] trailing_sl  Profit 0.64R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.6408992309209228, "r_distance": 2.5355000000000003, "current_price": 103.045}
+    [2026-04-28T04:15:06.025788+00:00] trailing_sl  Profit 0.61R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.6144744626306475, "r_distance": 2.5355000000000003, "current_price": 102.97800000000001}
+    [2026-04-28T04:20:04.627037+00:00] trailing_sl  Profit 0.58R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.5777953066456333, "r_distance": 2.5355000000000003, "current_price": 102.885}
+    [2026-04-28T04:25:04.64306+00:00] trailing_sl  Profit 0.57R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.5663577203707326, "r_distance": 2.5355000000000003, "current_price": 102.856}
+    [2026-04-28T04:30:04.52734+00:00] trailing_sl  Profit 0.55R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.5541313350423983, "r_distance": 2.5355000000000003, "current_price": 102.825}
+    [2026-04-28T04:35:09.333177+00:00] trailing_sl  Profit 0.52R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.524945770065077, "r_distance": 2.5355000000000003, "current_price": 102.751}
+    [2026-04-28T04:40:03.980952+00:00] trailing_sl  Profit 0.55R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.553342535988959, "r_distance": 2.5355000000000003, "current_price": 102.82300000000001}
+    [2026-04-28T04:45:05.00232+00:00] trailing_sl  Profit 0.55R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.5513705383553524, "r_distance": 2.5355000000000003, "current_price": 102.818}
+    [2026-04-28T04:50:06.452245+00:00] trailing_sl  Profit 0.54R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.5371721553934115, "r_distance": 2.5355000000000003, "current_price": 102.782}
+    [2026-04-28T04:55:04.256161+00:00] trailing_sl  Profit 0.55R, SL -0.50R dall'entry  {"new_sl": 100.15225, "old_sl": 100.152, "offset_r": -0.5, "profit_r": 0.5529481364622366, "r_distance": 2.5355000000000003, "current_price": 102.822}
+    [2026-04-28T05:45:04.443351+00:00] trailing_sl  Profit 1.01R, SL +0.00R dall'entry  {"new_sl": 101.42, "old_sl": 100.152, "offset_r": 0.0, "profit_r": 1.0100571879313716, "r_distance": 2.5355000000000003, "current_price": 103.981}
+    [2026-04-28T08:05:29.411783+00:00] manual_close  Richiesta utente da monitor  {"pnl": null, "close_level": 101.42}
+
+------------------------------------------------------------------------
+#20  trade id=20  signal id=64  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Brent Oil  (long)
+  Aperto:       2026-04-29T20:06:43.569623+00:00
+  Chiuso:       2026-04-30T00:15:07.228556+00:00
+  Size:         2.2
+  Entry:        111.08 EUR
+  Stop loss:    108.82 EUR
+  Take profit:  115.48 EUR
+  Prezzo uscita:109.95 EUR
+  Motivo uscita:reconcile:stop_hit (rebuild_from_activity)
+  P&L:          -2.48 EUR  (-1.02%)
+
+  -- Setup originario (signal) --
+  Score:        7.2
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-04-29T20:05:41.365275+00:00
+  Tesi:
+    Il Brent segna un daily_pct_change di +6.5% con catalyst netto identificabile: chiusura dello Stretto di Hormuz. Il trend_slope_pct è positivo (+0.5) e il prezzo è a soli -0.13% dal massimo delle ultime 20 candele, segnale di forza strutturale. La bb_width_pct al 12.86% mostra espansione di volatilità coerente con continuazione del breakout. Il rischio principale è il RSI 4H a 85.4, fortemente ipercomprato: il setup è da gestire con stop stretto e target rapido, poiché un ritracciamento tecnico può materializzarsi velocemente. Si invalida se il prezzo rientra sensibilmente dal massimo 20 candele o se emergono notizie di riapertura di Hormuz.
+  Feature alla decisione:
+    epic: OIL_BRENT
+    news: [{'source': 'Investing.com Commodities', 'datetime': '2026-04-29T19:55:59+00:00', 'headline': 'Oil prices surge amid continued shuttering of Hormuz; Fed holds rates as expected'}, {'source': 'Investing.com Commodities', 'datetime': '2026-04-29T19:52:22+00:00', 'headline': 'Soybean futures rise on higher crude oil prices and stronger crush margins'}, {'source': 'Investing.com Commodities', 'datetime': '2026-04-29T19:36:15+00:00', 'headline': 'Canola futures rise on crude oil surge'}]
+    atr_4h: 1.71596
+    low_20: 100.497
+    rsi_14: 85.4
+    high_20: 111.276
+    leverage: 20.0
+    min_size: 1.0
+    size_step: 0.1
+    last_price: 111.133
+    spread_pct: 0.081
+    asset_class: energy
+    bb_width_pct: 12.858
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 7.45
+    trend_slope_pct: 0.504
+    atr_pct_of_price: 1.544
+    daily_pct_change: 6.5
+    pct_from_high_20: -0.13
+    pct_from_daily_high: -0.4
+
+  -- Eventi (2) --
+    [2026-04-29T20:06:43.649257+00:00] opened  Esecuzione automatica da signal  {"size": 2.2, "deal_id": "00018092-0001-54c4-0000-000082a4ad85", "notional": 244.28140000000002, "fill_level": 111.082, "margin_budget": 15.0, "risk_estimate": 4.8856280000000005, "deal_reference": "o_0ae984eb-bda2-4d30-9999-aac5c441332d", "margin_estimate": 12.214070000000001}
+    [2026-04-29T21:20:04.830465+00:00] trailing_sl  Profit 0.74R, SL -0.50R dall'entry  {"new_sl": 109.971, "old_sl": 108.816, "offset_r": -0.5, "profit_r": 0.7395437604652423, "r_distance": 2.22164, "current_price": 112.725}
+
+------------------------------------------------------------------------
+#21  trade id=21  signal id=65  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Gold  (long)
+  Aperto:       2026-04-30T06:06:39.426683+00:00
+  Chiuso:       2026-05-01T09:00:11.607386+00:00
+  Size:         0.06
+  Entry:        4 565.15 EUR
+  Stop loss:    4 496.34 EUR
+  Take profit:  4 701.75 EUR
+  Prezzo uscita:4 565.13 EUR
+  Motivo uscita:reconcile:stop_hit
+  P&L:          -0.00 EUR  (-0.00%)
+
+  -- Setup originario (signal) --
+  Score:        7
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-04-30T06:05:37.395926+00:00
+  Tesi:
+    L'oro presenta RSI 4H a 23, in zona di ipervenduto estremo su scala 4H, con il prezzo a ridosso del minimo delle ultime 20 candele (pct_from_high_20 -3.41%). Nonostante il trend_slope_pct sia leggermente negativo (-0.21), la bb_width_pct al 5.28% segnala volatilità già espansa e il daily_pct_change di +0.43% suggerisce un primo tentativo di stabilizzazione. Un RSI a 23 rappresenta una condizione di esaurimento del selling pressure che storicamente precede rimbalzi tecnici significativi, rendendo un'entrata long contrarian giustificata con gestione rischio rigorosa. Il rischio principale è che la discesa continui in assenza di catalyst specifici (news vuote) e con dati macro EU in arrivo che potrebbero spostare il risk appetite.
+  Feature alla decisione:
+    epic: GOLD
+    news: []
+    atr_4h: 38.21714
+    low_20: 4546.99
+    rsi_14: 23.0
+    high_20: 4724.27
+    leverage: 20.0
+    min_size: 0.01
+    size_step: 0.01
+    last_price: 4562.99
+    spread_pct: 0.0164
+    asset_class: metal
+    bb_width_pct: 5.28
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 0.94
+    trend_slope_pct: -0.21
+    atr_pct_of_price: 0.838
+    daily_pct_change: 0.43
+    pct_from_high_20: -3.41
+    pct_from_daily_high: -0.42
+
+  -- Eventi (3) --
+    [2026-04-30T06:06:39.505324+00:00] opened  Esecuzione automatica da signal  {"size": 0.06, "deal_id": "00601567-0001-54c4-0000-00008fd20f0b", "notional": 273.8886, "fill_level": 4565.15, "margin_budget": 15.0, "risk_estimate": 4.1083289999999995, "deal_reference": "o_690236ce-e88e-4168-8094-58530899c717", "margin_estimate": 13.69443}
+    [2026-04-30T07:50:05.142344+00:00] trailing_sl  Profit 0.52R, SL -0.50R dall'entry  {"new_sl": 4530.91, "old_sl": 4496.34, "offset_r": -0.5, "profit_r": 0.5172520800703894, "r_distance": 68.47725, "current_price": 4600.57}
+    [2026-04-30T10:30:07.455473+00:00] trailing_sl  Profit 1.17R, SL +0.00R dall'entry  {"new_sl": 4565.15, "old_sl": 4530.91, "offset_r": 0.0, "profit_r": 1.1653505361269645, "r_distance": 68.47725, "current_price": 4644.95}
+
+------------------------------------------------------------------------
+#22  trade id=22  signal id=66  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Gold  (long)
+  Aperto:       2026-05-01T14:06:38.757897+00:00
+  Chiuso:       2026-05-04T06:00:35.30334+00:00
+  Size:         0.06
+  Entry:        4 637.31 EUR
+  Stop loss:    4 581.44 EUR
+  Take profit:  4 766.93 EUR
+  Prezzo uscita:4 599.05 EUR
+  Motivo uscita:manual:Richiesta utente da monitor
+  P&L:          -2.30 EUR  (-0.83%)
+
+  -- Setup originario (signal) --
+  Score:        7.5
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-01T14:05:36.660489+00:00
+  Tesi:
+    L'oro si trova a soli -0.03% dal massimo delle ultime 20 candele, segnalando una forza tecnica eccezionale e la capacità di mantenere i livelli. RSI 4H a 62.6 è in territorio rialzista ma non esaurito, con margine di continuazione. Il bb_width_pct al 2.4% e l'atr_pct allo 0.82% indicano una volatilità moderata e contenuta, compatibile con una prosecuzione ordinata del trend. Il critical_event (scadenza War Powers Act su Iran tra ~46h) con direction_hint 'risk_off_if_fails' rappresenta un catalyst geopolitico potenzialmente potente: in scenario di escalation, l'oro è il beneficiario diretto, rafforzando la tesi long. Il setup sarebbe invalidato da una discesa marcata dal massimo 20 candele o da una risoluzione positiva della crisi Iran che riduca il bid risk-off.
+  Feature alla decisione:
+    epic: GOLD
+    news: []
+    atr_4h: 38.03286
+    low_20: 4546.99
+    rsi_14: 62.6
+    high_20: 4630.21
+    leverage: 20.0
+    min_size: 0.01
+    size_step: 0.01
+    last_price: 4628.715
+    spread_pct: 0.0108
+    asset_class: metal
+    bb_width_pct: 2.403
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 1.64
+    trend_slope_pct: 0.049
+    atr_pct_of_price: 0.822
+    daily_pct_change: 0.29
+    pct_from_high_20: -0.03
+    pct_from_daily_high: -0.15
+
+  -- Eventi (2) --
+    [2026-05-01T14:06:38.864521+00:00] opened  Esecuzione automatica da signal  {"size": 0.06, "deal_id": "00601567-0001-54c4-0000-00008fdcf787", "notional": 278.2254, "fill_level": 4637.31, "margin_budget": 15.0, "risk_estimate": 3.3387048, "deal_reference": "o_b6305485-7039-41d9-90cd-6b49887b9291", "margin_estimate": 13.91127}
+    [2026-05-04T06:00:35.413893+00:00] manual_close  Richiesta utente da monitor  {"pnl": -2.3, "close_level": 4599.05, "close_source": "activity", "confirm_level": 4599.05}
+
+------------------------------------------------------------------------
+#23  trade id=23  signal id=67  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Bitcoin  (long)
+  Aperto:       2026-05-04T08:06:42.152676+00:00
+  Chiuso:       2026-05-05T08:45:09.091354+00:00
+  Size:         0.0003
+  Entry:        79 621.65 EUR
+  Stop loss:    76 810.75 EUR
+  Take profit:  85 168.40 EUR
+  Prezzo uscita:80 718.25 EUR
+  Motivo uscita:manual:Richiesta utente da monitor
+  P&L:          +0.33 EUR  (+1.38%)
+
+  -- Setup originario (signal) --
+  Score:        7
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-04T08:05:38.937851+00:00
+  Tesi:
+    Bitcoin ha superato quota $80K per la prima volta da gennaio (news Cointelegraph confermano il breakout) e il daily_pct_change positivo rafforza il momentum intraday. Il trend_slope_pct +0.12 su 4H è coerente con la direzione rialzista, l'RSI 4H a 63.7 è in zona bullish senza essere in esaurimento, e la distanza dal massimo 20 candele è contenuta (-0.83%), suggerendo che il prezzo è nelle vicinanze della resistenza recente e la pressione è comprativa. Il recupero degli ETF inflows citato da CoinDesk costituisce un catalyst fondamentale. Il rischio principale è il rientro sotto il massimo 20 candele se il breakout non ha continuazione, con Strategy che ha messo in pausa gli acquisti prima degli earnings di martedì.
+  Feature alla decisione:
+    epic: BTCUSD
+    news: [{'source': 'CoinDesk', 'datetime': '2026-05-04T07:14:17+00:00', 'headline': 'Recovery in bitcoin ETF inflows is real. It is just not complete yet.'}, {'source': 'Cointelegraph', 'datetime': '2026-05-04T06:54:18+00:00', 'headline': 'Bitcoin climbs past $80K for the first time since January'}, {'source': 'CoinDesk', 'datetime': '2026-05-04T05:14:53+00:00', 'headline': 'Strategy pauses bitcoin buys before Tuesday earnings'}]
+    atr_4h: 598.43929
+    low_20: 77109.5
+    rsi_14: 63.7
+    high_20: 80307.2
+    leverage: 2.0
+    min_size: 0.0001
+    size_step: 0.0001
+    last_price: 79637.6
+    spread_pct: 0.0628
+    asset_class: crypto
+    bb_width_pct: 3.519
+    candles_used: 60
+    margin_factor: 0.5
+    market_status: TRADEABLE
+    daily_range_pct: 2.89
+    trend_slope_pct: 0.123
+    atr_pct_of_price: 0.751
+    daily_pct_change: 0.85
+    pct_from_high_20: -0.83
+    pct_from_daily_high: -1.17
+
+  -- Eventi (3) --
+    [2026-05-04T08:06:42.263746+00:00] opened  Esecuzione automatica da signal  {"size": 0.00030000000000000003, "deal_id": "000940dd-0001-54c4-0000-00008518a497", "notional": 23.878995, "fill_level": 79621.65, "margin_budget": 15.0, "risk_estimate": 0.835764825, "deal_reference": "o_9014be9d-920f-4531-a1ff-920448234cab", "margin_estimate": 11.9394975}
+    [2026-05-05T05:25:05.442771+00:00] trailing_sl  Profit 0.56R, SL -0.50R dall'entry  {"new_sl": 78228.25, "old_sl": 76810.75, "offset_r": -0.5, "profit_r": 0.557296377842675, "r_distance": 2786.7577499999998, "current_price": 81174.7}
+    [2026-05-05T08:45:09.187492+00:00] manual_close  Richiesta utente da monitor  {"pnl": 0.329, "close_level": 80718.25, "close_source": "activity", "confirm_level": 79621.65}
+
+------------------------------------------------------------------------
+#24  trade id=24  signal id=68  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Brent Oil  (long)
+  Aperto:       2026-05-04T11:06:57.024588+00:00
+  Chiuso:       2026-05-05T12:35:58.234049+00:00
+  Size:         1.6
+  Entry:        111.01 EUR
+  Stop loss:    107.89 EUR
+  Take profit:  117.10 EUR
+  Prezzo uscita:110.43 EUR
+  Motivo uscita:manual:Richiesta utente da monitor
+  P&L:          -0.93 EUR  (-0.52%)
+
+  -- Setup originario (signal) --
+  Score:        7
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-04T11:05:54.439921+00:00
+  Tesi:
+    Il Brent mostra un rimbalzo intraday deciso (+2.69% daily_pct_change) supportato da news geopolitiche esplicite (attacco segnalato a nave USA e stallo US-Iran), con daily_range_pct del 7.32% che indica forte direzionalità odierna. Il prezzo si trova a soli -1.88% dal massimo delle ultime 20 candele e l'RSI 4H a 46.4 è neutro, lasciando spazio al rialzo senza segnali di ipercomprato. Il trend_slope_pct è leggermente negativo (-0.13) ma il catalyst geopolitico e il momentum intraday possono anticipare un cambio di regime a breve termine. Il setup si invalida se le tensioni si attenuano o il prezzo non riesce a consolidare il guadagno odierno. Attenzione alla RBA decision entro ~17h che impatta direttamente Brent Oil.
+  Feature alla decisione:
+    epic: OIL_BRENT
+    news: [{'source': 'Investing.com Commodities', 'datetime': '2026-05-04T10:48:49+00:00', 'headline': 'Oil prices rise on reported strike on U.S. vessel'}, {'source': 'Finnhub:Reuters', 'datetime': '2026-05-04T01:31:00+00:00', 'headline': 'Indian rupee, bonds set to sway to oil prices as US-Iran stalemate drags - Reuters'}]
+    atr_4h: 2.67754
+    low_20: 107.121
+    rsi_14: 46.4
+    high_20: 112.608
+    leverage: 20.0
+    min_size: 1.0
+    size_step: 0.1
+    last_price: 110.491
+    spread_pct: 0.081
+    asset_class: energy
+    bb_width_pct: 6.22
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 7.32
+    trend_slope_pct: -0.129
+    atr_pct_of_price: 2.423
+    daily_pct_change: 2.69
+    pct_from_high_20: -1.88
+    pct_from_daily_high: -2.11
+
+  -- Eventi (3) --
+    [2026-05-04T11:06:57.148245+00:00] opened  Esecuzione automatica da signal  {"size": 1.6, "deal_id": "00018092-0001-54c4-0000-000082ab701b", "notional": 177.5936, "fill_level": 111.01, "margin_budget": 15.0, "risk_estimate": 4.9726208000000005, "deal_reference": "o_151ecaf5-0708-4c00-9209-8e752f06eb3b", "margin_estimate": 8.87968}
+    [2026-05-04T15:25:04.964235+00:00] trailing_sl  Profit 0.58R, SL -0.50R dall'entry  {"new_sl": 109.456, "old_sl": 107.888, "offset_r": -0.5, "profit_r": 0.579420129460667, "r_distance": 3.1082799999999997, "current_price": 112.811}
+    [2026-05-05T12:35:58.342723+00:00] manual_close  Richiesta utente da monitor  {"pnl": -0.9296, "close_level": 110.429, "close_source": "activity", "confirm_level": 112.492}
+
+------------------------------------------------------------------------
+#25  trade id=25  signal id=69  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Gold  (long)
+  Aperto:       2026-05-04T19:06:37.799482+00:00
+  Chiuso:       2026-05-06T03:15:06.390519+00:00
+  Size:         0.05
+  Entry:        4 517.81 EUR
+  Stop loss:    4 429.30 EUR
+  Take profit:  4 643.88 EUR
+  Prezzo uscita:4 643.99 EUR
+  Motivo uscita:reconcile:tp_hit
+  P&L:          +6.31 EUR  (+2.79%)
+
+  -- Setup originario (signal) --
+  Score:        7
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-04T19:05:35.429698+00:00
+  Tesi:
+    L'oro è al minimo delle ultime 20 candele (pct_from_high_20 -2.75%, low_20 coincide con last_price), con RSI 4H a 31.0 che segnala zona di ipervenduto tecnico da cui storicamente emerge rimbalzo. Il daily_pct_change di -2.21% indica una sessione di sell-off intenso, ma con bb_width_pct al 3.15% la volatilità è già in espansione. Il contesto geopolitico (attacco Iran, tensioni Hormuz) è tipicamente risk-off e favorevole ai metalli preziosi nel breve. Il trend_slope_pct è quasi piatto (-0.03%), suggerendo che la pressione ribassista multi-giorno è esaurita. L'ipotesi di rimbalzo tecnico dall'ipervenduto e dallo scenario risk-off geopolitico offre un'asimmetria interessante con stop sotto il minimo 20 candele.
+  Feature alla decisione:
+    epic: GOLD
+    news: [{'source': 'Investing.com Commodities', 'datetime': '2026-05-04T18:54:50+00:00', 'headline': 'Goldman says global oil stocks approaching eight-year low, depletion speed a concern'}, {'source': 'Finnhub:CNBC', 'datetime': '2026-05-04T16:43:19+00:00', 'headline': 'Anthropic teams with Goldman, Blackstone and others on $1.5 billion AI venture targeting PE-owned firms'}]
+    atr_4h: 38.17464
+    low_20: 4515.7
+    rsi_14: 31.0
+    high_20: 4643.34
+    leverage: 20.0
+    min_size: 0.01
+    size_step: 0.01
+    last_price: 4515.7
+    spread_pct: 0.0111
+    asset_class: metal
+    bb_width_pct: 3.146
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 3.05
+    trend_slope_pct: -0.028
+    atr_pct_of_price: 0.845
+    daily_pct_change: -2.21
+    pct_from_high_20: -2.75
+    pct_from_daily_high: -2.73
+
+  -- Eventi (3) --
+    [2026-05-04T19:06:37.897217+00:00] opened  Esecuzione automatica da signal  {"size": 0.05, "deal_id": "00601567-0001-54c4-0000-00008fe9fd33", "notional": 225.86950000000002, "fill_level": 4517.81, "margin_budget": 15.0, "risk_estimate": 4.404455250000001, "deal_reference": "o_f7b073ca-0a66-4463-a27c-de7718cf0321", "margin_estimate": 11.293475}
+    [2026-05-05T11:45:04.392811+00:00] trailing_sl  Profit 0.52R, SL -0.50R dall'entry  {"new_sl": 4473.76, "old_sl": 4429.3, "offset_r": -0.5, "profit_r": 0.5212418837604396, "r_distance": 88.09729500000002, "current_price": 4563.73}
+    [2026-05-06T00:35:04.784523+00:00] trailing_sl  Profit 1.03R, SL +0.00R dall'entry  {"new_sl": 4517.81, "old_sl": 4473.76, "offset_r": 0.0, "profit_r": 1.0349920505504666, "r_distance": 88.09729500000002, "current_price": 4608.99}
+
+------------------------------------------------------------------------
+#26  trade id=26  signal id=71  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        US500  (long)
+  Aperto:       2026-05-05T15:06:46.177894+00:00
+  Chiuso:       2026-05-06T09:30:36.001524+00:00
+  Size:         0.04
+  Entry:        7 259.30 EUR
+  Stop loss:    7 215.50 EUR
+  Take profit:  7 360.70 EUR
+  Prezzo uscita:7 305.20 EUR
+  Motivo uscita:manual:Richiesta utente da monitor
+  P&L:          +1.84 EUR  (+0.63%)
+
+  -- Setup originario (signal) --
+  Score:        7.5
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-05T15:05:43.901638+00:00
+  Tesi:
+    L'US500 si trova praticamente al massimo delle ultime 20 candele 4H (pct_from_high_20 -0.03%), segnale di forza strutturale estrema. RSI 4H a 57.2 è in zona neutro-rialzista, lontano dall'ipercomprato, lasciando spazio di salita. La bb_width_pct compressa (1.09%) indica una fase di consolidamento che tipicamente precede un breakout direzionale; la pendenza positiva del trend_slope_pct (+0.01) conferma che la pressione di fondo è rialzista. Il daily_pct_change +0.84% segnala momentum intraday coerente. Il rischio principale è il dato NFP in uscita venerdì (~69h), che potrebbe introdurre incertezza sulla chiusura di settimana, ma l'orizzonte 2-3 giorni è gestibile con uno stop adeguato.
+  Feature alla decisione:
+    epic: US500
+    news: [{'source': 'Finnhub:CNBC', 'datetime': '2026-05-05T13:01:40+00:00', 'headline': "Jim Cramer's top 10 things to watch in the stock market Tuesday"}]
+    atr_4h: 28.3
+    low_20: 7168.5
+    rsi_14: 57.2
+    high_20: 7256.8
+    leverage: 20.0
+    min_size: 0.01
+    size_step: 0.01
+    last_price: 7254.6
+    spread_pct: 0.0055
+    asset_class: index
+    bb_width_pct: 1.088
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 0.86
+    trend_slope_pct: 0.01
+    atr_pct_of_price: 0.39
+    daily_pct_change: 0.84
+    pct_from_high_20: -0.03
+    pct_from_daily_high: -0.07
+
+  -- Eventi (4) --
+    [2026-05-05T15:06:46.262172+00:00] opened  Esecuzione automatica da signal  {"size": 0.04, "deal_id": "004d0627-0001-54c4-0000-000081ca11e2", "notional": 290.36400000000003, "fill_level": 7259.3, "margin_budget": 15.0, "risk_estimate": 1.742184, "deal_reference": "o_9b4648cd-f064-41ef-888f-f0cfd8c3e0c0", "margin_estimate": 14.518200000000002}
+    [2026-05-05T22:55:05.123542+00:00] trailing_sl  Profit 0.66R, SL -0.50R dall'entry  {"new_sl": 7237.5, "old_sl": 7215.5, "offset_r": -0.5, "profit_r": 0.6589248733808085, "r_distance": 43.5558, "current_price": 7288.0}
+    [2026-05-06T08:55:13.62182+00:00] trailing_sl  Profit 1.12R, SL +0.00R dall'entry  {"new_sl": 7259.3, "old_sl": 7237.5, "offset_r": 0.0, "profit_r": 1.1181059698134306, "r_distance": 43.5558, "current_price": 7308.0}
+    [2026-05-06T09:30:36.087414+00:00] manual_close  Richiesta utente da monitor  {"pnl": 1.836, "close_level": 7305.2, "close_source": "activity", "confirm_level": 7259.3}
+
+------------------------------------------------------------------------
+#27  trade id=27  signal id=72  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Gold  (long)
+  Aperto:       2026-05-06T05:06:47.335474+00:00
+  Chiuso:       2026-05-06T16:00:21.201162+00:00
+  Size:         0.06
+  Entry:        4 651.41 EUR
+  Stop loss:    4 595.35 EUR
+  Take profit:  4 781.39 EUR
+  Prezzo uscita:4 685.95 EUR
+  Motivo uscita:manual:Richiesta utente da monitor
+  P&L:          +2.07 EUR  (+0.74%)
+
+  -- Setup originario (signal) --
+  Score:        8
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-06T05:05:35.745394+00:00
+  Tesi:
+    L'oro si trova esattamente al massimo delle ultime 20 candele (pct_from_high_20 = 0.0%), segnalando una rottura del range superiore in corso. Il daily_pct_change di +2.06% conferma un impulso rialzista intraday robusto, supportato da tre news convergenti: indebolimento del dollaro, segnali di de-escalation in Medio Oriente e la pausa di Trump su 'Project Freedom'. L'RSI 4H a 56.9 è neutro-positivo e non in zona di ipercomprato, lasciando ampio spazio alla continuazione. La bb_width_pct a 3.56 è in espansione, coerente con la fase di breakout. Il rischio principale è il NFP USA previsto tra ~55h che potrebbe generare volatilità inversa.
+  Feature alla decisione:
+    epic: GOLD
+    news: [{'source': 'ForexLive', 'datetime': '2026-05-06T03:46:50+00:00', 'headline': 'investingLive Asia-Pacific news wrap: Trump pauses Project Freedom. Oil drops, gold surges'}, {'source': 'Investing.com Commodities', 'datetime': '2026-05-06T02:51:55+00:00', 'headline': 'Gold prices rise on Middle East de-escalation signals, weaker dollar'}, {'source': 'Finnhub:Reuters', 'datetime': '2026-05-06T02:44:00+00:00', 'headline': 'Gold jumps on weaker dollar, Middle East peace hopes - Reuters'}]
+    atr_4h: 35.86893
+    low_20: 4517.8
+    rsi_14: 56.9
+    high_20: 4649.49
+    leverage: 20.0
+    min_size: 0.01
+    size_step: 0.01
+    last_price: 4649.49
+    spread_pct: 0.0107
+    asset_class: metal
+    bb_width_pct: 3.564
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 2.31
+    trend_slope_pct: -0.013
+    atr_pct_of_price: 0.771
+    daily_pct_change: 2.06
+    pct_from_high_20: 0.0
+    pct_from_daily_high: -0.09
+
+  -- Eventi (4) --
+    [2026-05-06T05:06:47.450465+00:00] opened  Esecuzione automatica da signal  {"size": 0.06, "deal_id": "00601567-0001-54c4-0000-00008ff3af08", "notional": 279.0696, "fill_level": 4651.41, "margin_budget": 15.0, "risk_estimate": 3.3488351999999995, "deal_reference": "o_5495ca14-70cd-4dd7-a9f7-deff770461b4", "margin_estimate": 13.953479999999999}
+    [2026-05-06T08:00:07.323654+00:00] trailing_sl  Profit 0.53R, SL -0.50R dall'entry  {"new_sl": 4623.5, "old_sl": 4595.35, "offset_r": -0.5, "profit_r": 0.529767676181339, "r_distance": 55.81692, "current_price": 4680.98}
+    [2026-05-06T10:35:04.568125+00:00] trailing_sl  Profit 1.05R, SL +0.00R dall'entry  {"new_sl": 4651.41, "old_sl": 4623.5, "offset_r": 0.0, "profit_r": 1.0468151951057185, "r_distance": 55.81692, "current_price": 4709.84}
+    [2026-05-06T16:00:21.314774+00:00] manual_close  Richiesta utente da monitor  {"pnl": 2.0724, "close_level": 4685.95, "close_source": "activity", "confirm_level": 4651.41}
+
+------------------------------------------------------------------------
+#28  trade id=28  signal id=73  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Brent Oil  (long)
+  Aperto:       2026-05-06T16:06:42.844504+00:00
+  Chiuso:       2026-05-06T18:00:31.287658+00:00
+  Size:         1.4
+  Entry:        101.22 EUR
+  Stop loss:    97.64 EUR
+  Take profit:  108.26 EUR
+  Prezzo uscita:100.43 EUR
+  Motivo uscita:manual:Richiesta utente da monitor
+  P&L:          -1.11 EUR  (-0.78%)
+
+  -- Setup originario (signal) --
+  Score:        7.5
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-06T16:05:40.077503+00:00
+  Tesi:
+    Brent Oil ha subito un crollo del -7.56% giornaliero portando il RSI 4H a 26.5, livello di ipervenduto estremo che storicamente precede rimbalzi tecnici rilevanti. Il prezzo è ora vicino al minimo delle ultime 20 candele (pct_from_high_20 -10.37%), ma la news suggerisce che il sell-off è guidato da aspettative di accordo USA-Iran: un accordo già in parte scontato riduce il rischio di ulteriore downside improvviso. Il bb_width_pct a 14.46 indica volatilità espansa, coerente con un movimento di capitolazione che può esaurirsi rapidamente. L'asimmetria rischio/rendimento è favorevole per un rimbalzo tecnico dal ipervenduto estremo, ma il trend_slope_pct negativo (-0.34) impone cautela sulla tenuta di medio termine.
+  Feature alla decisione:
+    epic: OIL_BRENT
+    news: [{'source': 'BBC Business', 'datetime': '2026-05-06T15:58:38+00:00', 'headline': 'Oil prices drop and stock markets rise after reports of deal to end Iran war'}, {'source': 'ForexLive', 'datetime': '2026-05-06T14:30:25+00:00', 'headline': 'Weekly crude oil inventories for the current week fall -2.313 million vs -3.291M estimate'}, {'source': 'Investing.com Commodities', 'datetime': '2026-05-06T13:37:05+00:00', 'headline': 'Brent oscillates around $100 amid reports U.S., Iran nearing deal to end war'}]
+    atr_4h: 2.68007
+    low_20: 99.175
+    rsi_14: 26.5
+    high_20: 112.736
+    leverage: 20.0
+    min_size: 1.0
+    size_step: 0.1
+    last_price: 101.04
+    spread_pct: 0.0891
+    asset_class: energy
+    bb_width_pct: 14.458
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 12.64
+    trend_slope_pct: -0.337
+    atr_pct_of_price: 2.652
+    daily_pct_change: -7.56
+    pct_from_high_20: -10.37
+    pct_from_daily_high: -7.79
+
+  -- Eventi (2) --
+    [2026-05-06T16:06:42.938861+00:00] opened  Esecuzione automatica da signal  {"size": 1.4000000000000001, "deal_id": "00018092-0001-54c4-0000-000082ad5870", "notional": 141.64640000000003, "fill_level": 101.221, "margin_budget": 15.0, "risk_estimate": 4.957624, "deal_reference": "o_556cc87c-cf05-4a47-a207-fd1ea7e9d385", "margin_estimate": 7.082320000000002}
+    [2026-05-06T18:00:31.390803+00:00] manual_close  Richiesta utente da monitor  {"pnl": -1.11, "close_level": 100.429, "close_source": "activity", "confirm_level": 100.429}
+
+------------------------------------------------------------------------
+#29  trade id=29  signal id=75  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Gold  (long)
+  Aperto:       2026-05-08T12:06:36.1367+00:00
+  Chiuso:       2026-05-11T05:30:43.218501+00:00
+  Size:         0.05
+  Entry:        4 713.83 EUR
+  Stop loss:    4 628.80 EUR
+  Take profit:  4 826.78 EUR
+  Prezzo uscita:4 674.93 EUR
+  Motivo uscita:manual:Richiesta utente da monitor
+  P&L:          -1.95 EUR  (-0.83%)
+
+  -- Setup originario (signal) --
+  Score:        7
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-08T12:05:33.870408+00:00
+  Tesi:
+    L'oro si trova a -0.63% dal massimo delle ultime 20 candele con trend_slope_pct positivo (+0.17) e RSI 4H a 60.4, non ancora in zona di esaurimento. La bb_width_pct al 4.98% suggerisce una volatilità in espansione compatibile con continuazione rialzista. Il contesto geopolitico (scambi di fuoco USA-Iran nello stretto di Hormuz) alimenta la domanda di safe haven, mentre la notizia di possibili negoziati di pace USA-Iran introduce un rischio cap sui guadagni. Il setup si invalida se il prezzo scende significativamente sotto il massimo 20 candele in caso di distensione geopolitica rapida o NFP sorprendentemente forte tra meno di 30 minuti.
+  Feature alla decisione:
+    epic: GOLD
+    news: [{'source': 'Investing.com Commodities', 'datetime': '2026-05-08T10:30:27+00:00', 'headline': 'Gold set for weekly rise on US-Iran peace prospects; Hormuz tensions cap gains'}]
+    atr_4h: 35.55536
+    low_20: 4554.9
+    rsi_14: 60.4
+    high_20: 4743.24
+    leverage: 20.0
+    min_size: 0.01
+    size_step: 0.01
+    last_price: 4713.24
+    spread_pct: 0.0106
+    asset_class: metal
+    bb_width_pct: 4.982
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 1.23
+    trend_slope_pct: 0.175
+    atr_pct_of_price: 0.754
+    daily_pct_change: 0.56
+    pct_from_high_20: -0.63
+    pct_from_daily_high: -0.45
+
+  -- Eventi (2) --
+    [2026-05-08T12:06:36.231318+00:00] opened  Esecuzione automatica da signal  {"size": 0.05, "deal_id": "00601567-0001-54c4-0000-0000900847b1", "notional": 235.6825, "fill_level": 4713.83, "margin_budget": 15.0, "risk_estimate": 4.242285, "deal_reference": "o_06f77d2a-a152-4331-baf4-50f54f9047e2", "margin_estimate": 11.784125000000001}
+    [2026-05-11T05:30:43.318551+00:00] manual_close  Richiesta utente da monitor  {"pnl": -1.95, "close_level": 4674.93, "close_source": "activity", "confirm_level": 4674.93}
+
+------------------------------------------------------------------------
+#30  trade id=30  signal id=76  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Brent Oil  (long)
+  Aperto:       2026-05-12T13:06:46.412364+00:00
+  Chiuso:       2026-05-14T11:31:13.519677+00:00
+  Size:         1.3
+  Entry:        105.70 EUR
+  Stop loss:    102.01 EUR
+  Take profit:  110.41 EUR
+  Prezzo uscita:103.08 EUR
+  Motivo uscita:manual:Richiesta utente da monitor
+  P&L:          -3.41 EUR  (-2.48%)
+
+  -- Setup originario (signal) --
+  Score:        7.5
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-12T13:05:43.994244+00:00
+  Tesi:
+    Il Brent si trova esattamente al massimo delle ultime 20 candele (pct_from_high_20 = 0.0%), con trend_slope_pct positivo (+0.31) e un gain giornaliero del +2.97% che conferma la pressione rialzista in corso. Le news sono fortemente supportive: l'impasse nei negoziati US-Iran e il rialzo delle previsioni di HSBC a $95 per il 2026 forniscono un catalyst fondamentale chiaro. Il critical_event 'ceasefire on life support' con direction_hint risk_off_if_fails (tra ~47h) è coerente con la direzione long sull'oil: un fallimento dei negoziati spinge ulteriormente il petrolio. Il principale rischio è il RSI 4H a 78.2 in area ipercomprato, che suggerisce possibile pullback tecnico a breve; per questo lo stop va allargato e il target è calibrato sulla bb_width_pct in espansione (8.51%).
+  Feature alla decisione:
+    epic: OIL_BRENT
+    news: [{'source': 'Investing.com Commodities', 'datetime': '2026-05-12T12:58:40+00:00', 'headline': 'HSBC raises 2026 Brent crude forecast to $95 on Hormuz closure'}, {'source': 'Investing.com Commodities', 'datetime': '2026-05-12T11:18:46+00:00', 'headline': 'Oil prices jump on latest US-Iran peace process impasse'}]
+    atr_4h: 1.60596
+    low_20: 98.039
+    rsi_14: 78.2
+    high_20: 105.747
+    leverage: 20.0
+    min_size: 1.0
+    size_step: 0.1
+    last_price: 105.747
+    spread_pct: 0.0851
+    asset_class: energy
+    bb_width_pct: 8.514
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 3.46
+    trend_slope_pct: 0.311
+    atr_pct_of_price: 1.519
+    daily_pct_change: 2.97
+    pct_from_high_20: 0.0
+    pct_from_daily_high: -0.46
+
+  -- Eventi (2) --
+    [2026-05-12T13:06:46.493395+00:00] opened  Esecuzione automatica da signal  {"size": 1.3, "deal_id": "00018092-0001-54c4-0000-000082b7c2dc", "notional": 137.3463, "fill_level": 105.696, "margin_budget": 15.0, "risk_estimate": 4.73844735, "deal_reference": "o_1bb91160-f329-4738-8a9f-2efc640ea75c", "margin_estimate": 6.867315000000001}
+    [2026-05-14T11:31:13.607416+00:00] manual_close  Richiesta utente da monitor  {"pnl": -3.4073, "close_level": 103.075, "close_source": "activity", "confirm_level": 103.548}
+
+------------------------------------------------------------------------
+#31  trade id=31  signal id=77  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Nasdaq 100  (long)
+  Aperto:       2026-05-13T17:06:42.320549+00:00
+  Chiuso:       2026-05-15T05:30:31.268538+00:00
+  Size:         0.01
+  Entry:        29 383.90 EUR
+  Stop loss:    28 898.30 EUR
+  Take profit:  30 088.30 EUR
+  Prezzo uscita:29 328.70 EUR
+  Motivo uscita:manual:Richiesta utente da monitor
+  P&L:          -0.55 EUR  (-0.19%)
+
+  -- Setup originario (signal) --
+  Score:        7.5
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-13T17:05:40.087242+00:00
+  Tesi:
+    Il Nasdaq 100 si trova esattamente sul massimo delle ultime 20 candele 4H (pct_from_high_20 = 0.0%), segnalando una rottura dei massimi recenti confermata dal daily_pct_change +1.16%. RSI 4H a 53.6 è in zona neutro-positiva, con ampio spazio prima dell'ipercomprato, e la bb_width_pct a 1.94 è in espansione coerente con la continuazione del breakout. Le news citano massimi storici di S&P e Nasdaq trainati dal settore tech e dall'ottimismo per il viaggio di Trump in Cina, con il summit Trump-Xi atteso entro ~7h come potenziale catalyst risk-on aggiuntivo. La tesi si invaliderebbe con un fallimento del summit o un close nettamente sotto il massimo 20 candele.
+  Feature alla decisione:
+    epic: US100
+    news: [{'source': 'Investing.com Stock Markets', 'datetime': '2026-05-13T16:42:35+00:00', 'headline': 'S&P, Nasdaq hit record highs on tech boost amid optimism over Trump’s China trip'}]
+    atr_4h: 207.54286
+    low_20: 28732.0
+    rsi_14: 53.6
+    high_20: 29359.4
+    leverage: 20.0
+    min_size: 0.001
+    size_step: 0.001
+    last_price: 29359.4
+    spread_pct: 0.0061
+    asset_class: index
+    bb_width_pct: 1.938
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 1.35
+    trend_slope_pct: -0.013
+    atr_pct_of_price: 0.707
+    daily_pct_change: 1.16
+    pct_from_high_20: 0.0
+    pct_from_daily_high: 0.04
+
+  -- Eventi (3) --
+    [2026-05-13T17:06:42.43034+00:00] opened  Esecuzione automatica da signal  {"size": 0.01, "deal_id": "00384627-0001-54c4-0000-0000891a7cf0", "notional": 293.831, "fill_level": 29383.9, "margin_budget": 15.0, "risk_estimate": 4.8482115, "deal_reference": "o_ece41878-aca2-4e4f-b387-55d4440d3765", "margin_estimate": 14.691550000000001}
+    [2026-05-14T15:15:06.121162+00:00] trailing_sl  Profit 0.52R, SL -0.50R dall'entry  {"new_sl": 29141.5, "old_sl": 28898.3, "offset_r": -0.5, "profit_r": 0.5172900806223727, "r_distance": 484.83435, "current_price": 29634.699999999997}
+    [2026-05-15T05:30:31.346925+00:00] manual_close  Richiesta utente da monitor  {"pnl": -0.55, "close_level": 29328.7, "close_source": "activity", "confirm_level": 29328.7}
+
+------------------------------------------------------------------------
+#32  trade id=33  signal id=80  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        US Tech 100  (long)
+  Aperto:       2026-05-14T18:10:03.929204+00:00
+  Chiuso:       2026-05-15T06:00:12.842031+00:00
+  Size:         0.01
+  Entry:        29 554.90 EUR
+  Stop loss:    29 287.70 EUR
+  Take profit:  30 085.70 EUR
+  Prezzo uscita:29 287.70 EUR
+  Motivo uscita:reconcile:stop_hit
+  P&L:          -2.67 EUR  (-0.90%)
+
+  -- Setup originario (signal) --
+  Score:        7
+  Costo atteso: n/d
+  Stato signal: executed_recovered
+  Creato:       2026-05-14T18:05:32.128061+00:00
+  Tesi:
+    Il Nasdaq 100 si trova a -0.2% dal massimo delle ultime 20 candele, con trend_slope_pct positivo su 4H e RSI 64.5 in zona rialzista ma non in ipercomprato. La bb_width_pct al 2.95% segnala espansione di volatilità coerente con continuazione del breakout. Il contesto macro è supportivo: S&P 500 su nuovi massimi storici, e il Summit Trump-Xi atteso entro 6 ore potrebbe fungere da catalizzatore risk-on per i tech. Il setup viene invalidato se il prezzo si allontana significativamente dal massimo 20 candele o se il Summit produce toni negativi sui dazi tech.
+  Feature alla decisione:
+    epic: US100
+    news: [{'source': 'Investing.com Stock Markets', 'datetime': '2026-05-14T17:31:08+00:00', 'headline': 'CALM Chain files for IPO offering 3 million shares on Nasdaq'}, {'source': 'CoinDesk', 'datetime': '2026-05-14T16:25:45+00:00', 'headline': 'CME dives further into $85 trillion digital assets market with Nasdaq CME Crypto Index futures'}]
+    atr_4h: 229.32143
+    low_20: 28732.0
+    rsi_14: 64.5
+    high_20: 29651.3
+    leverage: 20.0
+    min_size: 0.001
+    size_step: 0.001
+    last_price: 29592.6
+    spread_pct: 0.0061
+    asset_class: index
+    bb_width_pct: 2.947
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 1.13
+    trend_slope_pct: 0.074
+    atr_pct_of_price: 0.775
+    daily_pct_change: 0.42
+    pct_from_high_20: -0.2
+    pct_from_daily_high: -0.28
+
+  -- Eventi (1) --
+    [2026-05-16T16:18:32.677437+00:00] backfill_orphan_link  Backfill: trade 33 -> signal 80  {"epic": "US100", "deal_id": "00384627-0001-54c4-0000-0000891d224a", "direction": "long", "backfilled_at": "2026-05-16T16:18:32.562008+00:00", "trade_opened_at": "2026-05-14T18:10:03.929204+00:00", "signal_created_at": "2026-05-14T18:05:32.128061+00:00", "signal_status_before": "cancelled_other", "capital_activity_date": "2026-05-14T20:06:34.280", "delta_signal_to_trade_opened_seconds": 271.801143}
+
+------------------------------------------------------------------------
+#33  trade id=34  signal id=81  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Brent Oil  (long)
+  Aperto:       2026-05-15T12:06:42.954683+00:00
+  Chiuso:       2026-05-18T05:30:30.517372+00:00
+  Size:         2.8
+  Entry:        105.91 EUR
+  Stop loss:    104.29 EUR
+  Take profit:  109.26 EUR
+  Prezzo uscita:107.99 EUR
+  Motivo uscita:manual:Richiesta utente da monitor
+  P&L:          +5.83 EUR  (+1.97%)
+
+  -- Setup originario (signal) --
+  Score:        7
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-15T12:05:40.527102+00:00
+  Tesi:
+    Brent Oil è l'asset con il setup più convincente: RSI 4H neutro a 55.8, prezzo a soli -0.08% dal massimo delle ultime 20 candele (minima distanza dal top recente), e una news Reuters che cita Trump che perde pazienza con l'Iran, catalizzatore geopolitico diretto per il petrolio. Il daily_pct_change +1.55% conferma momentum intraday positivo. Il trend_slope_pct è leggermente negativo (-0.04) ma quasi piatto, e la forza direzionale odierna può anticipare un cambio di regime verso il rialzo. Rischio principale è il G7 finanza tra ~48h con focus su costi energetici (direction_hint unknown), che introduce incertezza da fine settimana.
+  Feature alla decisione:
+    epic: OIL_BRENT
+    news: [{'source': 'Finnhub:Reuters', 'datetime': '2026-05-15T09:32:53+00:00', 'headline': 'Oil prices up 3% after Trump says he is losing patience with Iran - Reuters'}, {'source': 'ForexLive', 'datetime': '2026-05-15T08:55:09+00:00', 'headline': 'Treasury yields jump across the curve, 10-year yields hit near one-year high'}]
+    atr_4h: 1.43096
+    low_20: 102.607
+    rsi_14: 55.8
+    high_20: 105.976
+    leverage: 20.0
+    min_size: 1.0
+    size_step: 0.1
+    last_price: 105.8945
+    spread_pct: 0.0425
+    asset_class: energy
+    bb_width_pct: 3.856
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 2.92
+    trend_slope_pct: -0.042
+    atr_pct_of_price: 1.351
+    daily_pct_change: 1.55
+    pct_from_high_20: -0.08
+    pct_from_daily_high: -0.96
+
+  -- Eventi (5) --
+    [2026-05-15T12:06:43.041063+00:00] opened  Esecuzione automatica da signal  {"size": 2.8000000000000003, "deal_id": "00018092-0001-54c4-0000-000082b8ca1d", "notional": 296.4514, "fill_level": 105.908, "margin_budget": 15.0, "risk_estimate": 4.446771, "deal_reference": "o_24b3b2a7-9989-4a50-993b-9a43a8a061ef", "margin_estimate": 14.822569999999999}
+    [2026-05-15T15:50:04.292396+00:00] trailing_sl  Profit 0.51R, SL -0.50R dall'entry  {"new_sl": 105.114, "old_sl": 104.287, "offset_r": -0.5, "profit_r": 0.5105059737382086, "r_distance": 1.58862, "current_price": 106.719}
+    [2026-05-17T22:25:04.97878+00:00] trailing_sl  Profit 1.05R, SL +0.00R dall'entry  {"new_sl": 105.908, "old_sl": 105.114, "offset_r": 0.0, "profit_r": 1.0521710667119857, "r_distance": 1.58862, "current_price": 107.5795}
+    [2026-05-18T01:15:10.70432+00:00] trailing_sl  Profit 1.51R, SL +0.50R dall'entry  {"new_sl": 106.702, "old_sl": 105.908, "offset_r": 0.5, "profit_r": 1.5135778222608294, "r_distance": 1.58862, "current_price": 108.3125}
+    [2026-05-18T05:30:30.584511+00:00] manual_close  Richiesta utente da monitor  {"pnl": 5.83, "close_level": 107.991, "close_source": "activity", "confirm_level": 107.991}
+
+------------------------------------------------------------------------
+#34  trade id=35  signal id=82  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Brent Oil  (long)
+  Aperto:       2026-05-18T05:06:42.639597+00:00
+  Chiuso:       2026-05-18T12:00:07.206919+00:00
+  Size:         2.2
+  Entry:        107.96 EUR
+  Stop loss:    105.67 EUR
+  Take profit:  112.47 EUR
+  Prezzo uscita:105.67 EUR
+  Motivo uscita:reconcile:stop_hit
+  P&L:          -5.05 EUR  (-2.12%)
+
+  -- Setup originario (signal) --
+  Score:        7
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-18T05:05:40.605547+00:00
+  Tesi:
+    Il Brent si trova al massimo delle ultime 20 candele (pct_from_high_20 ~0%), con trend_slope_pct positivo e un momentum intraday solido (+1.13%). Le tensioni geopolitiche Iran-USA sono il catalyst principale: Trump avverte che 'il tempo stringe' e il drone UAE amplifica il risk premium sul petrolio. RSI 4H a 76 è in zona overbought e rappresenta il principale elemento di cautela, ma la narrazione geopolitica può sostenere livelli elevati ancora per 2-3 giorni. Il critical_event del 20 maggio (riunione sicurezza USA-Iran) ha direction_hint risk_off_if_fails, il che supporta la continuazione del rialzo petrolifero nel caso di escalation o stallo diplomatico. bb_width_pct in espansione (6.12) conferma un regime di trend attivo, non lateralità.
+  Feature alla decisione:
+    epic: OIL_BRENT
+    news: [{'source': 'BBC Business', 'datetime': '2026-05-18T02:23:24+00:00', 'headline': "Oil prices rise after Trump warns 'clock is ticking' on Iran peace talks"}, {'source': 'Investing.com Commodities', 'datetime': '2026-05-18T00:09:27+00:00', 'headline': 'Oil price hit 2-wk high as US-Iran tensions simmer after UAE drone strike'}]
+    atr_4h: 1.47429
+    low_20: 102.607
+    rsi_14: 76.0
+    high_20: 108.0575
+    leverage: 20.0
+    min_size: 1.0
+    size_step: 0.1
+    last_price: 108.0575
+    spread_pct: 0.0315
+    asset_class: energy
+    bb_width_pct: 6.117
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 1.96
+    trend_slope_pct: 0.193
+    atr_pct_of_price: 1.364
+    daily_pct_change: 1.13
+    pct_from_high_20: 0.0
+    pct_from_daily_high: -0.74
+
+  -- Eventi (1) --
+    [2026-05-18T05:06:42.77223+00:00] opened  Esecuzione automatica da signal  {"size": 2.2, "deal_id": "00018092-0001-54c4-0000-000082b906c4", "notional": 237.46690000000004, "fill_level": 107.962, "margin_budget": 15.0, "risk_estimate": 4.986804900000001, "deal_reference": "o_2475d3b6-9a16-4aec-96aa-26322a3e5445", "margin_estimate": 11.873345000000002}
+
+------------------------------------------------------------------------
+#35  trade id=36  signal id=83  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Gold  (long)
+  Aperto:       2026-05-18T12:06:41.783021+00:00
+  Chiuso:       2026-05-19T10:30:20.086636+00:00
+  Size:         0.06
+  Entry:        4 555.57 EUR
+  Stop loss:    4 486.96 EUR
+  Take profit:  4 701.05 EUR
+  Prezzo uscita:4 540.26 EUR
+  Motivo uscita:manual:Richiesta utente da monitor
+  P&L:          -0.92 EUR  (-0.34%)
+
+  -- Setup originario (signal) --
+  Score:        7.5
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-18T12:05:39.478677+00:00
+  Tesi:
+    L'oro presenta RSI 4H a soli 10.7, livello di ipervenduto estremo che storicamente anticipa un rimbalzo tecnico significativo. Il prezzo si trova vicino al minimo delle ultime 20 candele (pct_from_high_20 -3.12%), con atr_pct_of_price a 0.83% e bb_width_pct in espansione a 5.77%, coerente con un movimento volatile in atto. Il contesto geopolitico (tensioni Iran citate nelle news, warning Trump) favorisce la narrativa risk-off che tipicamente supporta il metallo. Il trend_slope_pct è leggermente negativo (-0.23%), segnale di cautela, ma l'RSI così estremo suggerisce capitolazione dei venditori piuttosto che continuazione del ribasso. La tesi verrebbe invalidata da una chiusura 4H sotto il minimo 20 candele con RSI che non recupera.
+  Feature alla decisione:
+    epic: GOLD
+    news: [{'source': 'Investing.com Commodities', 'datetime': '2026-05-18T11:39:53+00:00', 'headline': 'Gold prices choppy amid rising yields, simmering Iran tensions'}, {'source': 'Cointelegraph', 'datetime': '2026-05-18T10:47:03+00:00', 'headline': 'Goldman Sachs exits XRP, Solana ETF exposure in Q1 2026'}]
+    atr_4h: 37.56393
+    low_20: 4537.28
+    rsi_14: 10.7
+    high_20: 4696.73
+    leverage: 20.0
+    min_size: 0.01
+    size_step: 0.01
+    last_price: 4550.32
+    spread_pct: 0.0165
+    asset_class: metal
+    bb_width_pct: 5.773
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 1.9
+    trend_slope_pct: -0.23
+    atr_pct_of_price: 0.826
+    daily_pct_change: 0.27
+    pct_from_high_20: -3.12
+    pct_from_daily_high: -0.36
+
+  -- Eventi (2) --
+    [2026-05-18T12:06:41.916239+00:00] opened  Esecuzione automatica da signal  {"size": 0.06, "deal_id": "00601567-0001-54c4-0000-0000903a334c", "notional": 273.3171, "fill_level": 4555.57, "margin_budget": 15.0, "risk_estimate": 4.0997565, "deal_reference": "o_8efaf3c5-871e-46cb-a0ce-59f7f5be843c", "margin_estimate": 13.665855}
+    [2026-05-19T10:30:20.16533+00:00] manual_close  Richiesta utente da monitor  {"pnl": -0.92, "close_level": 4540.26, "close_source": "activity", "confirm_level": 4540.26}
+
+------------------------------------------------------------------------
+#36  trade id=37  signal id=84  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Brent Oil  (long)
+  Aperto:       2026-05-19T11:06:36.768383+00:00
+  Chiuso:       2026-05-20T07:00:14.940715+00:00
+  Size:         2.5
+  Entry:        107.72 EUR
+  Stop loss:    105.76 EUR
+  Take profit:  111.58 EUR
+  Prezzo uscita:106.62 EUR
+  Motivo uscita:manual:Richiesta utente da monitor
+  P&L:          -2.76 EUR  (-1.02%)
+
+  -- Setup originario (signal) --
+  Score:        7.2
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-19T11:05:34.46495+00:00
+  Tesi:
+    Brent Oil presenta il setup più pulito dell'universo disponibile: trend_slope_pct positivo (+0.21) su 4H, RSI 4H a 62.9 non ancora in ipercomprato, e il prezzo si trova a soli -0.34% dal massimo delle ultime 20 candele, segnalando forza relativa. La variazione giornaliera +1.24% conferma un momentum intraday positivo. La bb_width_pct (5.97%) suggerisce volatilità già espansa e coerente con la continuazione del trend rialzista. L'unico catalizzatore macro rilevante è l'inflazione canadese tra circa 1.4h, che non impatta direttamente l'oil, mentre l'assenza di news avverse rafforza la tesi. Il setup sarebbe invalidato da un ritorno deciso sotto il minimo delle ultime 20 candele o da una notizia geopolitica risk-off significativa.
+  Feature alla decisione:
+    epic: OIL_BRENT
+    news: []
+    atr_4h: 1.86761
+    low_20: 102.607
+    rsi_14: 62.9
+    high_20: 108.0505
+    leverage: 20.0
+    min_size: 1.0
+    size_step: 0.1
+    last_price: 107.6885
+    spread_pct: 0.0418
+    asset_class: energy
+    bb_width_pct: 5.97
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 1.86
+    trend_slope_pct: 0.209
+    atr_pct_of_price: 1.734
+    daily_pct_change: 1.24
+    pct_from_high_20: -0.34
+    pct_from_daily_high: -0.34
+
+  -- Eventi (2) --
+    [2026-05-19T11:06:36.857018+00:00] opened  Esecuzione automatica da signal  {"size": 2.5, "deal_id": "00018092-0001-54c4-0000-000082b9aaae", "notional": 269.25375, "fill_level": 107.724, "margin_budget": 15.0, "risk_estimate": 4.8465675, "deal_reference": "o_2faf7d26-82b0-4e35-b50c-120a3f962039", "margin_estimate": 13.462687500000001}
+    [2026-05-20T07:00:15.037196+00:00] manual_close  Richiesta utente da monitor  {"pnl": -2.76, "close_level": 106.621, "close_source": "activity", "confirm_level": 106.621}
+
+------------------------------------------------------------------------
+#37  trade id=38  signal id=85  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Brent Oil  (short)
+  Aperto:       2026-05-20T16:06:50.31946+00:00
+  Chiuso:       2026-05-21T05:30:23.177193+00:00
+  Size:         1.3
+  Entry:        102.15 EUR
+  Stop loss:    106.03 EUR
+  Take profit:  97.09 EUR
+  Prezzo uscita:102.83 EUR
+  Motivo uscita:manual:Richiesta utente da monitor
+  P&L:          -0.88 EUR  (-0.66%)
+
+  -- Setup originario (signal) --
+  Score:        7
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-20T16:05:47.694896+00:00
+  Tesi:
+    Brent ha perso oltre il 5% nella seduta odierna toccando il minimo delle ultime 20 candele (pct_from_high_20 -5.26%, low_20 coincide con last_price), con RSI 4H a 32.8 in zona di debolezza senza ancora segnali di rimbalzo credibili. La news sull'accordo Iran quasi finalizzato da Trump introduce un chiaro catalyst bearish: un'eventuale riapertura delle forniture iraniane pesa strutturalmente sulle quotazioni. I draw delle scorte settimanali sopra le attese (-7.86M vs -2.94M stimato) avrebbero potuto sostenere i prezzi ma il movimento ribassista è comunque dominante, suggerendo che il mercato prezza già il surplus Iran. Il trend_slope_pct è negativo (-0.11) e la bb_width_pct ampia (5.63%) indica volatilità espansa coerente con continuazione del movimento. Il setup viene invalidato se le trattative Iran collassano o se emergono interruzioni significative dell'offerta OPEC+.
+  Feature alla decisione:
+    epic: OIL_BRENT
+    news: [{'source': 'ForexLive', 'datetime': '2026-05-20T15:20:58+00:00', 'headline': 'Trump: US in final stages in talks with Iran'}, {'source': 'ForexLive', 'datetime': '2026-05-20T14:35:46+00:00', 'headline': 'Weekly crude oil inventories fall -7.863M vs -2.942M estimate'}]
+    atr_4h: 2.00036
+    low_20: 102.4135
+    rsi_14: 32.8
+    high_20: 108.0995
+    leverage: 20.0
+    min_size: 1.0
+    size_step: 0.1
+    last_price: 102.4135
+    spread_pct: 0.044
+    asset_class: energy
+    bb_width_pct: 5.629
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 7.17
+    trend_slope_pct: -0.114
+    atr_pct_of_price: 1.953
+    daily_pct_change: -5.05
+    pct_from_high_20: -5.26
+    pct_from_daily_high: -5.28
+
+  -- Eventi (2) --
+    [2026-05-20T16:06:50.436893+00:00] opened  Esecuzione automatica da signal  {"size": 1.3, "deal_id": "00018092-0001-54c4-0000-000082ba4e4b", "notional": 132.86325, "fill_level": 102.154, "margin_budget": 15.0, "risk_estimate": 4.982371874999999, "deal_reference": "o_662830dd-4fe7-4280-80eb-1e739455475b", "margin_estimate": 6.6431625}
+    [2026-05-21T05:30:23.22858+00:00] manual_close  Richiesta utente da monitor  {"pnl": -0.88, "close_level": 102.831, "close_source": "activity", "confirm_level": 102.831}
+
+------------------------------------------------------------------------
+#38  trade id=39  signal id=86  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Nasdaq 100  (long)
+  Aperto:       2026-05-20T19:06:45.954373+00:00
+  Chiuso:       2026-05-21T16:38:57.32363+00:00
+  Size:         0.01
+  Entry:        29 229.30 EUR
+  Stop loss:    28 857.00 EUR
+  Take profit:  29 785.10 EUR
+  Prezzo uscita:29 150.80 EUR
+  Motivo uscita:manual:Richiesta utente da monitor
+  P&L:          -0.79 EUR  (-0.27%)
+
+  -- Setup originario (signal) --
+  Score:        7.5
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-20T19:05:43.459445+00:00
+  Tesi:
+    Il Nasdaq 100 si trova esattamente sul massimo delle ultime 20 candele (pct_from_high_20 = -0.04%), segnalando un breakout imminente o un test del massimo con forza. Il trend_slope_short_pct è positivo a +0.25, indicando che il breve termine ha già girato al rialzo, mentre il trend_slope_pct medio è piatto (-0.01), confermando che siamo all'inizio dello swing. RSI 4H a 55 in zona neutro-rialzista, non ipercomprato, lascia spazio alla continuazione. Il daily_pct_change +1.44% con bb_width_pct 1.92% relativamente compresso suggerisce che una rottura esplosiva è possibile. Le news Iran in fase finale di accordo (risk-on) supportano la propensione al rischio sugli indici. Il Samsung strike critical_event a 40h non è immediato e non invalida il setup intraday.
+  Feature alla decisione:
+    epic: US100
+    news: [{'source': 'ForexLive', 'datetime': '2026-05-20T15:20:58+00:00', 'headline': 'Trump: US in final stages in talks with Iran'}]
+    atr_4h: 259.11429
+    low_20: 28722.2
+    rsi_14: 55.0
+    high_20: 29241.5
+    leverage: 20.0
+    min_size: 0.001
+    size_step: 0.001
+    last_price: 29230.9
+    spread_pct: 0.0062
+    asset_class: index
+    bb_width_pct: 1.916
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 2.03
+    trend_slope_pct: -0.009
+    atr_pct_of_price: 0.886
+    daily_pct_change: 1.44
+    pct_from_high_20: -0.04
+    pct_from_daily_high: -0.24
+    trend_slope_short_pct: 0.253
+
+  -- Eventi (2) --
+    [2026-05-20T19:06:46.045181+00:00] opened  Esecuzione automatica da signal  {"size": 0.01, "deal_id": "00384627-0001-54c4-0000-000089281486", "notional": 292.29699999999997, "fill_level": 29229.3, "margin_budget": 15.0, "risk_estimate": 3.7267867499999996, "deal_reference": "o_beb74167-3d47-441e-8364-c086648a64e6", "margin_estimate": 14.614849999999999}
+    [2026-05-21T16:38:57.416249+00:00] manual_close  Richiesta utente da monitor  {"pnl": -0.79, "close_level": 29150.8, "close_source": "activity", "confirm_level": 29150.8}
+
+------------------------------------------------------------------------
+#39  trade id=40  signal id=88  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Nasdaq 100  (long)
+  Aperto:       2026-05-22T06:06:48.594656+00:00
+  Chiuso:       2026-05-25T12:32:18.727707+00:00
+  Size:         0.01
+  Entry:        29 471.10 EUR
+  Stop loss:    29 072.40 EUR
+  Take profit:  30 030.10 EUR
+  Prezzo uscita:29 887.50 EUR
+  Motivo uscita:manual:Richiesta utente da monitor
+  P&L:          +4.16 EUR  (+1.41%)
+
+  -- Setup originario (signal) --
+  Score:        7
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-22T06:05:46.280176+00:00
+  Tesi:
+    Nasdaq 100 mostra entrambe le pendenze positive (trend_slope_pct +0.13, trend_slope_short_pct +0.15), confermando un uptrend consolidato su tutti gli orizzonti. Il prezzo si trova a soli -0.11% dal massimo delle ultime 20 candele, segnalando pressione rialzista sostenuta e test imminente del massimo recente. Il critical_event 'SpaceX Starship launch retry' entro ~18h ha direction_hint risk_on, catalyst favorevole per tech/indici. L'RSI 4H a 71.6 è appena sotto la soglia di ipercomprato (75): non è ancora un segnale di esaurimento ma richiede cautela; lo stop va allargato per l'evento macro Ifo atteso tra ~2h. Setup invalidato da un ritorno deciso al di sotto del range giornaliero.
+  Feature alla decisione:
+    epic: US100
+    news: []
+    atr_4h: 212.65
+    low_20: 28722.2
+    rsi_14: 71.6
+    high_20: 29492.3
+    leverage: 20.0
+    min_size: 0.001
+    size_step: 0.001
+    last_price: 29461.2
+    spread_pct: 0.0061
+    asset_class: index
+    bb_width_pct: 3.334
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 0.57
+    trend_slope_pct: 0.128
+    atr_pct_of_price: 0.722
+    daily_pct_change: 0.4
+    pct_from_high_20: -0.11
+    pct_from_daily_high: -0.22
+    trend_slope_short_pct: 0.151
+
+  -- Eventi (4) --
+    [2026-05-22T06:06:48.690081+00:00] opened  Esecuzione automatica da signal  {"size": 0.01, "deal_id": "00384627-0001-54c4-0000-0000892b2736", "notional": 294.702, "fill_level": 29471.1, "margin_budget": 15.0, "risk_estimate": 3.978477, "deal_reference": "o_055227ba-4527-474a-b4f9-a02661fa51b7", "margin_estimate": 14.735100000000001}
+    [2026-05-24T22:05:04.945589+00:00] trailing_sl  Profit 0.50R, SL -0.50R dall'entry  {"new_sl": 29272.2, "old_sl": 29072.4, "offset_r": -0.5, "profit_r": 0.5011815090163068, "r_distance": 397.85985, "current_price": 29670.5}
+    [2026-05-25T03:00:04.718539+00:00] trailing_sl  Profit 1.03R, SL +0.00R dall'entry  {"new_sl": 29471.1, "old_sl": 29272.2, "offset_r": 0.0, "profit_r": 1.0327757374864577, "r_distance": 397.85985, "current_price": 29882.0}
+    [2026-05-25T12:32:18.820647+00:00] manual_close  Richiesta utente da monitor  {"pnl": 4.16, "close_level": 29887.5, "close_source": "activity", "confirm_level": 29887.5}
+
+------------------------------------------------------------------------
+#40  trade id=41  signal id=89  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Gold  (long)
+  Aperto:       2026-05-22T07:06:43.32639+00:00
+  Chiuso:       2026-05-22T08:50:39.226603+00:00
+  Size:         0.06
+  Entry:        4 525.23 EUR
+  Stop loss:    4 479.61 EUR
+  Take profit:  4 624.40 EUR
+  Prezzo uscita:4 522.00 EUR
+  Motivo uscita:manual:Richiesta utente da monitor
+  P&L:          -0.19 EUR  (-0.07%)
+
+  -- Setup originario (signal) --
+  Score:        7
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-22T07:05:40.89832+00:00
+  Tesi:
+    Oro a -0.7% dal massimo 20 candele con RSI 4H a 59.4: momentum neutro-rialzista senza ipercomprato, ideale per un setup long di continuazione. Le due pendenze (trend_slope_pct +0.02 e trend_slope_short_pct +0.03) sono entrambe positive e coerenti, segnalando una salita ordinata senza accelerazione esagerata. La bb_width_pct a 2.2 indica volatilità compressa: una rottura al rialzo del massimo 20 candele potrebbe innescare l'espansione. Il contesto risk-off favorisce i metalli preziosi; l'evento Ifo tedesco in uscita entro 1h (stima 84.2 vs prev 84.4) è marginalmente negativo per l'EUR ma neutro-favorevole per il gold come bene rifugio. Setup invalidato da una chiusura 4H sotto il minimo recente.
+  Feature alla decisione:
+    epic: GOLD
+    news: []
+    atr_4h: 35.31464
+    low_20: 4463.82
+    rsi_14: 59.4
+    high_20: 4557.275
+    leverage: 20.0
+    min_size: 0.01
+    size_step: 0.01
+    last_price: 4525.57
+    spread_pct: 0.0166
+    asset_class: metal
+    bb_width_pct: 2.199
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 0.85
+    trend_slope_pct: 0.017
+    atr_pct_of_price: 0.78
+    daily_pct_change: -0.39
+    pct_from_high_20: -0.7
+    pct_from_daily_high: -0.45
+    trend_slope_short_pct: 0.033
+
+  -- Eventi (2) --
+    [2026-05-22T07:06:43.427567+00:00] opened  Esecuzione automatica da signal  {"size": 0.06, "deal_id": "00601567-0001-54c4-0000-000090566234", "notional": 271.49129999999997, "fill_level": 4525.23, "margin_budget": 15.0, "risk_estimate": 2.7149129999999997, "deal_reference": "o_8289ec7b-927f-4662-9084-d4adc0a3c924", "margin_estimate": 13.574565}
+    [2026-05-22T08:50:39.324803+00:00] manual_close  Richiesta utente da monitor  {"pnl": -0.19, "close_level": 4522.0, "close_source": "activity", "confirm_level": 4522.0}
+
+------------------------------------------------------------------------
+#41  trade id=42  signal id=90  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Brent Oil  (short)
+  Aperto:       2026-05-22T09:06:39.026175+00:00
+  Chiuso:       2026-05-24T22:15:05.789726+00:00
+  Size:         1.9
+  Entry:        103.12 EUR
+  Stop loss:    105.72 EUR
+  Take profit:  97.98 EUR
+  Prezzo uscita:97.41 EUR
+  Motivo uscita:reconcile:tp_hit
+  P&L:          +10.85 EUR  (+5.54%)
+
+  -- Setup originario (signal) --
+  Score:        7
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-22T09:05:36.274106+00:00
+  Tesi:
+    Brent in downtrend consolidato: trend_slope_pct -0.33 e trend_slope_short_pct -0.15 entrambi negativi confermano la pressione ribassista su più orizzonti. RSI 4H a 33.9 è in zona di debolezza ma SOPRA 25, quindi non ipervenduto: il downtrend può continuare. pct_from_high_20 -4.61% segnala prezzo già nettamente staccato dai massimi recenti, bb_width_pct 9.05% elevato coerente con espansione di volatilità ribassista. Il rimbalzo odierno (+0.81%) appare tecnico: le news citano dubbi sui colloqui USA-Iran e Barclays mantiene target $100, suggerendo upside limitato e downside persistente. Lo short è invalidato da un recupero deciso verso il massimo 20 candele.
+  Feature alla decisione:
+    epic: OIL_BRENT
+    news: [{'source': 'Investing.com Commodities', 'datetime': '2026-05-22T07:13:20+00:00', 'headline': 'Oil prices rise as investors doubt breakthrough in US-Iran peace talks'}, {'source': 'Investing.com Commodities', 'datetime': '2026-05-22T06:24:27+00:00', 'headline': 'Barclays keeps $100 Brent oil forecast for 2026 but risks skew higher'}]
+    atr_4h: 2.21446
+    low_20: 101.5615
+    rsi_14: 33.9
+    high_20: 108.0995
+    leverage: 20.0
+    min_size: 1.0
+    size_step: 0.1
+    last_price: 103.117
+    spread_pct: 0.0436
+    asset_class: energy
+    bb_width_pct: 9.049
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 2.3
+    trend_slope_pct: -0.328
+    atr_pct_of_price: 2.148
+    daily_pct_change: 0.81
+    pct_from_high_20: -4.61
+    pct_from_daily_high: -0.29
+    trend_slope_short_pct: -0.153
+
+  -- Eventi (4) --
+    [2026-05-22T09:06:39.121134+00:00] opened  Esecuzione automatica da signal  {"size": 1.9000000000000001, "deal_id": "00018092-0001-54c4-0000-000082bb20b9", "notional": 195.96505000000002, "fill_level": 103.117, "margin_budget": 15.0, "risk_estimate": 4.89912625, "deal_reference": "o_5a1107d7-366d-42a2-a0b1-d688e36c414f", "margin_estimate": 9.798252500000002}
+    [2026-05-22T12:00:10.979642+00:00] trailing_sl  Profit 0.51R, SL -0.50R dall'entry  {"new_sl": 104.406, "old_sl": 105.718, "offset_r": -0.5, "profit_r": 0.5056392253459661, "r_distance": 2.577925, "current_price": 101.8135}
+    [2026-05-22T12:15:11.573781+00:00] trailing_sl  Profit 1.01R, SL +0.00R dall'entry  {"new_sl": 103.117, "old_sl": 104.406, "offset_r": 0.0, "profit_r": 1.0089509974107078, "r_distance": 2.577925, "current_price": 100.516}
+    [2026-05-22T17:30:07.457339+00:00] trailing_sl  Profit 1.58R, SL +0.50R dall'entry  {"new_sl": 101.828, "old_sl": 103.117, "offset_r": 0.5, "profit_r": 1.5752979625086094, "r_distance": 2.577925, "current_price": 99.056}
+
+------------------------------------------------------------------------
+#42  trade id=43  signal id=91  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Gold  (long)
+  Aperto:       2026-05-25T12:06:57.565003+00:00
+  Chiuso:       2026-05-26T02:15:10.544591+00:00
+  Size:         0.06
+  Entry:        4 563.60 EUR
+  Stop loss:    4 531.42 EUR
+  Take profit:  4 636.37 EUR
+  Prezzo uscita:4 531.42 EUR
+  Motivo uscita:reconcile:stop_hit
+  P&L:          -1.93 EUR  (-0.71%)
+
+  -- Setup originario (signal) --
+  Score:        7.5
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-25T12:05:45.814455+00:00
+  Tesi:
+    Oro in forte momentum rialzista intraday con daily_pct_change +1.25% e trend_slope_short_pct +0.2 che guida il trend medio ancora piatto (trend_slope_pct +0.03): la pendenza corta anticipa l'accelerazione swing-up. RSI 4H a 66.9, solido ma ancora sotto la soglia di ipercomprato a 75, con spazio per continuazione. Il prezzo è a soli -0.11% dal massimo delle ultime 20 candele, segnalando una rottura imminente dei massimi recenti. Le news di oggi sono un catalyst chiaro e convergente: la speranza di un accordo USA-Iran abbassa il dollaro e spinge i capitali verso metalli rifugio, confermando la narrativa risk-off su oro. bb_width_pct a 1.78 in espansione coerente con il breakout in corso. Il setup si invalida se il prezzo si stacca nettamente dal massimo 20 candele senza followthrough.
+  Feature alla decisione:
+    epic: GOLD
+    news: [{'source': 'Investing.com Stock Markets', 'datetime': '2026-05-25T11:40:08+00:00', 'headline': 'TSX futures jump as gold climbs, oil falls amid Iran peace deal hopes'}, {'source': 'Finnhub:Reuters', 'datetime': '2026-05-25T10:03:28+00:00', 'headline': 'Gold climbs as Middle East peace hopes push oil and dollar lower - Reuters'}, {'source': 'Investing.com Commodities', 'datetime': '2026-05-25T09:45:37+00:00', 'headline': 'Gold prices jump 1% as U.S.-Iran peace hopes weigh on oil, dollar'}]
+    atr_4h: 27.31
+    low_20: 4508.35
+    rsi_14: 66.9
+    high_20: 4569.66
+    leverage: 20.0
+    min_size: 0.01
+    size_step: 0.01
+    last_price: 4564.685
+    spread_pct: 0.011
+    asset_class: metal
+    bb_width_pct: 1.783
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 1.36
+    trend_slope_pct: 0.034
+    atr_pct_of_price: 0.598
+    daily_pct_change: 1.25
+    pct_from_high_20: -0.11
+    pct_from_daily_high: -0.33
+    trend_slope_short_pct: 0.203
+
+  -- Eventi (1) --
+    [2026-05-25T12:06:57.660841+00:00] opened  Esecuzione automatica da signal  {"size": 0.06, "deal_id": "00601567-0001-54c4-0000-0000905ea274", "notional": 273.80159999999995, "fill_level": 4563.6, "margin_budget": 15.0, "risk_estimate": 1.9166111999999995, "deal_reference": "o_ebca806e-5934-44a1-8e6d-87da7d7a1d81", "margin_estimate": 13.690079999999998}
+
+------------------------------------------------------------------------
+#43  trade id=44  signal id=92  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Brent Oil  (long)
+  Aperto:       2026-05-26T08:06:50.881277+00:00
+  Chiuso:       2026-05-27T03:15:06.526875+00:00
+  Size:         2.1
+  Entry:        96.32 EUR
+  Stop loss:    93.99 EUR
+  Take profit:  101.11 EUR
+  Prezzo uscita:95.16 EUR
+  Motivo uscita:reconcile:stop_hit
+  P&L:          -2.44 EUR  (-1.21%)
+
+  -- Setup originario (signal) --
+  Score:        7
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-26T08:05:47.831133+00:00
+  Tesi:
+    Il Brent registra un daily_pct_change +2.69% sostenuto da una news esplicita: attacchi militari USA sull'Iran aumentano l'incertezza sull'accordo di pace e la supply geopolitica. Il prezzo è vicino al minimo giornaliero (pct_from_daily_high -0.3%), segnalando che il momentum intraday è ancora costruttivo. Il trend_slope_short_pct ha girato positivo (+0.15) dopo un trend_slope_pct medio negativo (-0.55), indicando un potenziale inizio di swing-up. RSI 4H a 33.1: siamo nella fascia di debolezza prolungata ma sopra la soglia critica di ipervenduto (25), e il rimbalzo intraday con catalyst geopolitico chiaro può sostenere il setup. La bb_width_pct molto espansa (14.18) riflette alta volatilità ma è coerente con un movimento direzionale deciso. Rischio principale: il trend medio resta discendente e i dati macro USA giovedì (Core PCE, GDP) potrebbero pesare sul sentiment energetico.
+  Feature alla decisione:
+    epic: OIL_BRENT
+    news: [{'source': 'Investing.com Commodities', 'datetime': '2026-05-26T06:54:52+00:00', 'headline': 'Brent gains 2% as US military strikes on Iran add to peace deal uncertainty'}]
+    atr_4h: 2.10596
+    low_20: 93.8545
+    rsi_14: 33.1
+    high_20: 104.275
+    leverage: 20.0
+    min_size: 1.0
+    size_step: 0.1
+    last_price: 96.3495
+    spread_pct: 0.0467
+    asset_class: energy
+    bb_width_pct: 14.178
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 2.09
+    trend_slope_pct: -0.553
+    atr_pct_of_price: 2.186
+    daily_pct_change: 2.69
+    pct_from_high_20: -7.6
+    pct_from_daily_high: -0.3
+    trend_slope_short_pct: 0.146
+
+  -- Eventi (2) --
+    [2026-05-26T08:06:51.016422+00:00] opened  Esecuzione automatica da signal  {"size": 2.1, "deal_id": "00018092-0001-54c4-0000-000082be21b6", "notional": 202.22895, "fill_level": 96.322, "margin_budget": 15.0, "risk_estimate": 4.853494799999999, "deal_reference": "o_e79c8363-e2bf-4b98-9bea-54a9873b237d", "margin_estimate": 10.1114475}
+    [2026-05-26T13:55:04.827475+00:00] trailing_sl  Profit 0.60R, SL -0.50R dall'entry  {"new_sl": 95.166, "old_sl": 93.988, "offset_r": -0.5, "profit_r": 0.601498100122507, "r_distance": 2.311728, "current_price": 97.7125}
+
+------------------------------------------------------------------------
+#44  trade id=45  signal id=93  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Nasdaq 100  (long)
+  Aperto:       2026-05-26T19:06:47.499549+00:00
+  Chiuso:       2026-05-27T14:00:06.510523+00:00
+  Size:         0.01
+  Entry:        29 959.30 EUR
+  Stop loss:    29 687.50 EUR
+  Take profit:  30 556.20 EUR
+  Prezzo uscita:29 959.30 EUR
+  Motivo uscita:reconcile:stop_hit
+  P&L:          +0.00 EUR  (+0.00%)
+
+  -- Setup originario (signal) --
+  Score:        7.5
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-26T19:05:44.884212+00:00
+  Tesi:
+    Il Nasdaq 100 si trova esattamente al massimo delle ultime 20 candele (pct_from_high_20 = 0.0%), segnale di forza relativa rispetto all'US500. Il trend_slope_pct +0.09 è positivo e il trend_slope_short_pct +0.02 è piatto/leggermente positivo: non c'è inversione in corso. L'RSI 4H a 64.9 è nella fascia di forza senza essere in ipercomprato (soglia 75). Le news confermano il driver: AI optimism che sovrasta i rischi geopolitici mediorientali. Il Core PCE e il GDP tra ~41h potrebbero essere catalizzatori di volatilità: lo stop va allargato di conseguenza. Setup invalidato se il prezzo rompe sotto il minimo 20 candele o l'RSI supera 75.
+  Feature alla decisione:
+    epic: US100
+    news: [{'source': 'Finnhub:Reuters', 'datetime': '2026-05-26T17:12:25+00:00', 'headline': 'S&P 500, Nasdaq rise as AI optimism outweighs Middle East risks - Reuters'}]
+    atr_4h: 146.25
+    low_20: 29351.7
+    rsi_14: 64.9
+    high_20: 29933.5
+    leverage: 20.0
+    min_size: 0.001
+    size_step: 0.001
+    last_price: 29933.5
+    spread_pct: 0.006
+    asset_class: index
+    bb_width_pct: 2.551
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 1.24
+    trend_slope_pct: 0.089
+    atr_pct_of_price: 0.489
+    daily_pct_change: 0.28
+    pct_from_high_20: 0.0
+    pct_from_daily_high: -0.36
+    trend_slope_short_pct: 0.018
+
+  -- Eventi (3) --
+    [2026-05-26T19:06:47.628209+00:00] opened  Esecuzione automatica da signal  {"size": 0.01, "deal_id": "00384627-0001-54c4-0000-0000892fc023", "notional": 299.57099999999997, "fill_level": 29959.3, "margin_budget": 15.0, "risk_estimate": 2.696139, "deal_reference": "o_fcd25b9b-f51e-4842-b278-5939f268cd63", "margin_estimate": 14.978549999999998}
+    [2026-05-27T08:15:07.420197+00:00] trailing_sl  Profit 0.52R, SL -0.50R dall'entry  {"new_sl": 29824.5, "old_sl": 29687.5, "offset_r": -0.5, "profit_r": 0.5177394368730697, "r_distance": 269.6337, "current_price": 30098.9}
+    [2026-05-27T12:20:04.352146+00:00] trailing_sl  Profit 1.02R, SL +0.00R dall'entry  {"new_sl": 29959.3, "old_sl": 29824.5, "offset_r": 0.0, "profit_r": 1.0150808300297802, "r_distance": 269.6337, "current_price": 30233.0}
+
+------------------------------------------------------------------------
+#45  trade id=46  signal id=94  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Brent Oil  (short)
+  Aperto:       2026-05-27T09:06:50.450956+00:00
+  Chiuso:       2026-05-28T05:30:16.804966+00:00
+  Size:         1.3
+  Entry:        93.58 EUR
+  Stop loss:    97.39 EUR
+  Take profit:  88.45 EUR
+  Prezzo uscita:95.52 EUR
+  Motivo uscita:manual:Richiesta utente da monitor
+  P&L:          -2.52 EUR  (-2.08%)
+
+  -- Setup originario (signal) --
+  Score:        8
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-27T09:05:47.782497+00:00
+  Tesi:
+    Brent in downtrend consolidato: trend_slope_pct -0.37 e trend_slope_short_pct -0.45 entrambi negativi e in accelerazione, confermando uno short ad alta convinzione. RSI 4H a 38.2 in calo, nella fascia di debolezza continuativa (ben sopra la soglia 25), non ipervenduto. Il prezzo è distante dal massimo 20 candele (-8.93%) con daily_pct_change -3.38% che rafforza la pressione ribassista. La bb_width_pct a 11.42 è in forte espansione, coerente con continuazione del trend. Il catalyst fondamentale è il progresso dei negoziati US-Iran con possibile accordo su Hormuz, che ridurrebbe il premio di rischio geopolitico sul petrolio. Il critical_event con direction_hint 'risk_off_if_fails' tra ~2.9h aggiunge upside risk nel breve ma il trend tecnico e il news-flow dominano. Invalidazione su recupero deciso dei massimi 20 candele.
+  Feature alla decisione:
+    epic: OIL_BRENT
+    news: [{'source': 'Investing.com Commodities', 'datetime': '2026-05-26T23:51:04+00:00', 'headline': 'Oil prices sink with US-Iran negotiations, Hormuz deal in focus'}]
+    atr_4h: 1.69521
+    low_20: 93.3775
+    rsi_14: 38.2
+    high_20: 102.5295
+    leverage: 20.0
+    min_size: 1.0
+    size_step: 0.1
+    last_price: 93.3775
+    spread_pct: 0.0482
+    asset_class: energy
+    bb_width_pct: 11.416
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 4.0
+    trend_slope_pct: -0.366
+    atr_pct_of_price: 1.815
+    daily_pct_change: -3.38
+    pct_from_high_20: -8.93
+    pct_from_daily_high: -3.51
+    trend_slope_short_pct: -0.454
+
+  -- Eventi (2) --
+    [2026-05-27T09:06:50.599115+00:00] opened  Esecuzione automatica da signal  {"size": 1.3, "deal_id": "00018092-0001-54c4-0000-000082be9a6e", "notional": 121.67675, "fill_level": 93.575, "margin_budget": 15.0, "risk_estimate": 4.9279083749999995, "deal_reference": "o_c44c4746-9021-4bcc-9450-523cd900a4b7", "margin_estimate": 6.0838375000000005}
+    [2026-05-28T05:30:16.860355+00:00] manual_close  Richiesta utente da monitor  {"pnl": -2.52, "close_level": 95.517, "close_source": "activity", "confirm_level": 95.517}
+
+------------------------------------------------------------------------
+#46  trade id=47  signal id=95  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Gold  (short)
+  Aperto:       2026-05-28T14:06:42.74917+00:00
+  Chiuso:       2026-05-28T16:30:12.415661+00:00
+  Size:         0.06
+  Entry:        4 426.84 EUR
+  Stop loss:    4 493.48 EUR
+  Take profit:  4 285.41 EUR
+  Prezzo uscita:4 493.48 EUR
+  Motivo uscita:reconcile:stop_hit
+  P&L:          -4.00 EUR  (-1.51%)
+
+  -- Setup originario (signal) --
+  Score:        7
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-28T14:05:40.024305+00:00
+  Tesi:
+    Oro in downtrend confermato da entrambe le pendenze negative (trend_slope_pct -0.23, trend_slope_short_pct -0.13), con prezzo già distaccato del 3% dal massimo 20 candele. RSI 4H a 32 in calo: sopra la soglia 25, non ipervenduto, compatibile con continuazione ribassista. Le news confermano il catalyst: i raid US-Iran alimentano timori di inflazione e rialzo tassi, che paradossalmente pesano sull'oro comprimendo le attese di tagli. bb_width_pct 5.58 in espansione coerente con continuazione. Il setup viene invalidato da un recupero deciso verso il massimo 20 candele.
+  Feature alla decisione:
+    epic: GOLD
+    news: [{'source': 'Investing.com Commodities', 'datetime': '2026-05-28T13:10:04+00:00', 'headline': 'Gold prices slide as U.S.-Iran hostilities keep inflation, rate hike fears in play'}, {'source': 'Finnhub:Reuters', 'datetime': '2026-05-28T01:38:00+00:00', 'headline': 'Gold at two-month low as US-Iran strikes boost inflation fears, PCE data on tap - Reuters'}]
+    atr_4h: 43.4775
+    low_20: 4374.915
+    rsi_14: 32.0
+    high_20: 4570.97
+    leverage: 20.0
+    min_size: 0.01
+    size_step: 0.01
+    last_price: 4433.055
+    spread_pct: 0.0169
+    asset_class: metal
+    bb_width_pct: 5.579
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 2.26
+    trend_slope_pct: -0.229
+    atr_pct_of_price: 0.981
+    daily_pct_change: -0.67
+    pct_from_high_20: -3.02
+    pct_from_daily_high: -0.76
+    trend_slope_short_pct: -0.128
+
+  -- Eventi (1) --
+    [2026-05-28T14:06:42.86216+00:00] opened  Esecuzione automatica da signal  {"size": 0.06, "deal_id": "00601567-0001-54c4-0000-000090788f62", "notional": 265.62449999999995, "fill_level": 4426.84, "margin_budget": 15.0, "risk_estimate": 3.9843674999999994, "deal_reference": "o_7013f586-3b1c-406c-86aa-6cb565bde8e8", "margin_estimate": 13.281225}
+
+------------------------------------------------------------------------
+#47  trade id=48  signal id=96  [IN CORSO]
+------------------------------------------------------------------------
+  Asset:        Nasdaq 100  (long)
+  Aperto:       2026-05-28T16:07:05.085889+00:00
+  Size:         0.009
+  Entry:        30 190.70 EUR
+  Stop loss:    29 948.80 EUR
+  Take profit:  30 733.70 EUR
+  P&L:          n/d  (n/d)
+
+  -- Setup originario (signal) --
+  Score:        7.5
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-28T16:06:02.445562+00:00
+  Tesi:
+    Nasdaq 100 si trova a -0.05% dal massimo delle ultime 20 candele, con trend_slope_pct +0.04 e trend_slope_short_pct +0.13 entrambi positivi: le due pendenze sono allineate e la corta accelera, segnale di slancio rialzista in corso. RSI 4H a 62 è in zona di forza senza essere ipercomprato. Il daily_pct_change +0.41% conferma la pressione in acquisto. bb_width_pct 1.95 in espansione coerente con continuazione del movimento. Setup invalido su rottura al ribasso del minimo 20 candele.
+  Feature alla decisione:
+    epic: US100
+    news: []
+    atr_4h: 196.0
+    low_20: 29700.7
+    rsi_14: 62.0
+    high_20: 30192.2
+    leverage: 20.0
+    min_size: 0.001
+    size_step: 0.001
+    last_price: 30176.7
+    spread_pct: 0.006
+    asset_class: index
+    bb_width_pct: 1.952
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 1.74
+    trend_slope_pct: 0.041
+    atr_pct_of_price: 0.65
+    daily_pct_change: 0.41
+    pct_from_high_20: -0.05
+    pct_from_daily_high: -0.13
+    trend_slope_short_pct: 0.13
+
+  -- Eventi (3) --
+    [2026-05-28T16:07:05.217037+00:00] opened  Esecuzione automatica da signal  {"size": 0.009000000000000001, "deal_id": "00384627-0001-54c4-0000-000089339619", "notional": 271.71270000000004, "fill_level": 30190.7, "margin_budget": 15.0, "risk_estimate": 2.1737016000000007, "deal_reference": "o_0a917f96-5ecb-4b28-bcab-f82eb2187bf1", "margin_estimate": 13.585635000000003}
+    [2026-05-29T13:30:07.321032+00:00] trailing_sl  Profit 0.56R, SL -0.50R dall'entry  {"new_sl": 30069.9, "old_sl": 29948.8, "offset_r": -0.5, "profit_r": 0.5610171344155499, "r_distance": 241.52560000000003, "current_price": 30326.199999999997}
+    [2026-05-29T14:00:07.0407+00:00] trailing_sl  Profit 1.13R, SL +0.00R dall'entry  {"new_sl": 30190.7, "old_sl": 30069.9, "offset_r": 0.0, "profit_r": 1.1290728601854243, "r_distance": 241.52560000000003, "current_price": 30463.4}
+
+------------------------------------------------------------------------
+#48  trade id=49  signal id=97  [CHIUSO]
+------------------------------------------------------------------------
+  Asset:        Brent Oil  (short)
+  Aperto:       2026-05-28T19:06:54.094067+00:00
+  Chiuso:       2026-05-29T15:15:06.669295+00:00
+  Size:         3.2
+  Entry:        92.88 EUR
+  Stop loss:    94.30 EUR
+  Take profit:  89.93 EUR
+  Prezzo uscita:89.92 EUR
+  Motivo uscita:reconcile:tp_hit
+  P&L:          +9.46 EUR  (+3.18%)
+
+  -- Setup originario (signal) --
+  Score:        7
+  Costo atteso: n/d
+  Stato signal: auto_confirmed
+  Creato:       2026-05-28T19:05:51.13185+00:00
+  Tesi:
+    Brent Oil è in downtrend con trend_slope_pct -0.12 e pct_from_high_20 -4.5%, prezzo nettamente staccato dai massimi recenti. RSI 4H a 35.3 è in area di debolezza (sopra la soglia 25, non ipervenduto), coerente con continuazione ribassista. Il catalyst fondamentale è potente e duplice: il Segretario Bessent ha dichiarato che i prezzi del petrolio scenderanno sotto i livelli pre-conflitto, e le notizie di un accordo USA-Iran eliminano un premium geopolitico che sosteneva il prezzo. Le scorte USA hanno deluso al ribasso (-3.33M vs -4.14M atteso), segnale di domanda ancora debole. Il daily_pct_change è piatto (-0.02%) ma pct_from_daily_high -3.15% indica che il prezzo ha già ceduto molto nel corso della giornata. trend_slope_short_pct è quasi piatto (+0.01), suggerendo esaurimento del rimbalzo intraday: ideale per entrare short prima che la pendenza corta confermi il ritorno ribassista.
+  Feature alla decisione:
+    epic: OIL_BRENT
+    news: [{'source': 'ForexLive', 'datetime': '2026-05-28T18:21:39+00:00', 'headline': 'Treasury Secretary Bessent: Oil prices will be lower than pre-conflict levels'}, {'source': 'Investing.com Forex', 'datetime': '2026-05-28T17:17:51+00:00', 'headline': 'Oil prices muted after U.S. and Iran said to reach deal pending Trump nod'}, {'source': 'ForexLive', 'datetime': '2026-05-28T16:06:22+00:00', 'headline': 'Crude oil inventories fall -3.327 million versus -4.143 million estimate'}]
+    atr_4h: 1.64132
+    low_20: 92.919
+    rsi_14: 35.3
+    high_20: 97.2975
+    leverage: 20.0
+    min_size: 1.0
+    size_step: 0.1
+    last_price: 92.9205
+    spread_pct: 0.0484
+    asset_class: energy
+    bb_width_pct: 5.543
+    candles_used: 60
+    margin_factor: 0.05
+    market_status: TRADEABLE
+    daily_range_pct: 4.6
+    trend_slope_pct: -0.123
+    atr_pct_of_price: 1.766
+    daily_pct_change: -0.02
+    pct_from_high_20: -4.5
+    pct_from_daily_high: -3.15
+    trend_slope_short_pct: 0.013
+
+  -- Eventi (4) --
+    [2026-05-28T19:06:54.255552+00:00] opened  Esecuzione automatica da signal  {"size": 3.2, "deal_id": "00018092-0001-54c4-0000-000082bf621d", "notional": 297.2848, "fill_level": 92.879, "margin_budget": 15.0, "risk_estimate": 4.459272, "deal_reference": "o_2e1fa7cd-0056-4171-a0ba-5303562af920", "margin_estimate": 14.864240000000002}
+    [2026-05-28T21:05:04.821786+00:00] trailing_sl  Profit 0.55R, SL -0.50R dall'entry  {"new_sl": 93.576, "old_sl": 94.295, "offset_r": -0.5, "profit_r": 0.5462304001263364, "r_distance": 1.393185, "current_price": 92.118}
+    [2026-05-29T06:25:05.483232+00:00] trailing_sl  Profit 1.05R, SL +0.00R dall'entry  {"new_sl": 92.879, "old_sl": 93.576, "offset_r": 0.0, "profit_r": 1.0533418031345554, "r_distance": 1.393185, "current_price": 91.41149999999999}
+    [2026-05-29T10:45:10.115119+00:00] trailing_sl  Profit 1.57R, SL +0.50R dall'entry  {"new_sl": 92.182, "old_sl": 92.879, "offset_r": 0.5, "profit_r": 1.5722965722427389, "r_distance": 1.393185, "current_price": 90.6885}
+
+========================================================================
+RIEPILOGO (EURO)
+========================================================================
+  Setup chiusi:    47   P&L realizzato:  +8.75 EUR
+  Setup in corso:  1   P&L flottante:   +0.00 EUR
+  Totale combinato:            +8.75 EUR
