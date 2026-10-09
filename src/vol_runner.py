@@ -25,8 +25,8 @@ from src.vol_config import carica
 from src.vol_store import VolStore
 from src.volatilita import (
     Conto, Gradino, Parametri, Segnale, conto_autorizzato, fine_pausa, in_pausa,
-    livello_stop, perdita_da_salto, scala, serve_ribilancio, stop_colpito,
-    unita_target,
+    livello_stop, ordine_accettato, perdita_da_salto, scala, segno_verso,
+    serve_ribilancio, stop_colpito, unita_target, verso_consentito,
 )
 
 log = logging.getLogger(__name__)
@@ -106,6 +106,7 @@ def _mercato(cap: Any, epic: str) -> dict[str, Any] | None:
     return {
         "prezzo": prezzo,
         "aperto": (sn.get("marketStatus") or "").upper() == "TRADEABLE",
+        "modi": list(sn.get("marketModes") or []),
         "meta": meta,
         "noz_unita": meta["min_size"] * prezzo * q2r,
         "q2r": q2r,
@@ -118,10 +119,11 @@ def _spiega_gradino(g: Gradino, capitale: float, par: Parametri) -> str:
     noz = capitale * g.frazione
     if g.frazione <= 0:
         return "Esposizione a zero: resto fuori."
+    salto = par.salto_catastrofe
     return (f"Esposizione al {g.frazione:.0%} del capitale ({noz:.0f} € su "
-            f"{capitale:.0f} €). Se lo strumento saltasse del 66% in una notte, "
-            f"come il 5 febbraio 2018, perderei circa "
-            f"{perdita_da_salto(noz):.0f} €.")
+            f"{capitale:.0f} €). Se lo strumento andasse contro del {salto:.0%} "
+            f"in una notte, come nel peggior giorno della sua storia, perderei "
+            f"circa {perdita_da_salto(noz, salto):.0f} €.")
 
 
 # --- il giro completo -----------------------------------------------------
@@ -173,6 +175,24 @@ def esegui(argv: list[str] | None = None) -> int:
         tg.send_message(f"⏹️ <b>Assicurazione: chiusa</b>\nChiuse {len(deals)} posizioni.")
         return 0
 
+    # Fail-closed sul verso: se il broker non permette di aprire cosi', meglio
+    # non fare niente e dirlo, che mandare ordini destinati al rifiuto.
+    if not verso_consentito(mk["modi"], par.verso):
+        log.error("%s: il broker non permette il verso '%s' (marketModes=%s). "
+                  "Nessun ordine.", par.epic, par.verso, mk["modi"])
+        store.decisione(epic=par.epic, gradino=gradino, azione="rifiutato",
+                        eseguito=False, segnale=segnale, conto=conto,
+                        capitale=capitale, nozionale_attuale=noz_attuale,
+                        size_prima=size, risultato_eur=pnl,
+                        motivo=f"verso {par.epic} non consentito: {mk['modi']}")
+        if "--stato" not in argv and mk["aperto"]:
+            tg.send_message(
+                f"⚠️ <b>Assicurazione: non posso aprire</b>\n"
+                f"Il broker non permette di stare {'corti' if segno_verso(par.verso) < 0 else 'lunghi'} "
+                f"su {par.epic} (modalità {', '.join(mk['modi']) or 'sconosciuta'}). "
+                f"Non ho mandato nessun ordine: va cambiato strumento o verso.")
+        return 1
+
     if not mk["aperto"]:
         log.info("%s: mercato chiuso, non tocco nulla", par.epic)
         store.decisione(epic=par.epic, gradino=gradino, azione="nessuna",
@@ -223,7 +243,7 @@ def esegui(argv: list[str] | None = None) -> int:
         return 0
 
     unita = unita_target(obiettivo, mk["noz_unita"])
-    size_target = -unita * mk["meta"]["min_size"]
+    size_target = segno_verso(par.verso) * unita * mk["meta"]["min_size"]
     delta = size_target - size
     if abs(delta) < mk["meta"]["min_size"] / 2:
         return 0
@@ -248,23 +268,55 @@ def esegui(argv: list[str] | None = None) -> int:
 
     noz_target = unita * mk["noz_unita"]
     verso = "SELL" if delta < 0 else "BUY"
-    stop_level = livello_stop(mk["prezzo"], noz_target, par) if size_target < 0 else None
+    # lo stop del broker protegge la posizione risultante, qualunque sia il verso
+    stop_level = livello_stop(mk["prezzo"], noz_target, par) if size_target else None
+    azione = "apertura" if not size else ("aumento" if noz_target > noz_attuale
+                                          else "riduzione")
     log.info("%s: gradino %s, da %+.0f a %+.0f unita (%s %.4f), esposizione "
              "%.2f -> %.2f€, stop a %s", par.epic, gradino.nome, size, size_target,
              verso, abs(delta), noz_attuale, noz_target, stop_level)
-    esito = cap.create_position(epic=par.epic, direction=verso, size=abs(delta),
-                                stop_level=stop_level)
 
-    azione = "apertura" if not size else ("aumento" if noz_target > noz_attuale
-                                          else "riduzione")
+    # L'ordine e' asincrono: il 200 con dealReference dice solo "ricevuto". Il
+    # verdetto sta in /confirms, e senza un ACCEPTED esplicito l'ordine NON e'
+    # stato eseguito (14 rifiuti silenziosi fra il 16/09 e il 05/10/2026).
+    conferma: dict[str, Any] = {}
+    errore = ""
+    try:
+        esito = cap.create_position(epic=par.epic, direction=verso, size=abs(delta),
+                                    stop_level=stop_level)
+        ref = (esito or {}).get("dealReference")
+        conferma = cap.confirm_deal(ref) if ref else {}
+    except Exception as exc:   # rete, 4xx, conferma mai indicizzata
+        errore = str(exc)[:300]
+    if not ordine_accettato(conferma):
+        motivo = (conferma.get("rejectReason") or conferma.get("dealStatus")
+                  or errore or "nessuna conferma")
+        log.error("%s: ordine %s %.4f NON eseguito: %s", par.epic, verso,
+                  abs(delta), motivo)
+        store.decisione(epic=par.epic, gradino=gradino, azione=azione, eseguito=False,
+                        segnale=segnale, conto=conto, capitale=capitale,
+                        nozionale_attuale=noz_attuale, nozionale_target=noz_target,
+                        size_prima=size, size_dopo=size, risultato_eur=pnl,
+                        stop_level=stop_level, motivo=f"rifiutato: {motivo}")
+        tg.send_message(
+            f"⚠️ <b>Assicurazione: ordine rifiutato</b>\n"
+            f"Volevo portare {par.epic} da {size:+.0f} a {size_target:+.0f} quote, il "
+            f"broker ha risposto: <i>{motivo}</i>.\n"
+            f"La posizione resta quella che è ({eur(noz_attuale)} di esposizione). "
+            f"Riprovo al prossimo giro.")
+        return 1
+
+    fill = conferma.get("level") or mk["prezzo"]
+    log.info("%s: ESEGUITO %s %.4f a %s (deal %s)", par.epic, verso, abs(delta),
+             fill, conferma.get("dealId"))
     store.decisione(epic=par.epic, gradino=gradino, azione=azione, eseguito=True,
                     segnale=segnale, conto=conto, capitale=capitale,
                     nozionale_attuale=noz_attuale, nozionale_target=noz_target,
                     size_prima=size, size_dopo=size_target, risultato_eur=pnl,
                     stop_level=stop_level)
-    store.apertura(epic=par.epic, deal_id=(esito or {}).get("dealReference"),
+    store.apertura(epic=par.epic, deal_id=conferma.get("dealId") or (esito or {}).get("dealReference"),
                    verso="short" if size_target < 0 else "long",
-                   size=abs(size_target), prezzo=mk["prezzo"])
+                   size=abs(size_target), prezzo=float(fill))
     scrivi({**st, "ultimo_ordine": datetime.now(timezone.utc).isoformat(),
             "unita": unita, "in_pausa_fino": None, "gradino": gradino.nome})
 
@@ -281,14 +333,21 @@ def _avvisa(tg: Any, st: dict, par: Parametri, gradino: Gradino, capitale: float
     """
     noz = unita * mk["noz_unita"]
     if not st.get("avviata"):
+        if segno_verso(par.verso) < 0:
+            come = (f"Vendo {unita} quote di {par.epic} allo scoperto: {eur(noz)} di "
+                    f"esposizione su {eur(capitale)}.\n\n"
+                    f"Non prevede niente: quello strumento perde valore per come è "
+                    f"costruito, e io incasso quel calo.")
+        else:
+            come = (f"Compro {unita} quote di {par.epic}: {eur(noz)} di esposizione "
+                    f"su {eur(capitale)}.\n\n"
+                    f"Non prevede niente: quello strumento è costruito per incassare "
+                    f"il premio che pagano i compratori di protezione, e sale finché "
+                    f"i mercati restano calmi.")
         tg.send_message(
-            f"🛡️ <b>Assicurazione: partita</b>\n"
-            f"Vendo {unita} quote di {par.epic} allo scoperto: {eur(noz)} di "
-            f"esposizione su {eur(capitale)}.\n\n"
-            f"Non prevede niente: quello strumento perde valore per come è "
-            f"costruito, e io incasso quel calo. Si guadagna poco quasi sempre e "
-            f"si perde molto di rado: se perde {eur(par.stop_eur)} chiudo e resto "
-            f"fermo {par.pausa_giorni} giorni.")
+            f"🛡️ <b>Assicurazione: partita</b>\n{come} Si guadagna poco quasi "
+            f"sempre e si perde molto di rado: se perde {eur(par.stop_eur)} chiudo "
+            f"e resto fermo {par.pausa_giorni} giorni.")
         scrivi({**stato(), "avviata": datetime.now(timezone.utc).isoformat(),
                 "gradino": gradino.nome})
         return

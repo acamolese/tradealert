@@ -244,7 +244,7 @@ class Configurazione(unittest.TestCase):
 
     def test_file_versionato_e_valido(self):
         par = carica(env={})
-        self.assertEqual(par.epic, "UVXY")
+        self.assertEqual(par.epic, "SVXY")
         self.assertLessEqual(par.frazione_piena, par.tetto)
 
     def test_il_file_vince_sui_default(self):
@@ -282,3 +282,63 @@ class Configurazione(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class VersoEConferma(unittest.TestCase):
+    """Il 2026-10-09: UVXY e' LONG_ONLY su Capital, 14 ordini SELL rifiutati in
+    silenzio. Da qui in poi il verso si controlla prima e l'esito si verifica dopo."""
+
+    def test_short_vietato_su_long_only(self):
+        from src.volatilita import verso_consentito
+        self.assertFalse(verso_consentito(["LONG_ONLY"], "short"))
+
+    def test_long_permesso_su_long_only(self):
+        from src.volatilita import verso_consentito
+        self.assertTrue(verso_consentito(["LONG_ONLY"], "long"))
+
+    def test_regular_permette_entrambi(self):
+        from src.volatilita import verso_consentito
+        self.assertTrue(verso_consentito(["REGULAR"], "short"))
+        self.assertTrue(verso_consentito(["REGULAR"], "long"))
+
+    def test_modi_sconosciuti_non_bloccano(self):
+        from src.volatilita import verso_consentito
+        self.assertTrue(verso_consentito(None, "short"))
+        self.assertTrue(verso_consentito([], "long"))
+
+    def test_senza_conferma_l_ordine_non_e_eseguito(self):
+        from src.volatilita import ordine_accettato
+        self.assertFalse(ordine_accettato(None))
+        self.assertFalse(ordine_accettato({}))
+        self.assertFalse(ordine_accettato({"dealReference": "abc"}))
+
+    def test_rifiuto_esplicito(self):
+        from src.volatilita import ordine_accettato
+        self.assertFalse(ordine_accettato({"dealStatus": "REJECTED",
+                                           "rejectReason": "LONG_ONLY"}))
+
+    def test_accettato(self):
+        from src.volatilita import ordine_accettato
+        self.assertTrue(ordine_accettato({"dealStatus": "accepted"}))
+
+    def test_stop_lungo_sta_sotto_il_prezzo(self):
+        from dataclasses import replace
+        lungo = replace(PAR, verso="long")
+        self.assertAlmostEqual(livello_stop(10.0, 30.0, lungo), 5.0, places=2)
+        self.assertAlmostEqual(livello_stop(10.0, 5.0, lungo), 4.0, places=2)
+
+    def test_stop_corto_sta_sopra_il_prezzo(self):
+        self.assertGreater(livello_stop(10.0, 30.0, PAR), 10.0)
+
+    def test_segno_verso(self):
+        from src.volatilita import segno_verso
+        self.assertEqual(segno_verso("long"), 1)
+        self.assertEqual(segno_verso("short"), -1)
+        self.assertEqual(segno_verso(""), -1)
+
+    def test_il_file_versionato_compra_svxy(self):
+        par = carica(env={})
+        self.assertEqual(par.epic, "SVXY")
+        self.assertEqual(par.verso, "long")
+        self.assertLessEqual(par.salto_catastrofe, 1.0)
+        self.assertGreater(par.salto_catastrofe, 0.0)

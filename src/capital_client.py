@@ -97,6 +97,11 @@ class CapitalClient:
         self._preferences_cache: dict[str, Any] | None = None
         self._preferences_cached_at: float = 0.0
 
+    @property
+    def config(self) -> Config:
+        """La configurazione con cui il client e' stato costruito (es. capital_env)."""
+        return self._cfg
+
     def _url(self, path: str) -> str:
         return f"{self._cfg.capital_base_url}{path}"
 

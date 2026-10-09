@@ -32,7 +32,8 @@ RADICE = Path(__file__).resolve().parent.parent
 TEMPLATE = RADICE / "web" / "claudetrade.template.html"
 JOURNAL = RADICE / "web" / "journal.json"
 USCITA = Path(os.environ.get("CLAUDETRADE_OUT", "/var/www/claudetrade/index.html"))
-PANIERE = ["NL25", "US100", "DE40", "HK50", "J225", "GOLD", "US30", "US500"]
+# HK50 fuori dal 2026-10-09: spread dieci volte gli altri, peggiore su entrambi i conti
+PANIERE = ["NL25", "US100", "DE40", "J225", "GOLD", "US30", "US500"]
 ROMA = ZoneInfo("Europe/Rome")
 
 

@@ -1,7 +1,10 @@
 {
   "_commento": "Parametri della vendita di assicurazione sulla volatilita' (jobs/paura_esegui.py). Versionato apposta: fino al 2026-09-12 stavano in variabili d'ambiente sulla VM, quindi la configurazione che girava davvero non era ricostruibile da qui. Le variabili PAURA_* continuano a funzionare e vincono su questo file, per poter intervenire sulla VM senza un deploy. Formato JSON e non YAML per coerenza con config/critical_events.json e per non aggiungere una dipendenza.",
 
-  "epic": "UVXY",
+  "_verso": "Dal 2026-10-09 lo strumento e' SVXY (ETF inverso -0.5x sui futures VIX a breve) comprato LUNGO. Prima era UVXY venduto allo scoperto: su Capital gli ETF sono LONG_ONLY e i 14 ordini SELL fra il 16/09 e il 05/10 sono stati tutti rifiutati senza che il codice se ne accorgesse. VXX, VIXY e SVIX non esistono su Capital. Costo del verso lungo: finanziamento 0.0222%/giorno (8.1%/anno) contro lo 0.56%/anno dello scoperto, quindi il premio netto e' circa un terzo di quello del disegno originale. Pre-registrazione e gate in docs/gate-svxy-2026-10-09.md.",
+  "epic": "SVXY",
+  "verso": "long",
+  "salto_catastrofe": 0.50,
   "capitale_default": 200.0,
 
   "_scala": "Quanta esposizione tenere, in frazione del capitale dichiarato. Si sale solo a condizioni verificate (curva, VIX, storia del conto), si scende subito quando cadono. Nessun gradino supera il tetto.",

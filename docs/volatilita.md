@@ -1,6 +1,19 @@
 # Vendere assicurazione sulla volatilità
 
-*Stato al 2026-09-12. Sistema attivo sul solo conto di prova.*
+*Stato al 2026-10-09. Sistema attivo sul solo conto di prova.*
+
+> **Aggiornamento del 2026-10-09.** Tutto quello che segue è stato scritto
+> immaginando di vendere UVXY allo scoperto. Su Capital gli ETF sono
+> `LONG_ONLY`: i quattordici ordini mandati fra il 16/09 e il 05/10 sono stati
+> rifiutati tutti, e il codice non se n'è accorto perché non leggeva la conferma.
+> La posizione descritta nei messaggi Telegram di settembre non è mai esistita.
+> Da oggi lo strumento è **SVXY comprato lungo**, con tre correzioni: controllo
+> di `marketModes` prima dell'ordine, verifica di `/confirms` dopo (senza
+> `ACCEPTED` l'ordine non conta), e stop dal lato giusto per ogni verso.
+> Il premio netto è circa un terzo di quello del disegno originale, perché il
+> finanziamento del lungo costa 8,1% l'anno. Pre-registrazione e criteri nuovi
+> in `gate-svxy-2026-10-09.md`; la scoperta e i numeri in
+> `valutazione-stasi-2026-10-09.md`.
 
 ## Cosa fa, in una riga
 

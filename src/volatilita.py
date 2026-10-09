@@ -4,8 +4,13 @@ Qui sta solo la logica: quanta esposizione tenere, che taglia ordinare, dove
 mettere lo stop, quando fermarsi. Niente rete, niente file, niente broker, cosi'
 e' testabile e ogni decisione e' riproducibile a tavolino.
 
-Il sistema non prevede niente: sta corto su uno strumento costruito per perdere
-valore e incassa quel decadimento. L'unica cosa che modula e' QUANTA esposizione
+Il sistema non prevede niente: incassa il decadimento degli strumenti che
+comprano protezione dalla volatilita'. Lo puo' fare in due modi equivalenti:
+stando CORTO su un ETF che perde valore (UVXY), oppure stando LUNGO su un ETF
+inverso che quel decadimento lo incassa per costruzione (SVXY). Il verso e' un
+parametro, perche' Capital quota gli ETF `LONG_ONLY` e la prima forma non e'
+eseguibile su questo broker (scoperto il 2026-10-09, dopo 14 ordini rifiutati
+in silenzio). L'unica cosa che modula e' QUANTA esposizione
 tenere, e lo fa su condizioni misurabili (pendenza della curva, livello del VIX,
 storia del conto), mai su una previsione di prezzo.
 
@@ -94,6 +99,8 @@ class Parametri:
     in produzione dal 2026-09-07 (esposizione fissa al 15%, tetto 25%)."""
 
     epic: str = "UVXY"
+    verso: str = "short"                # "short" (UVXY) oppure "long" (SVXY)
+    salto_catastrofe: float = 0.66      # il peggior giorno storico, in frazione
     capitale_default: float = 200.0
 
     # scala dell'esposizione, in frazione del capitale dichiarato
@@ -239,21 +246,60 @@ def serve_ribilancio(nozionale_attuale: float, nozionale_obiettivo: float,
     return abs(nozionale_attuale / nozionale_obiettivo - 1) > par.banda_ribilancio
 
 
+def segno_verso(verso: str) -> int:
+    """+1 se la posizione voluta e' lunga, -1 se corta."""
+    return 1 if (verso or "").strip().lower() == "long" else -1
+
+
+def verso_consentito(market_modes: list[str] | None, verso: str) -> bool:
+    """Il broker permette di aprire in questo verso?
+
+    Capital espone `marketModes` nello snapshot: gli ETF sono `LONG_ONLY`. Un
+    ordine SELL su uno di questi viene accettato (200, dealReference) e poi
+    rifiutato alla conferma: senza questo controllo il sistema ha creduto per
+    tre settimane di avere una posizione che non esisteva.
+    """
+    modi = {str(m).upper() for m in (market_modes or [])}
+    if segno_verso(verso) < 0 and "LONG_ONLY" in modi:
+        return False
+    if segno_verso(verso) > 0 and "SHORT_ONLY" in modi:
+        return False
+    return True
+
+
+def ordine_accettato(conferma: dict | None) -> bool:
+    """La conferma del broker dice che l'ordine e' stato eseguito?
+
+    Fail-closed: senza una conferma esplicita `ACCEPTED` l'ordine si considera
+    NON eseguito. Lo stato del sistema segue comunque la posizione letta dal
+    broker al run successivo, quindi un falso negativo si corregge da solo; un
+    falso positivo invece ha prodotto la posizione fantasma del 16/09.
+    """
+    if not conferma:
+        return False
+    return str(conferma.get("dealStatus") or "").upper() == "ACCEPTED"
+
+
 def livello_stop(prezzo: float, nozionale_target: float, par: Parametri) -> float | None:
-    """Stop di mercato sul broker per una posizione corta.
+    """Stop di mercato sul broker, dal lato giusto.
 
     Il controllo giornaliero non protegge dai salti notturni: il 5 febbraio 2018
-    questo strumento e' salito del 66% in una seduta. Il livello e' scelto perche'
-    la perdita corrisponda al limite in euro, con un tetto alla distanza.
+    UVXY e' salito del 66% in una seduta e il suo inverso ha perso l'83%. Il
+    livello e' scelto perche' la perdita corrisponda al limite in euro, con un
+    tetto alla distanza: sopra il prezzo se si e' corti, sotto se si e' lunghi.
     """
     if prezzo <= 0 or nozionale_target <= 0:
         return None
     distanza = min(par.stop_broker_max, par.stop_eur / nozionale_target)
-    return round(prezzo * (1 + distanza), 2)
+    # corto: la perdita arriva se il prezzo SALE, lo stop sta sopra; lungo: sotto
+    return round(prezzo * (1 - segno_verso(par.verso) * distanza), 2)
 
 
 def perdita_da_salto(nozionale: float, salto: float = 0.66) -> float:
-    """Quanto costa, in euro, uno strappo come quello del 5 febbraio 2018.
+    """Quanto costa, in euro, uno strappo come quello del 5 febbraio 2018
+    (66% per chi e' corto di UVXY; per chi e' lungo di SVXY il riferimento e'
+    `Parametri.salto_catastrofe`, 50%: il -0,5x ha perso il 46% nel marzo 2020
+    e il -1x che lo precedeva l'83% in quel singolo giorno del 2018).
 
     Serve a scrivere il numero nero su bianco ogni volta che l'esposizione sale:
     lo stop sul broker non protegge da un salto avvenuto a mercato chiuso.

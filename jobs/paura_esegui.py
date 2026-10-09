@@ -1,8 +1,10 @@
 """Vende assicurazione sulla volatilita': apre e mantiene la posizione.
 
-Cosa fa, in una riga: sta corto su uno strumento costruito per perdere valore
-(UVXY rinnova ogni giorno contratti a termine piu' cari di quelli che scadono,
--79,8% l'anno su quindici anni) e incassa quel decadimento.
+Cosa fa, in una riga: incassa il decadimento degli strumenti che comprano
+protezione dalla volatilita' (UVXY rinnova ogni giorno contratti a termine piu'
+cari di quelli che scadono, -79,8% l'anno su quindici anni). Dal 2026-10-09 lo
+fa comprando SVXY, l'ETF inverso: su Capital gli ETF sono LONG_ONLY e lo
+scoperto su UVXY non e' eseguibile (vedi config/volatilita.json).
 
 Non prevede niente. Il rendimento e' il premio di chi vende protezione: si
 guadagna poco quasi sempre e si perde molto raramente. Il 5 febbraio 2018 UVXY

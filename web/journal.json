@@ -1,5 +1,20 @@
 [
   {
+    "data": "2026-10-09",
+    "titolo": "L'assicurazione non era mai partita",
+    "testo": "Controllando i conti abbiamo scoperto che la vendita di protezione annunciata il 16 settembre non è mai avvenuta. Il broker non permette di vendere allo scoperto quello strumento: ogni giorno alle 16 il sistema mandava l'ordine, il broker lo accettava in apparenza e lo rifiutava subito dopo, e il programma non controllava la risposta. Quattordici ordini, quattordici rifiuti, nessuna posizione, nessun rischio corso e nessun guadagno. Il messaggio di partenza di settembre descriveva una cosa che non esisteva, e ce ne scusiamo. Da oggi il programma verifica l'esito di ogni ordine e avvisa quando viene rifiutato."
+  },
+  {
+    "data": "2026-10-09",
+    "titolo": "Si riparte con lo strumento che si può comprare",
+    "testo": "Lo stesso premio si può incassare in un altro modo: invece di vendere lo strumento che perde valore, si compra il suo opposto, costruito per guadagnare quando i mercati restano calmi. È l'unica forma che il broker permette. Costa di più, perché tenere una posizione comprata paga un interesse dell'8% l'anno, e questo si mangia circa due terzi del guadagno: sui dati dal 2018, al netto di quell'interesse, resta circa il 4% l'anno sulla somma impegnata, con cali del 46% nel marzo 2020. L'impegno resta il 15% del capitale con un tetto al 25%, il blocco a 15 euro di perdita resta, e il giudizio è fissato per il 7 gennaio 2027: se in mercati tranquilli non avrà reso niente, si spegne."
+  },
+  {
+    "data": "2026-10-09",
+    "titolo": "Un mese di stasi, misurato",
+    "testo": "Dopo trentatré giorni il conto vale 197,74 euro: meno due euro e mezzo. Non è quasi un guadagno né quasi una perdita, è zero: la variazione media giornaliera è lo 0,7% della sua oscillazione tipica. Il motivo è strutturale. Il sistema compra una quota minima quando il prezzo scende sotto la sua media e la rivende quando risale: in 21.000 decisioni non ha mai venduto allo scoperto e non ha mai aggiunto una seconda quota, perché i prezzi non si allontanano mai abbastanza dalla media. Le piccole vincite (quattro su cinque) e le perdite più grandi (una su cinque) si annullano al centesimo, e a restare è il costo di tenere le posizioni di notte, circa un euro al mese. Ci siamo chiesti se aumentare le taglie farebbe prendere una direzione: no, moltiplicherebbe solo le oscillazioni, e con lo stop attuale la direzione più probabile sarebbe quella dello stop. Le taglie restano quelle. L'unica modifica è togliere Hong Kong, lo strumento con il costo di scambio dieci volte più alto degli altri e il risultato peggiore: da oggi gli indici sono sette."
+  },
+  {
     "data": "2026-09-07",
     "titolo": "Da domani vendiamo assicurazione invece di prevedere",
     "testo": "Tutte le prove fatte finora cercavano di indovinare dove sarebbe andato un prezzo, e nessuna ci è riuscita. Da domani il conto prova una cosa diversa, che non richiede di indovinare niente. Esistono strumenti costruiti per perdere valore nel tempo: servono a proteggersi dai crolli e, come le assicurazioni, costano a chi le compra. Uno di questi ha perso in media l'80% all'anno negli ultimi quindici anni. Noi ci mettiamo dall'altra parte, quella di chi la protezione la vende e incassa il premio. Il rovescio della medaglia è preciso: si guadagna poco quasi sempre e si perde molto di rado, perché quando i mercati crollano quello strumento schizza in alto (il 5 febbraio 2018 è salito del 66% in una sola giornata). Per questo l'impegno è limitato al 15% del capitale, c'è un blocco automatico se la perdita supera i 15 euro, e dopo un blocco si resta fermi cinque giorni."

@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 CACHE = Path(__file__).resolve().parent.parent / "data" / "cache" / "yahoo"
-SPREAD = {"UVXY": 0.741, "VIXM": 0.681, "UVIX": 0.343}
+SPREAD = {"UVXY": 0.741, "VIXM": 0.681, "UVIX": 0.343, "SVXY": 0.29}
 FIN_SHORT_GG = 0.23 / 365
 
 
