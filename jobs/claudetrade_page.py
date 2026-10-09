@@ -129,7 +129,24 @@ def dati(capital, env: str = "demo") -> dict:
             "regole": {"capitale": cap, "max_unita": 2, "passo": 0.03,
                        "ema_giorni": 5, "cadenza_minuti": 30,
                        "strumenti": paniere(capital)},
+            "scalata": scalata_per_pagina(),
             "giorni": st.get("giorni", [])}
+
+
+def scalata_per_pagina() -> dict:
+    """Lo stato della scala (jobs/scalata.py) come lo racconta la pagina: senza
+    file lo si dice, invece di fingere un gradino zero."""
+    from src.scalata import Regole, leggi as leggi_scalata
+
+    r = Regole()
+    st = leggi_scalata("demo")
+    fuori = {"passo_eur": r.passo_eur, "max_gradini": r.max_gradini,
+             "slot": list(r.slot), "misurata": bool(st)}
+    if not st:
+        return fuori
+    fuori.update({k: st.get(k) for k in ("aggiornato", "gradino", "profitto_netto",
+                                         "mancano", "contributi", "extra", "storia")})
+    return fuori
 
 
 def main() -> int:

@@ -199,6 +199,18 @@ def main() -> int:
         n = int((budget / max_unita) / marg_min)
         unit_size = round(max(meta["min_size"], n * meta["min_size"]), 8)
 
+    # La scala (2026-10-09, solo conto di prova): la taglia di una unita' puo'
+    # essere un multiplo della minima, deciso da jobs/scalata.py sui soldi
+    # incassati dall'avvio. File assente o rotto = 1, mai di piu'. Il resto del
+    # grid non cambia: gradini, kill e stop lavorano sulla stessa unita' piu' grande.
+    moltiplicatore = 1
+    if v1.capital_env == "demo":
+        from src.scalata import moltiplicatore as _molt
+        moltiplicatore = max(1, _molt(epic, "demo"))
+        if moltiplicatore > 1:
+            unit_size = round(unit_size * moltiplicatore, 8)
+            log.info("scala: %s a taglia x%d (%s)", epic, moltiplicatore, unit_size)
+
     # posizione NETTA sul broker (long positiva, short negativa)
     netta = 0.0
     pnl = 0.0
@@ -388,7 +400,7 @@ def main() -> int:
         print(f"  prezzo {prezzo:.4f} | ancoraggio {p0:.4f} | passo {step:.2%} | "
               f"isteresi {'si' if isteresi else 'no'} | EMA {'chiusa' if ema_chiusa else 'con barra corrente'}")
         print(f"  unita': {unit_size} = {unit_size*prezzo*q2r:.2f}€ nozionale, "
-              f"max {max_unita} | budget {budget:.0f}€")
+              f"max {max_unita} | budget {budget:.0f}€ | scala x{moltiplicatore}")
         print(f"  posizione netta: {unita_correnti:+.1f} unita' -> target "
               f"{piano.unita_target:+d} | azione: {piano.azione}")
         print(f"  equity {equity:.2f}€ | P&L aperto {pnl:+.2f}€ | "

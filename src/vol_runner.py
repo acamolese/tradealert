@@ -115,6 +115,15 @@ def _mercato(cap: Any, epic: str) -> dict[str, Any] | None:
 
 # --- messaggi -------------------------------------------------------------
 
+def quote_extra(epic: str) -> int:
+    """Quote in piu' decise dalla scala per questo strumento. 0 se non si sa."""
+    try:
+        from src.scalata import extra_per
+        return max(0, int(extra_per(epic, "demo")))
+    except Exception:
+        return 0
+
+
 def _spiega_gradino(g: Gradino, capitale: float, par: Parametri) -> str:
     noz = capitale * g.frazione
     if g.frazione <= 0:
@@ -227,14 +236,24 @@ def esegui(argv: list[str] | None = None) -> int:
                         risultato_eur=pnl)
         return 0
 
+    # Il gradino dice la frazione, le quote sono intere: si ragiona in quote.
+    # La scala (src/scalata.py, 2026-10-09) puo' aggiungere quote comprate con i
+    # soldi incassati dal conto: valgono solo se il gradino e' sopra zero (la
+    # ritirata resta ritirata) e alzano il tetto della stessa misura.
     obiettivo = capitale * gradino.frazione
-    massimo = capitale * par.tetto
-    if noz_attuale > massimo:
-        log.warning("esposizione %.2f€ oltre il tetto %.2f€: riduco", noz_attuale, massimo)
-        obiettivo = min(obiettivo, massimo)
+    unita_base = unita_target(obiettivo, mk["noz_unita"])
+    extra = quote_extra(par.epic) if unita_base > 0 else 0
+    unita_tetto = max(1, round(capitale * par.tetto / mk["noz_unita"])) + extra
+    unita = min(unita_base + extra, unita_tetto)
+    obiettivo = unita * mk["noz_unita"]
+    massimo = unita_tetto * mk["noz_unita"]
+    if noz_attuale > massimo * 1.01:
+        log.warning("esposizione %.2f€ oltre il tetto %.2f€ (%d quote): riduco",
+                    noz_attuale, massimo, unita_tetto)
     elif not serve_ribilancio(noz_attuale, obiettivo, size, par):
-        log.info("%s: esposizione %.2f€ in linea con l'obiettivo %.2f€ (gradino %s), "
-                 "non tocco", par.epic, noz_attuale, obiettivo, gradino.nome)
+        log.info("%s: esposizione %.2f€ in linea con l'obiettivo %.2f€ (gradino %s, "
+                 "%d quote di cui %d dalla scala), non tocco", par.epic, noz_attuale,
+                 obiettivo, gradino.nome, unita, extra)
         store.decisione(epic=par.epic, gradino=gradino, azione="nessuna", eseguito=False,
                         segnale=segnale, conto=conto, capitale=capitale,
                         nozionale_attuale=noz_attuale, nozionale_target=obiettivo,
@@ -242,7 +261,6 @@ def esegui(argv: list[str] | None = None) -> int:
         _ricorda_gradino(st, gradino)
         return 0
 
-    unita = unita_target(obiettivo, mk["noz_unita"])
     size_target = segno_verso(par.verso) * unita * mk["meta"]["min_size"]
     delta = size_target - size
     if abs(delta) < mk["meta"]["min_size"] / 2:
@@ -405,6 +423,9 @@ def _stampa_stato(par: Parametri, mk: dict, size: float, pnl: float,
     print(f"mercato:   {vol_segnale.racconta(segnale)}")
     print(f"gradino:   {gradino.nome} -> {eur(capitale * gradino.frazione)} "
           f"({gradino.frazione:.0%} di {eur(capitale)})")
+    ex = quote_extra(par.epic)
+    if ex:
+        print(f"scala:     +{ex} quote dalla scala ({eur(ex * mk['noz_unita'])})")
     for m in gradino.motivi:
         print(f"           · {m}")
     if st.get("in_pausa_fino"):

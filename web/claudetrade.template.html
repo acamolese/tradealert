@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="ClaudeTrade: un conto da 200 euro gestito da un grid bidirezionale su sette indici. Valore, posizioni e registro giornaliero.">
+<meta name="description" content="ClaudeTrade: un conto da 200 euro con un grid su sette indici e un'assicurazione sulla volatilità, che alza la taglia solo con i soldi vinti. Valore, posizioni e registro giornaliero.">
 <meta name="robots" content="noindex">
 <link rel="canonical" href="https://claudetrade.eu/">
 <style>
@@ -131,6 +131,10 @@ th+th, td+td{padding-left:18px}
 .marker{position:absolute; top:12px; width:3px; height:18px; border-radius:2px; background:var(--accent)}
 .scala .cap{position:absolute; top:30px; font:400 11px/1 "IBM Plex Mono", monospace; color:var(--faint)}
 .scala .cap.sx{left:0} .scala .cap.dx{right:0} .scala .cap.mid{left:50%; transform:translateX(-50%)}
+.scala-box{background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:20px 22px; display:flex; flex-direction:column; gap:16px}
+.gradini{display:flex; gap:6px; align-items:flex-end; height:44px}
+.gradini span{flex:1; border:1px solid var(--line-strong); border-radius:3px; background:var(--panel-2); min-width:0}
+.gradini span.pieno{background:var(--pos); border-color:var(--pos)}
 .kv{display:flex; flex-direction:column; gap:9px; font-size:14px}
 .kv div{display:flex; justify-content:space-between; gap:16px; align-items:baseline}
 .kv span:last-child{font-variant-numeric:tabular-nums; font-weight:500}
@@ -191,10 +195,11 @@ footer code{font-family:"IBM Plex Mono", monospace; font-size:12.5px; color:var(
 
   <header class="head">
     <div>
-      <div class="eyebrow">Grid bidirezionale · sette indici</div>
+      <div class="eyebrow">Grid su sette indici · assicurazione sulla volatilità · scala</div>
       <h1>ClaudeTrade</h1>
       <p class="sub">Un conto da 200 euro che compra quando il prezzo scende sotto la sua media
-        e vende quando risale, sempre alla taglia più piccola che il broker accetta.
+        e vende quando risale, e che incassa il premio di chi si assicura contro i crolli.
+        Parte dalla taglia più piccola che il broker accetta e la alza solo con i soldi vinti.
         Questa pagina lo segue giorno per giorno: quanto vale, cosa ha in mano, quanto rischia.</p>
     </div>
     <div class="testa-stato">
@@ -273,6 +278,32 @@ footer code{font-family:"IBM Plex Mono", monospace; font-size:12.5px; color:var(
     </section>
   </div>
 
+  <section id="sez-scala">
+    <div class="sec-head">
+      <h2>La scala</h2>
+      <span class="hint" id="hint-scala">si sale solo con i soldi vinti</span>
+    </div>
+    <div class="scala-box">
+      <div class="gradini" id="gradini" aria-label="Gradini della scala"></div>
+      <div class="kv">
+        <div><span class="k">Gradino</span><span id="s-gradino">—</span></div>
+        <div><span class="k">Incassato dall'avvio</span><span id="s-incassato">—</span></div>
+        <div><span class="k">Prossimo gradino</span><span id="s-prossimo">—</span></div>
+        <div><span class="k">Ultimo cambio</span><span id="s-cambio">—</span></div>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin:0" id="s-spiega">
+        Ogni 5 € di profitto incassato (operazioni chiuse, costi notturni e dividendi, letti dal
+        broker) vale un gradino: una taglia minima in più su uno strumento, scelto fra quelli che
+        hanno reso di più. Si sale solo il lunedì, si scende qualunque giorno. Gli stop non cambiano.</p>
+    </div>
+    <div class="tab-scroll" style="margin-top:6px">
+      <table>
+        <thead><tr><th>Strumento</th><th>Ha reso</th><th>Taglia</th></tr></thead>
+        <tbody id="tb-scala"><tr><td colspan="3" style="color:var(--muted);text-align:left">La prima misura arriva la sera del primo giorno feriale.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
   <section>
     <div class="sec-head">
       <h2>Come è costruito</h2>
@@ -280,8 +311,8 @@ footer code{font-family:"IBM Plex Mono", monospace; font-size:12.5px; color:var(
     </div>
     <dl class="regole" id="regole">
       <div class="regola"><dt>Capitale</dt><dd>200,00 €</dd><dd class="why">tutto quello che c'è sul conto</dd></div>
-      <div class="regola"><dt>Strumenti</dt><dd>8 indici e oro</dd><dd class="why">nessuna cripto, spread troppo largo</dd></div>
-      <div class="regola"><dt>Gradini per verso</dt><dd>2</dd><dd class="why">da −2 a +2 taglie minime</dd></div>
+      <div class="regola"><dt>Strumenti</dt><dd>6 indici, oro e SVXY</dd><dd class="why">nessuna cripto, spread troppo largo</dd></div>
+      <div class="regola"><dt>Gradini per verso</dt><dd>2</dd><dd class="why">da −2 a +2 unità; l'unità cresce con la scala</dd></div>
       <div class="regola"><dt>Controllo</dt><dd>ogni 30 minuti</dd><dd class="why">misurato meglio di 5 e 15</dd></div>
       <div class="regola"><dt>Esposizione massima</dt><dd id="r-esposizione">644 €</dd><dd class="why">3,2 volte il capitale</dd></div>
       <div class="regola"><dt>Margine massimo</dt><dd id="r-margine">37 €</dd><dd class="why">18% del capitale</dd></div>
@@ -336,7 +367,8 @@ footer code{font-family:"IBM Plex Mono", monospace; font-size:12.5px; color:var(
   "use strict";
 
   var NOMI = {US100:"Nasdaq", US30:"Dow Jones", US500:"S&P 500", DE40:"DAX",
-              NL25:"AEX Olanda", J225:"Nikkei", HK50:"Hang Seng", GOLD:"Oro"};
+              NL25:"AEX Olanda", J225:"Nikkei", HK50:"Hang Seng", GOLD:"Oro",
+              SVXY:"Assicurazione (SVXY)"};
   var $ = function(id){ return document.getElementById(id); };
 
   function eur(x, segno){
@@ -541,6 +573,67 @@ footer code{font-family:"IBM Plex Mono", monospace; font-size:12.5px; color:var(
     $("sez-diario").hidden = false;
   }
 
+  // --------------------------------------------------------------- scala
+  function rendiScala(sc){
+    if (!sc) return;
+    var max = sc.max_gradini || 8, g = sc.gradino || 0;
+    var box = $("gradini");
+    svuota(box);
+    for (var i = 0; i < max; i++){
+      var sp = document.createElement("span");
+      var h = 30 + Math.round(70 * (i + 1) / max);
+      sp.style.height = h + "%";
+      if (i < g) sp.className = "pieno";
+      sp.title = "gradino " + (i + 1) + ": " + eur(sc.passo_eur * (i + 1));
+      box.appendChild(sp);
+    }
+    $("hint-scala").textContent = "gradino " + g + " di " + max;
+    if (!sc.misurata){
+      $("s-gradino").textContent = "0 di " + max;
+      $("s-incassato").textContent = "non ancora misurato";
+      $("s-prossimo").textContent = "a " + eur(sc.passo_eur) + " di profitto";
+      $("s-cambio").textContent = "—";
+      return;
+    }
+    $("s-gradino").textContent = g + " di " + max;
+    $("s-incassato").textContent = eur(sc.profitto_netto, true);
+    $("s-incassato").className = segnoClasse(sc.profitto_netto);
+    $("s-prossimo").textContent = g >= max ? "scala piena"
+      : "ancora " + eur(sc.mancano) + " di profitto";
+    var st = sc.storia || [];
+    if (st.length){
+      var u = st[st.length - 1];
+      var d = new Date(u.quando);
+      $("s-cambio").textContent = (isNaN(d) ? String(u.quando).slice(0, 10)
+        : d.toLocaleDateString("it-IT", {day:"numeric", month:"long"}))
+        + ": da " + u.da + " a " + u.a;
+    }
+    var tb = $("tb-scala");
+    var contributi = sc.contributi || {}, extra = sc.extra || {};
+    var righe = (sc.slot || []).map(function(e){
+      return {epic:e, reso:contributi[e], extra:extra[e] || 0};
+    }).filter(function(r){ return r.reso !== undefined || r.extra; });
+    if (!righe.length){
+      messaggio(tb, 3, "Nessuno strumento ha ancora chiuso un'operazione.");
+      return;
+    }
+    righe.sort(function(a, b){ return (b.reso || 0) - (a.reso || 0); });
+    svuota(tb);
+    righe.forEach(function(r){
+      var tr = document.createElement("tr");
+      var td1 = document.createElement("td");
+      var b = document.createElement("span");
+      b.className = "strum"; b.textContent = nome(r.epic);
+      var e = document.createElement("span");
+      e.className = "epic"; e.textContent = r.epic;
+      td1.appendChild(b); td1.appendChild(e);
+      tr.appendChild(td1);
+      tr.appendChild(cella(r.reso === undefined ? "—" : eur(r.reso, true), segnoClasse(r.reso || 0)));
+      tr.appendChild(cella(r.extra ? "×" + (1 + r.extra) + " (una in più)" : "minima"));
+      tb.appendChild(tr);
+    });
+  }
+
   // ------------------------------------------------------------- paniere
   function rendiRegole(r){
     var tb = $("tb-strumenti");
@@ -695,6 +788,7 @@ footer code{font-family:"IBM Plex Mono", monospace; font-size:12.5px; color:var(
   var capitale = (D.stato && D.stato.capitale) || 200;
   try { if (D.stato) rendiStato(D.stato); } catch (e){ console.error("stato", e); }
   try { if (D.regole) rendiRegole(D.regole); } catch (e){ console.error("regole", e); }
+  try { rendiScala(D.scalata); } catch (e){ console.error("scala", e); }
   try { if (D.giorni && D.giorni.length) rendiGiorni(D.giorni, capitale); }
   catch (e){ console.error("giorni", e); }
   try { rendiDiario(D.diario); } catch (e){ console.error("diario", e); }

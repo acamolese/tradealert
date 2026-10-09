@@ -28,10 +28,18 @@ TRADEALERT_HOME=/home/ubuntu/tradealert
 # domenica non parte: c'e' gia' la chiusura di giornata delle 22:30.
 30 22 * * 1-5        cd $TRADEALERT_HOME && python -m jobs.grid_esercizio --report >> logs/g2_esercizio.log 2>&1
 
+# La scala (dal 2026-10-09): la taglia segue i soldi incassati, letti dal broker.
+# Ogni sera feriale puo' solo scendere; il lunedi' mattina puo' anche salire e
+# manda il punto della settimana. Stato in data/scalata_demo.json, letto dai grid
+# di prova e dall'assicurazione. Pre-registrazione: docs/scalata-2026-10-09.md
+40 22 * * 1-5        cd $TRADEALERT_HOME && python -m jobs.scalata >> logs/scalata.log 2>&1
+50 7 * * 1           cd $TRADEALERT_HOME && python -m jobs.scalata --sali >> logs/scalata.log 2>&1
+
 
 # ---------- Assicurazione sulla volatilita' (conto di prova) ----------
-# Sta corto su UVXY, che perde valore per costruzione (-79,8%/anno su 15 anni).
-# Non prevede niente: incassa il premio di chi vende protezione. Gira una volta
+# Dal 2026-10-09 compra SVXY (inverso -0,5x: UVXY e' LONG_ONLY su Capital).
+# Non prevede niente: incassa il premio di chi compra protezione. Negoziabile
+# 15:30-22:00 ora italiana. Gira una volta
 # al giorno a mercato USA aperto; a mercato chiuso il job esce da solo.
 # Cinque minuti prima: registra il segnale e cosa avrebbero fatto le tre
 # politiche di esposizione (fissa, scala, spinta). Non esegue nulla.

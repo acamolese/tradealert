@@ -101,6 +101,14 @@ gate in `gate-esposizione-volatilita.md` le rivedrà.
 6. **Tetto**: nessun gradino può superarlo, nemmeno per un errore di
    configurazione (il loader riporta dentro i valori e lo scrive nel log).
 
+## La scala (dal 2026-10-09)
+
+Le quote di SVXY sono intere: il gradino della curva ne dà la base (una, con
+200 € e una quota da ~55 €), la scala di `src/scalata.py` ne aggiunge fino a
+una quando il conto ha incassato abbastanza, e il tetto sale della stessa
+misura. In ritirata o in pausa la scala non aggiunge niente. Regole e numeri in
+`scalata-2026-10-09.md`.
+
 ## Cosa viene registrato
 
 Schema `vol` su Supabase (migration `20260912150000_vol_schema.sql`, applicata il 2026-10-09; lo schema va anche esposto a PostgREST con `alter role authenticator set pgrst.db_schemas` e un `notify pgrst, 'reload schema'`, altrimenti l'API risponde PGRST106/PGRST205):
