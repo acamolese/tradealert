@@ -44,10 +44,12 @@ TRADEALERT_HOME=/home/ubuntu/tradealert
 # Cinque minuti prima: registra il segnale e cosa avrebbero fatto le tre
 # politiche di esposizione (fissa, scala, spinta). Non esegue nulla.
 55 15 * * 1-5        cd $TRADEALERT_HOME && python -m jobs.vol_shadow >> logs/paura.log 2>&1
-# Tre tentativi al giorno (dal 2026-10-09): il broker ha dato gli ETF sulla
-# volatilita' CHIUSI alle 16:00 per giorni interi, dentro l'orario dichiarato.
+# Tre tentativi al giorno (dal 2026-10-09): il broker apre gli ETF sulla
+# volatilita' qualche secondo DOPO le 16:00 (alle 16:00:04 CLOSED, alle 16:03
+# TRADEABLE), per cui il giro alle 16:00 in punto li trovava chiusi per giorni.
+# Primo tentativo alle 16:05; gli altri due coprono un'apertura in ritardo.
 # Il job e' idempotente: se e' gia' in linea non tocca nulla e non scrive.
-0 16,18,20 * * 1-5   cd $TRADEALERT_HOME && python -m jobs.paura_esegui >> logs/paura.log 2>&1
+5 16,18,20 * * 1-5   cd $TRADEALERT_HOME && python -m jobs.paura_esegui >> logs/paura.log 2>&1
 
 # ---------- Pagina pubblica di ClaudeTrade ----------
 # File statico rigenerato con i dati dentro e servito da nginx sulla porta 80.
