@@ -168,6 +168,8 @@ L'utente ha chiesto di procedere. Fatto:
 - stato locale `data/paura.json` azzerato, correzione pubblicata su Telegram e
   nel diario di claudetrade.eu.
 
-Resta pendente la migration dello schema `vol` su Supabase (serve la password
-del database): finché manca, decisioni e shadow non vengono registrati, ma il
-sistema opera lo stesso e lo scrive nel log.
+La migration dello schema `vol` è stata applicata lo stesso giorno (psql sul
+pooler) e lo schema esposto a PostgREST: su Supabase i nuovi schemi non sono
+visibili all'API finché non compaiono in `pgrst.db_schemas` del ruolo
+`authenticator`, e dopo ogni DDL serve `notify pgrst, 'reload schema'`. La
+prima riga di misura in ombra è del 9 ottobre.

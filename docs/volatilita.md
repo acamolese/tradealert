@@ -103,7 +103,7 @@ gate in `gate-esposizione-volatilita.md` le rivedrà.
 
 ## Cosa viene registrato
 
-Schema `vol` su Supabase (migration `20260912150000_vol_schema.sql`):
+Schema `vol` su Supabase (migration `20260912150000_vol_schema.sql`, applicata il 2026-10-09; lo schema va anche esposto a PostgREST con `alter role authenticator set pgrst.db_schemas` e un `notify pgrst, 'reload schema'`, altrimenti l'API risponde PGRST106/PGRST205):
 
 - `vol.decisione`: una riga per ogni run, **anche quando il sistema non fa
   nulla**, con `features_at_decision` (VIX, VIXM, pendenza, percentile, stato
